@@ -2,7 +2,13 @@
 
 Pacote de contexto e prompts para construir nosso cliente WYD no navegador, integrado ao servidor Go [Jean1dev/w2pp-OpenWYD](https://github.com/Jean1dev/w2pp-OpenWYD).
 
-Estado em **28/09/2026**: auditoria em andamento e continuidade do OpenWyd escolhida. O runtime do Alan já compilou/linkou localmente em WASM; ainda não há cliente adaptado, cena validada ou gateway implementado. Veja [progresso](docs/PROGRESS.md), [setup reproduzível](docs/setup.md) e [evidências](docs/evidence/01-auditoria/README.md).
+Estado em **28/09/2026**: auditoria em andamento e continuidade do OpenWyd escolhida. O runtime do Alan compila e linka localmente em WASM e já renderiza cenas reais no navegador — Field e seleção de servidor — sobre os assets locais do operador, com mouse e teclado. Ainda não há protocolo, gateway, login nem gameplay. Veja [progresso](docs/PROGRESS.md), [setup reproduzível](docs/setup.md) e evidências de [auditoria](docs/evidence/01-auditoria/README.md) e [cena](docs/evidence/02-build/README.md).
+
+Verificação local da cena, com o dataset já importado:
+
+```
+npm run scene
+```
 
 ## Começar
 

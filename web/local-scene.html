@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' blob:; media-src 'self' blob:; style-src 'self'; object-src 'none'; base-uri 'none'">
+<title>WYD — cena local</title>
+<link rel="stylesheet" href="local-scene.css">
+<h1>WYD — cena local</h1>
+<p id="status">Carregando assets locais…</p>
+<canvas id="canvas" width="800" height="600" tabindex="0" aria-label="Cena original WYD"></canvas>
+<p id="identity">Identificando a cena…</p>
+<p>Validação visual offline com assets locais. Login e conexão ao servidor ainda
+não estão habilitados. Use <code>?state=7</code> para a seleção de servidor.</p>
+<script src="local-scene.js"></script>
+<script src="openwyd_assets.js"></script>
+<script src="runtime.js"></script>
+</html>

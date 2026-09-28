@@ -1,0 +1,12 @@
+{
+  "name": "openwyd-local-verification",
+  "private": true,
+  "version": "0.0.0",
+  "devDependencies": {
+    "playwright": "1.54.2"
+  },
+  "scripts": {
+    "scene": "python tools/build_local_scene.py --page-only && node tools/verify_local_scene.mjs",
+    "scene:package": "python tools/build_local_scene.py && node tools/verify_local_scene.mjs"
+  }
+}

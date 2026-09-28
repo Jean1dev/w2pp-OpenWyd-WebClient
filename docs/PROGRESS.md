@@ -1,11 +1,11 @@
 # Progresso
 
-Atualização: 28/09/2026. Auditoria iniciada; runtime original do Alan compilado e linkado localmente em WASM. Ainda não há cliente adaptado, cena no navegador ou teste de gameplay.
+Atualização: 28/09/2026. Auditoria em andamento; runtime original do Alan compilado, linkado e agora renderizando cenas reais no navegador sobre os assets do operador, em página própria e sem servidor. Ainda não há protocolo, login ou teste de gameplay.
 
 | Etapa | Estado | Evidência |
 |---|---|---|
 | 1 Auditoria | Em andamento | [Fontes, layouts, build e assets](evidence/01-auditoria/README.md) |
-| 2 Build e cena | Pendente | — |
+| 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Pendente | — |
 | 4 Login e mundo | Pendente | — |
 | 5 Gameplay | Pendente | — |
@@ -15,7 +15,12 @@ Atualização: 28/09/2026. Auditoria iniciada; runtime original do Alan compilad
 
 ## Próxima ação
 
-Concluir `prompts/01-auditoria.md`: revisar os consumidores ainda assinalados na [matriz](compatibility.md), especialmente caudas e respostas auxiliares; fechar o mapeamento dos assets7662 para o runtime do Alan. A rota de continuidade está escolhida no [ADR001](decisions/001-client-architecture.md). O build de código já passou; a próxima prova de runtime exige loaders corretos para ItemList/SkillData e atlas/fontes locais válidos. Só então avançar à cena real da etapa2. Não seguir diretamente para login/UI.
+Duas frentes independentes, nesta ordem de valor:
+
+1. Etapa 3 (`prompts/03-protocolo.md`): o cliente já roda e aceita entrada, mas nada fala com o servidor. É o próximo passo que destrava login e mundo real. Requer o gateway de destinos configurados e vetores de handshake/framing independentes do próprio encoder.
+2. Fechar a etapa 1: revisar os consumidores ainda assinalados na [matriz](compatibility.md), especialmente caudas e respostas auxiliares.
+
+A lacuna de conteúdo de terreno ([known-asset-gaps.json](evidence/02-build/known-asset-gaps.json)) é dependência externa do operador, não trabalho de código: o cliente 7662 fornecido não contém os níveis de textura que o runtime 769 abre. Decidir entre obter os arquivos, fixar o runtime em um nível disponível ou aceitar a degradação — nenhuma substituição local reproduz o asset.
 
 ## Registro por sessão
 
@@ -35,5 +40,14 @@ Concluir `prompts/01-auditoria.md`: revisar os consumidores ainda assinalados na
 - Solicitação do usuário: commit, push e PR da entrega acima, na branch `Jean1dev/start`, com destino a `main`.
 - Revisados os arquivos próprios e a proveniência dos metadados; assets, executáveis, toolchains, checkouts externos e manifesto completo de assets permanecem ignorados.
 - Verificações de entrega: revisão do diff, `git diff --check`, inspeção dos arquivos novos e conferência dos resultados registrados. Não foram repetidos build ou testes de gameplay; a etapa 1 continua Em andamento.
+
+### 28/09/2026 — primeira cena real no navegador
+
+- **Solicitação do usuário:** seguir para a cena local com os assets e depois para a integração com o servidor.
+- **Entregas próprias:** página `web/local-scene.*` com ordem de boot correta, entrada de mouse/teclado ligada ao runtime e identificação lida do próprio cliente; smoke test `tools/verify_local_scene.mjs` que sobe o próprio servidor estático e reprova falha de runtime, asset ausente, erro WebGL, cena substituta e entrada não entregue; importação da música transmitida sob demanda em `tools/import_local_assets.py` (13 faixas, 26.272.662 bytes); `npm run scene`. Nenhuma alteração no upstream nem no servidor.
+- **Confirmado em execução:** Field (mapa 16,16, `OpenWYD` em 2096,5/2092,5, HP 320/320) e Select Server renderizam em WebGL2 com 121 quadros, zero erros GL, zero erros de página e zero requisições falhas. Clique moveu a rota para 2094,5/2090,5; teclado e consulta de terreno responderam.
+- **Causa encontrada:** a cena distorcida anterior vinha do relógio falso, não de renderização ou asset — o harness upstream reproduz a mesma imagem com `?tickMs=16`. A página passou a usar o relógio do navegador.
+- **Limitações:** cena Field é a fixture offline do runtime, não mapa do servidor; terreno sem textura por lacuna de conteúdo do cliente 7662 (16 caminhos observados, nada fabricado); só Chromium headless, ~1 quadro/s por rasterização em software; nenhum login, gateway ou multiplayer. Etapa 2 fica Em andamento, não Validada.
+- **Próximo passo:** etapa 3, protocolo e gateway.
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.
