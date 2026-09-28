@@ -1,0 +1,12 @@
+# Dependências, builds e dados locais; os diretórios definitivos serão definidos na auditoria.
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+build/
+.cache/
+.emscripten_cache/
+assets-local/
+external/
+*.log

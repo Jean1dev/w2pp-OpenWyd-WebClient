@@ -1,0 +1,5 @@
+* text=auto
+*.md text eol=lf
+*.json text eol=lf
+# Preserve snapshot bytes so manifest hashes remain valid across platforms.
+reference/server/*.md -text

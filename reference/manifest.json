@@ -1,0 +1,35 @@
+{
+  "captured_at": "2026-09-28",
+  "source_repository": "https://github.com/Jean1dev/w2pp-OpenWYD",
+  "files": [
+    {
+      "file": "reference/server/data-formats.md",
+      "source_path": "docs/migration/data-formats.md",
+      "source_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc",
+      "sha256": "f357da8e28493a82948ce96e234a43eb6eca588791ef56c14d1a0ef117c63636",
+      "source_sha256": "511720eed7272356c1baabb0dbe708dc63f099fbb262dc66361f16583a0f94d3"
+    },
+    {
+      "file": "reference/server/flows.md",
+      "source_path": "docs/migration/flows.md",
+      "source_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc",
+      "sha256": "f61a028d5216af6f31fd59b71100acc9bdc3d007a9302524d683513bdcab53e6",
+      "source_sha256": "dd57038235a2931c792e59e8c93c579f3c289d0fe1fe5707260e83d1647f4365"
+    },
+    {
+      "file": "reference/server/openwyd-client-feasibility.md",
+      "source_path": "docs/migration/openwyd-client-feasibility.md",
+      "source_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc",
+      "sha256": "eebab65d833bccc0556a42cfd5af7765b6ae1e5871bb5f766542dab8ba887a4a",
+      "source_sha256": "986285baa86ae170ff3b519f501dd9a1a20f3487a30d410b59fb0aa6de4a3904"
+    },
+    {
+      "file": "reference/server/protocol-spec.md",
+      "source_path": "docs/migration/protocol-spec.md",
+      "source_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc",
+      "sha256": "3f8b84dcb1ad17cd56bbcd68d4d5d2b3f099d0a96bc78b4e0f411d27cc7cdfa2",
+      "source_sha256": "d61000121565faa934d0221b6f3f038fb6b0753f016f42ef8d83dafbf2369b1e"
+    }
+  ],
+  "normalization": "Snapshots converted to UTF-8 LF; trailing line whitespace removed. source_sha256 records original checkout bytes."
+}
