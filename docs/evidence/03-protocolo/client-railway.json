@@ -1,0 +1,132 @@
+{
+ "mode": "server",
+ "ok": true,
+ "checks": {
+  "loginCalled": true,
+  "reachedSelectChar": true,
+  "noFixture": true,
+  "socketOpen": true,
+  "noPageErrors": true,
+  "noGlErrors": true,
+  "noSizeOrRangeDrops": true,
+  "accountLoginTranslated": true,
+  "cnfTranslated": true,
+  "selcharPopulated": true
+ },
+ "when": "2026-09-28T19:12:50.306Z",
+ "loginReturn": 1,
+ "selchar": {
+  "count": 0,
+  "slotsFilled": [
+   false,
+   false,
+   false,
+   false
+  ]
+ },
+ "pageErrors": [],
+ "consoleErrors": [],
+ "gatewayLog": [
+  {
+   "msg": "gateway listening"
+  },
+  {
+   "msg": "relay open",
+   "channel": "server"
+  },
+  {
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 132,
+   "bytes_down": 2008,
+   "channel": "server"
+  }
+ ],
+ "before": {
+  "state": 7,
+  "stateName": "Select Server",
+  "clientVersion": 12000,
+  "socket": {
+   "connectResult": 0,
+   "lastError": 0,
+   "bytesSent": 0,
+   "bytesReceived": 0,
+   "lastSentOpcode": 0,
+   "lastRecvOpcode": 0
+  },
+  "dialect": {
+   "inPass": 0,
+   "inTranslated": 0,
+   "inDropUnknown": 0,
+   "inDropSize": 0,
+   "inDropRange": 0,
+   "outPass": 0,
+   "outTranslated": 0,
+   "outDropUnknown": 0,
+   "outDropSize": 0,
+   "outDropRange": 0,
+   "outDropNoVersion": 0,
+   "fieldZeroed": 0,
+   "cargoHidden": 0,
+   "unmappedNonZero": 0,
+   "inboundFrames": 0,
+   "inboundHash": "811c9dc5",
+   "droppedIn": [],
+   "droppedOut": []
+  }
+ },
+ "after": {
+  "state": 5,
+  "stateName": "Select Character",
+  "clientVersion": 12000,
+  "socket": {
+   "connectResult": 1,
+   "lastError": 0,
+   "bytesSent": 132,
+   "bytesReceived": 2008,
+   "lastSentOpcode": 928,
+   "lastRecvOpcode": 266
+  },
+  "dialect": {
+   "inPass": 0,
+   "inTranslated": 1,
+   "inDropUnknown": 0,
+   "inDropSize": 0,
+   "inDropRange": 0,
+   "outPass": 1,
+   "outTranslated": 1,
+   "outDropUnknown": 0,
+   "outDropSize": 0,
+   "outDropRange": 0,
+   "outDropNoVersion": 0,
+   "fieldZeroed": 0,
+   "cargoHidden": 0,
+   "unmappedNonZero": 0,
+   "inboundFrames": 1,
+   "inboundHash": "32d70254",
+   "droppedIn": [],
+   "droppedOut": []
+  },
+  "field": {
+   "initialized": 0,
+   "fixture": 0,
+   "mapX": 0,
+   "mapY": 0,
+   "hasMyHuman": 0,
+   "humanName": "",
+   "humanClass": -1,
+   "humanX": 0,
+   "humanY": 0,
+   "humanHp": 0,
+   "humanMaxHp": 0
+  },
+  "webgl2": 1,
+  "glErrorTotal": 0
+ },
+ "target": {
+  "railway_service": "tm-server",
+  "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+  "deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "client_version": 12000
+ }
+}

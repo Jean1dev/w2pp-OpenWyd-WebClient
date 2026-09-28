@@ -1,0 +1,1828 @@
+{
+  "status": "confirmado em fonte",
+  "repositories": {
+    "server": {
+      "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+      "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git"
+    },
+    "upstream": {
+      "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26",
+      "url": "https://github.com/alanpetry/OpenWyd.git"
+    }
+  },
+  "upstream_header": {
+    "path": "Projects/TMProject/Basedef.h",
+    "sha256": "348ace5c1682f9fef72554198c8bf439694343e617d49af856ac853ce8557d5f"
+  },
+  "upstream_opcodes": [
+    {
+      "line": 25,
+      "name": "MSG_Recall_Opcode",
+      "value": "0x289"
+    },
+    {
+      "line": 26,
+      "name": "MSG_Ping_Opcode",
+      "value": "0x3A0"
+    },
+    {
+      "line": 37,
+      "name": "MSG_RequestCapsuleInfo_Opcode",
+      "value": "0x2CD"
+    },
+    {
+      "line": 38,
+      "name": "MSG_DelayStart_Opcode",
+      "value": "0x3AE"
+    },
+    {
+      "line": 39,
+      "name": "MSG_UseDeclarationOfWar_Opcode",
+      "value": "0xED7"
+    },
+    {
+      "line": 40,
+      "name": "MSG_SysQuit_Opcode",
+      "value": "0x3AE"
+    },
+    {
+      "line": 41,
+      "name": "MSG_SetPKMode_Opcode",
+      "value": "0x399"
+    },
+    {
+      "line": 48,
+      "name": "MSG_DeleteItem_Opcode",
+      "value": "0x2E4"
+    },
+    {
+      "line": 49,
+      "name": "MSG_SplitItem_Opcode",
+      "value": "0x2E5"
+    },
+    {
+      "line": 50,
+      "name": "MSG_DoJackpotBet_Opcode",
+      "value": "0x2BE"
+    },
+    {
+      "line": 51,
+      "name": "MSG_InviteGuild_Opcode",
+      "value": "0x3D5"
+    },
+    {
+      "line": 52,
+      "name": "MSG_Quest_Opcode",
+      "value": "0x28B"
+    },
+    {
+      "line": 53,
+      "name": "MSG_AirMove_Start_Opcode",
+      "value": "0xAD9"
+    },
+    {
+      "line": 724,
+      "name": "MSG_Action_Opcode",
+      "value": "0x36C"
+    },
+    {
+      "line": 725,
+      "name": "MSG_Action2_Opcode",
+      "value": "0x368"
+    },
+    {
+      "line": 726,
+      "name": "MSG_Action_Stop_Opcode",
+      "value": "0x366"
+    },
+    {
+      "line": 740,
+      "name": "MSG_Motion_Opcode",
+      "value": "0x36A"
+    },
+    {
+      "line": 764,
+      "name": "MSG_Trade_Opcode",
+      "value": "0x383"
+    },
+    {
+      "line": 775,
+      "name": "MSG_CloseTrade_Opcode",
+      "value": "0x384"
+    },
+    {
+      "line": 777,
+      "name": "MSG_Withdraw_Opcode",
+      "value": "0x387"
+    },
+    {
+      "line": 778,
+      "name": "MSG_Deposit_Opcode",
+      "value": "0x388"
+    },
+    {
+      "line": 780,
+      "name": "MSG_CombineItem_Opcode",
+      "value": "0x3A6"
+    },
+    {
+      "line": 781,
+      "name": "MSG_CombineItemTiny_Opcode",
+      "value": "0x3C0"
+    },
+    {
+      "line": 797,
+      "name": "MSG_CNFAccountLogin_Opcode",
+      "value": "0x10A"
+    },
+    {
+      "line": 810,
+      "name": "MSG_UseItem_Opcode",
+      "value": "0x373"
+    },
+    {
+      "line": 823,
+      "name": "MSG_UseItem2_Opcode",
+      "value": "0x3C9"
+    },
+    {
+      "line": 850,
+      "name": "MSG_AutoTrade_Opcode",
+      "value": "0x397"
+    },
+    {
+      "line": 892,
+      "name": "MSG_SendItem_Opcode",
+      "value": "0x182"
+    },
+    {
+      "line": 901,
+      "name": "MSG_UpdateEquip_Opcode",
+      "value": "0x36B"
+    },
+    {
+      "line": 909,
+      "name": "MSG_UpdateAffect_Opcode",
+      "value": "0x3B9"
+    },
+    {
+      "line": 916,
+      "name": "MSG_AccountLogin_Opcode",
+      "value": "0x20D"
+    },
+    {
+      "line": 928,
+      "name": "MSG_MessageWhisper_Opcode",
+      "value": "0x334"
+    },
+    {
+      "line": 929,
+      "name": "MSG_MessageShout_Opcode",
+      "value": "0xD1D"
+    },
+    {
+      "line": 938,
+      "name": "MSG_Encode_Opcode",
+      "value": "0xBFF"
+    },
+    {
+      "line": 945,
+      "name": "MSG_MessageChat_Opcode",
+      "value": "0x333"
+    },
+    {
+      "line": 952,
+      "name": "MSG_UpdateScore_Opcode",
+      "value": "0x336"
+    },
+    {
+      "line": 970,
+      "name": "MSG_UpdateEtc_Opcode",
+      "value": "0x337"
+    },
+    {
+      "line": 983,
+      "name": "MSG_MessagePanel_Opcode",
+      "value": "0x101"
+    },
+    {
+      "line": 990,
+      "name": "MSG_CharPassword_Opcode",
+      "value": "0xFDE"
+    },
+    {
+      "line": 998,
+      "name": "MSG_CharacterLogin_Opcode",
+      "value": "0x213"
+    },
+    {
+      "line": 1007,
+      "name": "MSG_NewCharacter_Opcode",
+      "value": "0x20F"
+    },
+    {
+      "line": 1016,
+      "name": "MSG_ReqTransper_Opcode",
+      "value": "0xFAA"
+    },
+    {
+      "line": 1026,
+      "name": "MSG_DeleteCharacter_Opcode",
+      "value": "0x211"
+    },
+    {
+      "line": 1035,
+      "name": "MSG_CNFNewCharacter_Opcode",
+      "value": "0x110"
+    },
+    {
+      "line": 1042,
+      "name": "MSG_CNFDeleteCharacter_Opcode",
+      "value": "0x112"
+    },
+    {
+      "line": 1049,
+      "name": "MSG_CNFCharacterLogin_Opcode",
+      "value": "0x114"
+    },
+    {
+      "line": 1064,
+      "name": "MSG_InitGuldName_Opcode",
+      "value": "0x1D6"
+    },
+    {
+      "line": 1072,
+      "name": "MSG_MessageLog_Opcode",
+      "value": "0x2BC"
+    },
+    {
+      "line": 1079,
+      "name": "MSG_CreateMob_Opcode",
+      "value": "0x364"
+    },
+    {
+      "line": 1098,
+      "name": "MSG_CreateMobTrade_Opcode",
+      "value": "0x363"
+    },
+    {
+      "line": 1118,
+      "name": "MSG_REQMobByID_Opcode",
+      "value": "0x369"
+    },
+    {
+      "line": 1125,
+      "name": "MSG_SetShortSkill_Opcode",
+      "value": "0x378"
+    },
+    {
+      "line": 1132,
+      "name": "MSG_ShopList_Opcode",
+      "value": "0x17C"
+    },
+    {
+      "line": 1141,
+      "name": "MSG_CloseShop_Opcode",
+      "value": "0x196"
+    },
+    {
+      "line": 1143,
+      "name": "MSG_SwapItem_Opcode",
+      "value": "0x376"
+    },
+    {
+      "line": 1154,
+      "name": "MSG_RepurchaseItems_Opcode",
+      "value": "0x3E8"
+    },
+    {
+      "line": 1162,
+      "name": "MSG_REQShopList_Opcode",
+      "value": "0x27B"
+    },
+    {
+      "line": 1169,
+      "name": "MSG_Buy_Opcode",
+      "value": "0x379"
+    },
+    {
+      "line": 1179,
+      "name": "MSG_Sell_Opcode",
+      "value": "0x37A"
+    },
+    {
+      "line": 1188,
+      "name": "MSG_Attack_Multi_Opcode",
+      "value": "0x367"
+    },
+    {
+      "line": 1189,
+      "name": "MSG_Attack_One_Opcode",
+      "value": "0x39D"
+    },
+    {
+      "line": 1190,
+      "name": "MSG_Attack_Two_Opcode",
+      "value": "0x39E"
+    },
+    {
+      "line": 1269,
+      "name": "MSG_REQParty_Opcode",
+      "value": "0x37F"
+    },
+    {
+      "line": 1283,
+      "name": "MSG_CNFParty2_Opcode",
+      "value": "0x3AB"
+    },
+    {
+      "line": 1291,
+      "name": "MSG_ApplyBonus_Opcode",
+      "value": "0x277"
+    },
+    {
+      "line": 1300,
+      "name": "MSG_ReqBuy_Opcode",
+      "value": "0x398"
+    },
+    {
+      "line": 1365,
+      "name": "MSG_UpdateItem_Opcode",
+      "value": "0x374"
+    },
+    {
+      "line": 1429,
+      "name": "MSG_DropItem_Opcode",
+      "value": "0x272"
+    },
+    {
+      "line": 1481,
+      "name": "MSG_GetItem_Opcode",
+      "value": "0x270"
+    }
+  ],
+  "upstream_structs": [
+    {
+      "line": 27,
+      "name": "MSG_STANDARD"
+    },
+    {
+      "line": 42,
+      "name": "MSG_STANDARDPARM"
+    },
+    {
+      "line": 54,
+      "name": "MSG_STANDARDPARM2"
+    },
+    {
+      "line": 61,
+      "name": "MSG_STANDARDPARM3"
+    },
+    {
+      "line": 69,
+      "name": "STRUCT_SCORE"
+    },
+    {
+      "line": 97,
+      "name": "STRUCT_ITEM"
+    },
+    {
+      "line": 103,
+      "name": "STRUCT_SELCHAR"
+    },
+    {
+      "line": 115,
+      "name": "STRUCT_MOB"
+    },
+    {
+      "line": 154,
+      "name": "STRUCT_AFFECT"
+    },
+    {
+      "line": 162,
+      "name": "STRUCT_MYBONUSEFFECT"
+    },
+    {
+      "line": 169,
+      "name": "STRUCT_MYITEM"
+    },
+    {
+      "line": 175,
+      "name": "STRUCT_NEEDITEM"
+    },
+    {
+      "line": 181,
+      "name": "STRUCT_POSITION"
+    },
+    {
+      "line": 187,
+      "name": "STRUCT_RESULT_ITEMLIST"
+    },
+    {
+      "line": 198,
+      "name": "STRUCT_OPTION"
+    },
+    {
+      "line": 204,
+      "name": "STRUCT_NEED_ITEMLIST"
+    },
+    {
+      "line": 213,
+      "name": "STRUCT_REFER"
+    },
+    {
+      "line": 220,
+      "name": "STRUCT_MIXHELP"
+    },
+    {
+      "line": 228,
+      "name": "STRUCT_MISSIONITEM"
+    },
+    {
+      "line": 234,
+      "name": "STRUCT_REPURCHASEITEM"
+    },
+    {
+      "line": 241,
+      "name": "STRUCT_STATICEFFECT"
+    },
+    {
+      "line": 247,
+      "name": "STRUCT_ITEMLIST"
+    },
+    {
+      "line": 276,
+      "name": "STRUCT_EXT1"
+    },
+    {
+      "line": 282,
+      "name": "STRUCT_SUBCLASS"
+    },
+    {
+      "line": 293,
+      "name": "STRUCT_EXT2"
+    },
+    {
+      "line": 305,
+      "name": "STRUCT_DAM"
+    },
+    {
+      "line": 311,
+      "name": "STRUCT_SPELL"
+    },
+    {
+      "line": 344,
+      "name": "STRUCT_INITITEM"
+    },
+    {
+      "line": 354,
+      "name": "STRUCT_AIRMOVELIST"
+    },
+    {
+      "line": 360,
+      "name": "STRUCT_TOTOLIST"
+    },
+    {
+      "line": 367,
+      "name": "STRUCT_LOTTO"
+    },
+    {
+      "line": 373,
+      "name": "STRUCT_SCORE_OLD"
+    },
+    {
+      "line": 391,
+      "name": "STRUCT_M_CHECK"
+    },
+    {
+      "line": 398,
+      "name": "STRUCT_GUILDLIST"
+    },
+    {
+      "line": 408,
+      "name": "STRUCT_TREASURE"
+    },
+    {
+      "line": 415,
+      "name": "STRUCT_TOTODATA"
+    },
+    {
+      "line": 426,
+      "name": "STRUCT_ACCOUNT"
+    },
+    {
+      "line": 442,
+      "name": "STRUCT_ACCOUNTFILE"
+    },
+    {
+      "line": 453,
+      "name": "STRUCT_SUBCLASS_OLD"
+    },
+    {
+      "line": 464,
+      "name": "STRUCT_EXT2_OLD"
+    },
+    {
+      "line": 475,
+      "name": "STRUCT_REQ"
+    },
+    {
+      "line": 485,
+      "name": "STRUCT_LEVSENDITEM"
+    },
+    {
+      "line": 491,
+      "name": "STRUCT_RANDOMQUIZ"
+    },
+    {
+      "line": 497,
+      "name": "STRUCT_ITEMHELP"
+    },
+    {
+      "line": 503,
+      "name": "STRUCT_MOB_OLD"
+    },
+    {
+      "line": 534,
+      "name": "STRUCT_COMBINE"
+    },
+    {
+      "line": 541,
+      "name": "STRUCT_BEASTBONUS"
+    },
+    {
+      "line": 562,
+      "name": "STRUCT_EXT"
+    },
+    {
+      "line": 569,
+      "name": "STRUCT_ACCOUNTFILE_OLD"
+    },
+    {
+      "line": 579,
+      "name": "STRUCT_EXT1_OLD"
+    },
+    {
+      "line": 585,
+      "name": "STRUCT_MISSION"
+    },
+    {
+      "line": 595,
+      "name": "STRUCT_ACCOUNTFILE_OLD2"
+    },
+    {
+      "line": 606,
+      "name": "STRUCT_GUILDZONE"
+    },
+    {
+      "line": 630,
+      "name": "STRUCT_SELCHAR_OLD"
+    },
+    {
+      "line": 642,
+      "name": "STRUCT_ACCOUNT_NEW"
+    },
+    {
+      "line": 658,
+      "name": "STRUCT_ACCOUNTFILE_OLD_NEW"
+    },
+    {
+      "line": 668,
+      "name": "STRUCT_SAME"
+    },
+    {
+      "line": 674,
+      "name": "STRUCT_RARE"
+    },
+    {
+      "line": 682,
+      "name": "STRUCT_ADMINGUILDITEM"
+    },
+    {
+      "line": 689,
+      "name": "STRUCT_ACCOUNTFILE_NEW"
+    },
+    {
+      "line": 700,
+      "name": "STRUCT_ACCOUNTFILE_OLD2_NEW"
+    },
+    {
+      "line": 711,
+      "name": "STRUCT_RUNEQUESTZONE"
+    },
+    {
+      "line": 719,
+      "name": "STRUCT_AUTOKICK"
+    },
+    {
+      "line": 728,
+      "name": "MSG_Action"
+    },
+    {
+      "line": 741,
+      "name": "MSG_Motion"
+    },
+    {
+      "line": 749,
+      "name": "MSG_CAPSULEINFO"
+    },
+    {
+      "line": 765,
+      "name": "MSG_Trade"
+    },
+    {
+      "line": 782,
+      "name": "MSG_CombineItem"
+    },
+    {
+      "line": 789,
+      "name": "MSG_Mission"
+    },
+    {
+      "line": 798,
+      "name": "MSG_CNFAccountLogin"
+    },
+    {
+      "line": 811,
+      "name": "MSG_UseItem"
+    },
+    {
+      "line": 824,
+      "name": "MSG_UseItem2"
+    },
+    {
+      "line": 837,
+      "name": "MSG_CAPSULEUSEITEM"
+    },
+    {
+      "line": 851,
+      "name": "MSG_AutoTrade"
+    },
+    {
+      "line": 862,
+      "name": "MSG_MOVESTOP"
+    },
+    {
+      "line": 873,
+      "name": "MSG_BuyToto"
+    },
+    {
+      "line": 885,
+      "name": "MSG_CNFRemoveServer"
+    },
+    {
+      "line": 893,
+      "name": "MSG_SendItem"
+    },
+    {
+      "line": 902,
+      "name": "MSG_UpdateEquip"
+    },
+    {
+      "line": 910,
+      "name": "MSG_UpdateAffect"
+    },
+    {
+      "line": 917,
+      "name": "MSG_AccountLogin"
+    },
+    {
+      "line": 930,
+      "name": "MSG_MessageWhisper"
+    },
+    {
+      "line": 939,
+      "name": "MSG_Encode"
+    },
+    {
+      "line": 946,
+      "name": "MSG_MessageChat"
+    },
+    {
+      "line": 953,
+      "name": "MSG_UpdateScore"
+    },
+    {
+      "line": 971,
+      "name": "MSG_UpdateEtc"
+    },
+    {
+      "line": 984,
+      "name": "MSG_MessagePanel"
+    },
+    {
+      "line": 991,
+      "name": "MSG_CHARPASSWORD"
+    },
+    {
+      "line": 999,
+      "name": "MSG_CharacterLogin"
+    },
+    {
+      "line": 1008,
+      "name": "MSG_NewCharacter"
+    },
+    {
+      "line": 1017,
+      "name": "MSG_ReqTransper"
+    },
+    {
+      "line": 1027,
+      "name": "MSG_DeleteCharacter"
+    },
+    {
+      "line": 1036,
+      "name": "MSG_CNFNewCharacter"
+    },
+    {
+      "line": 1043,
+      "name": "MSG_CNFDeleteCharacter"
+    },
+    {
+      "line": 1050,
+      "name": "MSG_CNFCharacterLogin"
+    },
+    {
+      "line": 1065,
+      "name": "MSG_INITGULDNAME"
+    },
+    {
+      "line": 1073,
+      "name": "MSG_MessageLog"
+    },
+    {
+      "line": 1080,
+      "name": "MSG_CreateMob"
+    },
+    {
+      "line": 1099,
+      "name": "MSG_CreateMobTrade"
+    },
+    {
+      "line": 1119,
+      "name": "MSG_REQMobByID"
+    },
+    {
+      "line": 1126,
+      "name": "MSG_SetShortSkill"
+    },
+    {
+      "line": 1133,
+      "name": "MSG_ShopList"
+    },
+    {
+      "line": 1144,
+      "name": "MSG_SwapItem"
+    },
+    {
+      "line": 1155,
+      "name": "MSG_RepurchaseItems"
+    },
+    {
+      "line": 1163,
+      "name": "MSG_REQShopList"
+    },
+    {
+      "line": 1170,
+      "name": "MSG_Buy"
+    },
+    {
+      "line": 1180,
+      "name": "MSG_Sell"
+    },
+    {
+      "line": 1192,
+      "name": "MSG_Attack"
+    },
+    {
+      "line": 1214,
+      "name": "MSG_AttackTwo"
+    },
+    {
+      "line": 1236,
+      "name": "MSG_AttackOne"
+    },
+    {
+      "line": 1270,
+      "name": "MSG_REQParty"
+    },
+    {
+      "line": 1277,
+      "name": "MSG_AddParty"
+    },
+    {
+      "line": 1284,
+      "name": "MSG_CNFParty2"
+    },
+    {
+      "line": 1292,
+      "name": "MSG_ApplyBonus"
+    },
+    {
+      "line": 1301,
+      "name": "MSG_ReqBuy"
+    },
+    {
+      "line": 1311,
+      "name": "MSG_CNFMobKill"
+    },
+    {
+      "line": 1320,
+      "name": "MSG_RemoveMob"
+    },
+    {
+      "line": 1326,
+      "name": "MSG_SetHpMode"
+    },
+    {
+      "line": 1333,
+      "name": "MSG_SetHpMp"
+    },
+    {
+      "line": 1342,
+      "name": "MSG_SetHpDam"
+    },
+    {
+      "line": 1349,
+      "name": "MSG_Carry"
+    },
+    {
+      "line": 1356,
+      "name": "MSG_HellBuy"
+    },
+    {
+      "line": 1366,
+      "name": "MSG_UpdateItem"
+    },
+    {
+      "line": 1375,
+      "name": "MSG_ReqSummon"
+    },
+    {
+      "line": 1382,
+      "name": "MSG_CNFRemoveServerLogin"
+    },
+    {
+      "line": 1403,
+      "name": "MSG_EnvEffect"
+    },
+    {
+      "line": 1414,
+      "name": "MSG_RandomQuiz"
+    },
+    {
+      "line": 1421,
+      "name": "MSG_LongMessagePanel"
+    },
+    {
+      "line": 1430,
+      "name": "MSG_DropItem"
+    },
+    {
+      "line": 1441,
+      "name": "MSG_CreateItem"
+    },
+    {
+      "line": 1455,
+      "name": "MSG_CNFDropItem"
+    },
+    {
+      "line": 1465,
+      "name": "MSG_CNFGetItem"
+    },
+    {
+      "line": 1473,
+      "name": "MSG_RMBShopList"
+    },
+    {
+      "line": 1482,
+      "name": "MSG_GetItem"
+    }
+  ],
+  "server_types": {
+    "path": "tmserver/internal/protocol/types.go",
+    "sha256": "2358346545b8717013c96dc06663739a6ec107ac2654f43ee6f3269d249780c5"
+  },
+  "server_opcodes": [
+    {
+      "line": 72,
+      "name": "MsgAccountLogin",
+      "value": "0x020D"
+    },
+    {
+      "line": 73,
+      "name": "MsgCharacterLogin",
+      "value": "0x0213"
+    },
+    {
+      "line": 74,
+      "name": "MsgCharacterLogout",
+      "value": "0x0215"
+    },
+    {
+      "line": 75,
+      "name": "MsgDeleteCharacter",
+      "value": "0x0211"
+    },
+    {
+      "line": 76,
+      "name": "MsgCreateCharacter",
+      "value": "0x020F"
+    },
+    {
+      "line": 77,
+      "name": "MsgAccountSecure",
+      "value": "0x0FDE"
+    },
+    {
+      "line": 78,
+      "name": "MsgMessageChat",
+      "value": "0x0333"
+    },
+    {
+      "line": 79,
+      "name": "MsgMessageWhisper",
+      "value": "0x0334"
+    },
+    {
+      "line": 80,
+      "name": "MsgAction",
+      "value": "0x036C"
+    },
+    {
+      "line": 81,
+      "name": "MsgAction2",
+      "value": "0x0366"
+    },
+    {
+      "line": 82,
+      "name": "MsgAction3",
+      "value": "0x0368"
+    },
+    {
+      "line": 83,
+      "name": "MsgMotion",
+      "value": "0x036A"
+    },
+    {
+      "line": 84,
+      "name": "MsgNoViewMob",
+      "value": "0x0369"
+    },
+    {
+      "line": 85,
+      "name": "MsgChangeCity",
+      "value": "0x0291"
+    },
+    {
+      "line": 86,
+      "name": "MsgReqTeleport",
+      "value": "0x0290"
+    },
+    {
+      "line": 87,
+      "name": "MsgAttack",
+      "value": "0x0367"
+    },
+    {
+      "line": 88,
+      "name": "MsgAttackOne",
+      "value": "0x039D"
+    },
+    {
+      "line": 89,
+      "name": "MsgAttackTwo",
+      "value": "0x039E"
+    },
+    {
+      "line": 90,
+      "name": "MsgDropItem",
+      "value": "0x0272"
+    },
+    {
+      "line": 91,
+      "name": "MsgGetItem",
+      "value": "0x0270"
+    },
+    {
+      "line": 92,
+      "name": "MsgUseItem",
+      "value": "0x0373"
+    },
+    {
+      "line": 93,
+      "name": "MsgDeleteItem",
+      "value": "0x02E4"
+    },
+    {
+      "line": 94,
+      "name": "MsgSplitItem",
+      "value": "0x02E5"
+    },
+    {
+      "line": 95,
+      "name": "MsgUpdateItem",
+      "value": "0x0374"
+    },
+    {
+      "line": 96,
+      "name": "MsgSendAffect",
+      "value": "0x03B9"
+    },
+    {
+      "line": 97,
+      "name": "MsgTradingItem",
+      "value": "0x0376"
+    },
+    {
+      "line": 98,
+      "name": "MsgTrade",
+      "value": "0x0383"
+    },
+    {
+      "line": 99,
+      "name": "MsgQuitTrade",
+      "value": "0x0384"
+    },
+    {
+      "line": 100,
+      "name": "MsgCombineItem",
+      "value": "0x03A6"
+    },
+    {
+      "line": 101,
+      "name": "MsgCombineItemEhre",
+      "value": "0x02D3"
+    },
+    {
+      "line": 102,
+      "name": "MsgCombineItemTiny",
+      "value": "0x03C0"
+    },
+    {
+      "line": 103,
+      "name": "MsgCombineItemShany",
+      "value": "0x02C4"
+    },
+    {
+      "line": 104,
+      "name": "MsgCombineItemAilyn",
+      "value": "0x03B5"
+    },
+    {
+      "line": 105,
+      "name": "MsgCombineItemAgatha",
+      "value": "0x03BA"
+    },
+    {
+      "line": 106,
+      "name": "MsgCombineItemOdin",
+      "value": "0x02D2"
+    },
+    {
+      "line": 107,
+      "name": "MsgCombineItemLindy",
+      "value": "0x02C3"
+    },
+    {
+      "line": 108,
+      "name": "MsgCombineItemAlquimia",
+      "value": "0x02E1"
+    },
+    {
+      "line": 109,
+      "name": "MsgCombineItemExtracao",
+      "value": "0x02D4"
+    },
+    {
+      "line": 110,
+      "name": "MsgApplyBonus",
+      "value": "0x0277"
+    },
+    {
+      "line": 111,
+      "name": "MsgSetShortSkill",
+      "value": "0x0378"
+    },
+    {
+      "line": 112,
+      "name": "MsgQuest",
+      "value": "0x028B"
+    },
+    {
+      "line": 113,
+      "name": "MsgMasterGriff",
+      "value": "0x0AD9"
+    },
+    {
+      "line": 114,
+      "name": "MsgReqRanking",
+      "value": "0x039F"
+    },
+    {
+      "line": 115,
+      "name": "MsgCapsuleInfo",
+      "value": "0x02CD"
+    },
+    {
+      "line": 116,
+      "name": "MsgPutoutSeal",
+      "value": "0x03CC"
+    },
+    {
+      "line": 117,
+      "name": "MsgRestart",
+      "value": "0x0289"
+    },
+    {
+      "line": 118,
+      "name": "MsgRemoveParty",
+      "value": "0x037E"
+    },
+    {
+      "line": 119,
+      "name": "MsgSendReqParty",
+      "value": "0x037F"
+    },
+    {
+      "line": 120,
+      "name": "MsgAcceptParty",
+      "value": "0x03AB"
+    },
+    {
+      "line": 121,
+      "name": "MsgInviteGuild",
+      "value": "0x03D5"
+    },
+    {
+      "line": 122,
+      "name": "MsgGuildAlly",
+      "value": "0x0E12"
+    },
+    {
+      "line": 123,
+      "name": "MsgWar",
+      "value": "0x0E0E"
+    },
+    {
+      "line": 124,
+      "name": "MsgChallange",
+      "value": "0x028E"
+    },
+    {
+      "line": 125,
+      "name": "MsgChallangeConfirm",
+      "value": "0x028F"
+    },
+    {
+      "line": 126,
+      "name": "MsgPing",
+      "value": "0x03A0"
+    },
+    {
+      "line": 130,
+      "name": "MsgSendAutoTrade",
+      "value": "0x0397"
+    },
+    {
+      "line": 131,
+      "name": "MsgReqBuy",
+      "value": "0x0398"
+    },
+    {
+      "line": 132,
+      "name": "MsgReqTradeList",
+      "value": "0x039A"
+    },
+    {
+      "line": 137,
+      "name": "MsgDeprivate",
+      "value": "0x028C"
+    },
+    {
+      "line": 143,
+      "name": "MsgMessagePanel",
+      "value": "0x0101"
+    },
+    {
+      "line": 144,
+      "name": "MsgMessageBoxOk",
+      "value": "0x0102"
+    },
+    {
+      "line": 145,
+      "name": "MsgCNFAccountLogin",
+      "value": "0x010A"
+    },
+    {
+      "line": 146,
+      "name": "MsgCNFNewCharacter",
+      "value": "0x0110"
+    },
+    {
+      "line": 147,
+      "name": "MsgCNFDeleteCharacter",
+      "value": "0x0112"
+    },
+    {
+      "line": 148,
+      "name": "MsgCNFCharacterLogin",
+      "value": "0x0114"
+    },
+    {
+      "line": 149,
+      "name": "MsgCNFCharacterLogout",
+      "value": "0x0116"
+    },
+    {
+      "line": 150,
+      "name": "MsgCharacterLoginFail",
+      "value": "0x0119"
+    },
+    {
+      "line": 151,
+      "name": "MsgNewCharacterFail",
+      "value": "0x011A"
+    },
+    {
+      "line": 152,
+      "name": "MsgAlreadyPlaying",
+      "value": "0x011C"
+    },
+    {
+      "line": 153,
+      "name": "MsgCreateMob",
+      "value": "0x0364"
+    },
+    {
+      "line": 154,
+      "name": "MsgRemoveMob",
+      "value": "0x0165"
+    },
+    {
+      "line": 155,
+      "name": "MsgPKInfo",
+      "value": "0x0166"
+    },
+    {
+      "line": 156,
+      "name": "MsgPKMode",
+      "value": "0x0399"
+    },
+    {
+      "line": 157,
+      "name": "MsgSendItem",
+      "value": "0x0182"
+    },
+    {
+      "line": 158,
+      "name": "MsgUpdateCarry",
+      "value": "0x0185"
+    },
+    {
+      "line": 159,
+      "name": "MsgAccountSecureFail",
+      "value": "0x0FDF"
+    },
+    {
+      "line": 160,
+      "name": "MsgCNFAddParty",
+      "value": "0x037D"
+    },
+    {
+      "line": 161,
+      "name": "MsgUpdateEquip",
+      "value": "0x036B"
+    },
+    {
+      "line": 162,
+      "name": "MsgREQShopList",
+      "value": "0x027B"
+    },
+    {
+      "line": 163,
+      "name": "MsgShopList",
+      "value": "0x017C"
+    },
+    {
+      "line": 164,
+      "name": "MsgBuy",
+      "value": "0x0379"
+    },
+    {
+      "line": 165,
+      "name": "MsgSell",
+      "value": "0x037A"
+    },
+    {
+      "line": 166,
+      "name": "MsgDeposit",
+      "value": "0x0388"
+    },
+    {
+      "line": 167,
+      "name": "MsgWithdraw",
+      "value": "0x0387"
+    },
+    {
+      "line": 168,
+      "name": "MsgUpdateCargoCoin",
+      "value": "0x0339"
+    },
+    {
+      "line": 169,
+      "name": "MsgUpdateEtc",
+      "value": "0x0337"
+    },
+    {
+      "line": 170,
+      "name": "MsgCNFGetItem",
+      "value": "0x0171"
+    },
+    {
+      "line": 171,
+      "name": "MsgCNFDropItem",
+      "value": "0x0175"
+    },
+    {
+      "line": 172,
+      "name": "MsgDecayItem",
+      "value": "0x016F"
+    },
+    {
+      "line": 173,
+      "name": "MsgCombineComplete",
+      "value": "0x03A7"
+    },
+    {
+      "line": 174,
+      "name": "MsgSendWarInfo",
+      "value": "0x03A8"
+    },
+    {
+      "line": 175,
+      "name": "MsgUpdateScore",
+      "value": "0x0336"
+    },
+    {
+      "line": 176,
+      "name": "MsgSetHpDam",
+      "value": "0x018A"
+    },
+    {
+      "line": 177,
+      "name": "MsgSetHpMp",
+      "value": "0x0181"
+    },
+    {
+      "line": 178,
+      "name": "MsgSendArchEffect",
+      "value": "0x03B4"
+    },
+    {
+      "line": 179,
+      "name": "MsgStartTime",
+      "value": "0x03A1"
+    },
+    {
+      "line": 180,
+      "name": "MsgEnvEffect",
+      "value": "0x03A2"
+    },
+    {
+      "line": 181,
+      "name": "MsgUpdateWeather",
+      "value": "0x018B"
+    },
+    {
+      "line": 190,
+      "name": "MsgMagicTrumpet",
+      "value": "0x0D1D"
+    },
+    {
+      "line": 194,
+      "name": "MsgCreateMobTrade",
+      "value": "0x0363"
+    },
+    {
+      "line": 195,
+      "name": "MsgItemSold",
+      "value": "0x039B"
+    },
+    {
+      "line": 196,
+      "name": "MsgExpPanel",
+      "value": "0x5000"
+    }
+  ],
+  "server_dispatch": {
+    "path": "tmserver/internal/handler/dispatch.go",
+    "sha256": "911ca0541e513876cb3181f39f1ffbe6797c35c2e5396a7bde108a65a104f31a"
+  },
+  "server_routes": [
+    {
+      "line": 337,
+      "name": "MsgAccountLogin",
+      "handler": "accountLogin"
+    },
+    {
+      "line": 338,
+      "name": "MsgCreateCharacter",
+      "handler": "createCharacter"
+    },
+    {
+      "line": 339,
+      "name": "MsgDeleteCharacter",
+      "handler": "deleteCharacter"
+    },
+    {
+      "line": 340,
+      "name": "MsgCharacterLogin",
+      "handler": "characterLogin"
+    },
+    {
+      "line": 341,
+      "name": "MsgCharacterLogout",
+      "handler": "characterLogout"
+    },
+    {
+      "line": 342,
+      "name": "MsgRestart",
+      "handler": "restart"
+    },
+    {
+      "line": 344,
+      "name": "MsgAction",
+      "handler": "action"
+    },
+    {
+      "line": 345,
+      "name": "MsgAction2",
+      "handler": "action"
+    },
+    {
+      "line": 346,
+      "name": "MsgAction3",
+      "handler": "action"
+    },
+    {
+      "line": 347,
+      "name": "MsgMotion",
+      "handler": "motion"
+    },
+    {
+      "line": 348,
+      "name": "MsgChangeCity",
+      "handler": "changeCity"
+    },
+    {
+      "line": 349,
+      "name": "MsgReqTeleport",
+      "handler": "reqTeleport"
+    },
+    {
+      "line": 350,
+      "name": "MsgNoViewMob",
+      "handler": "noViewMob"
+    },
+    {
+      "line": 351,
+      "name": "MsgPKMode",
+      "handler": "pkMode"
+    },
+    {
+      "line": 353,
+      "name": "MsgAttack",
+      "handler": "attack"
+    },
+    {
+      "line": 354,
+      "name": "MsgAttackOne",
+      "handler": "attack"
+    },
+    {
+      "line": 355,
+      "name": "MsgAttackTwo",
+      "handler": "attack"
+    },
+    {
+      "line": 357,
+      "name": "MsgDropItem",
+      "handler": "dropItem"
+    },
+    {
+      "line": 358,
+      "name": "MsgGetItem",
+      "handler": "getItem"
+    },
+    {
+      "line": 359,
+      "name": "MsgUseItem",
+      "handler": "useItem"
+    },
+    {
+      "line": 360,
+      "name": "MsgDeleteItem",
+      "handler": "deleteItem"
+    },
+    {
+      "line": 361,
+      "name": "MsgSplitItem",
+      "handler": "splitItem"
+    },
+    {
+      "line": 362,
+      "name": "MsgUpdateItem",
+      "handler": "updateItem"
+    },
+    {
+      "line": 364,
+      "name": "MsgREQShopList",
+      "handler": "reqShopList"
+    },
+    {
+      "line": 365,
+      "name": "MsgBuy",
+      "handler": "buy"
+    },
+    {
+      "line": 366,
+      "name": "MsgSell",
+      "handler": "sell"
+    },
+    {
+      "line": 368,
+      "name": "MsgDeposit",
+      "handler": "deposit"
+    },
+    {
+      "line": 369,
+      "name": "MsgWithdraw",
+      "handler": "withdraw"
+    },
+    {
+      "line": 371,
+      "name": "MsgTradingItem",
+      "handler": "tradingItem"
+    },
+    {
+      "line": 372,
+      "name": "MsgTrade",
+      "handler": "trade"
+    },
+    {
+      "line": 373,
+      "name": "MsgQuitTrade",
+      "handler": "quitTrade"
+    },
+    {
+      "line": 378,
+      "name": "MsgSendAutoTrade",
+      "handler": "sendAutoTrade"
+    },
+    {
+      "line": 379,
+      "name": "MsgReqTradeList",
+      "handler": "reqTradeList"
+    },
+    {
+      "line": 380,
+      "name": "MsgReqBuy",
+      "handler": "reqBuy"
+    },
+    {
+      "line": 385,
+      "name": "MsgCombineItemExtracao",
+      "handler": "combineExtracao"
+    },
+    {
+      "line": 386,
+      "name": "MsgCombineItemOdin",
+      "handler": "combineItemOdin"
+    },
+    {
+      "line": 387,
+      "name": "MsgCombineItemAilyn",
+      "handler": "combineItemAilyn"
+    },
+    {
+      "line": 388,
+      "name": "MsgCombineItemTiny",
+      "handler": "combineItemTiny"
+    },
+    {
+      "line": 389,
+      "name": "MsgCombineItemShany",
+      "handler": "combineItemShany"
+    },
+    {
+      "line": 390,
+      "name": "MsgCombineItemAgatha",
+      "handler": "combineItemAgatha"
+    },
+    {
+      "line": 391,
+      "name": "MsgCombineItemLindy",
+      "handler": "combineItemLindy"
+    },
+    {
+      "line": 392,
+      "name": "MsgCombineItemAlquimia",
+      "handler": "combineItemAlquimia"
+    },
+    {
+      "line": 393,
+      "name": "MsgCombineItemEhre",
+      "handler": "combineItemEhre"
+    },
+    {
+      "line": 395,
+      "name": "MsgSendReqParty",
+      "handler": "sendReqParty"
+    },
+    {
+      "line": 396,
+      "name": "MsgAcceptParty",
+      "handler": "acceptParty"
+    },
+    {
+      "line": 397,
+      "name": "MsgRemoveParty",
+      "handler": "removeParty"
+    },
+    {
+      "line": 398,
+      "name": "MsgInviteGuild",
+      "handler": "inviteGuild"
+    },
+    {
+      "line": 399,
+      "name": "MsgGuildAlly",
+      "handler": "guildAlly"
+    },
+    {
+      "line": 400,
+      "name": "MsgWar",
+      "handler": "war"
+    },
+    {
+      "line": 401,
+      "name": "MsgChallange",
+      "handler": "challange"
+    },
+    {
+      "line": 402,
+      "name": "MsgChallangeConfirm",
+      "handler": "challangeConfirm"
+    },
+    {
+      "line": 404,
+      "name": "MsgMessageChat",
+      "handler": "messageChat"
+    },
+    {
+      "line": 405,
+      "name": "MsgMessageWhisper",
+      "handler": "messageWhisper"
+    },
+    {
+      "line": 406,
+      "name": "MsgApplyBonus",
+      "handler": "applyBonus"
+    },
+    {
+      "line": 407,
+      "name": "MsgSetShortSkill",
+      "handler": "setShortSkill"
+    },
+    {
+      "line": 408,
+      "name": "MsgAccountSecure",
+      "handler": "accountSecure"
+    },
+    {
+      "line": 409,
+      "name": "MsgQuest",
+      "handler": "quest"
+    },
+    {
+      "line": 410,
+      "name": "MsgMasterGriff",
+      "handler": "masterGriff"
+    },
+    {
+      "line": 411,
+      "name": "MsgReqRanking",
+      "handler": "reqRanking"
+    },
+    {
+      "line": 412,
+      "name": "MsgCapsuleInfo",
+      "handler": "capsuleInfo"
+    },
+    {
+      "line": 413,
+      "name": "MsgPutoutSeal",
+      "handler": "putoutSeal"
+    }
+  ],
+  "server_changes_since_baseline": [
+    "api/db/v1/db.pb.go",
+    "api/db/v1/db.proto",
+    "api/db/v1/db_grpc.pb.go",
+    "dbserver/internal/convert/convert.go",
+    "dbserver/internal/convert/convert_test.go",
+    "dbserver/internal/grpcsrv/kefra.go",
+    "dbserver/internal/grpcsrv/kefra_test.go",
+    "dbserver/internal/grpcsrv/mapping.go",
+    "dbserver/internal/grpcsrv/server.go",
+    "dbserver/internal/grpcsrv/server_test.go",
+    "docs/migration/SESSION-PRIMER.md",
+    "docs/migration/captura-wyd-levelup.md",
+    "docs/migration/config-ops.md",
+    "docs/migration/game-rules.md",
+    "docs/migration/handlers/_MSG_UseItem.md",
+    "docs/migration/nightmare.md",
+    "internal/domain/domain.go",
+    "internal/domain/kefra.go",
+    "internal/migrations/0023_kefra_state.down.sql",
+    "internal/migrations/0023_kefra_state.up.sql",
+    "internal/migrations/0024_nightmare_entries.down.sql",
+    "internal/migrations/0024_nightmare_entries.up.sql",
+    "internal/savefmt/nightmare_test.go",
+    "internal/savefmt/structs.go",
+    "internal/store/kefra_state.go",
+    "internal/store/kefra_state_integration_test.go",
+    "internal/store/nightmare_integration_test.go",
+    "internal/store/store.go",
+    "internal/store/store_integration_test.go",
+    "internal/store/store_live.go",
+    "openspec/specs/arch-crystal-quest/spec.md",
+    "tmserver/cmd/tmserver/kefra_test.go",
+    "tmserver/cmd/tmserver/main.go",
+    "tmserver/cmd/tmserver/main_test.go",
+    "tmserver/internal/dbclient/client.go",
+    "tmserver/internal/dbclient/client_test.go",
+    "tmserver/internal/dbclient/kefra.go",
+    "tmserver/internal/dbclient/kefra_test.go",
+    "tmserver/internal/handler/arch_progression.go",
+    "tmserver/internal/handler/arch_progression_test.go",
+    "tmserver/internal/handler/character.go",
+    "tmserver/internal/handler/chat.go",
+    "tmserver/internal/handler/death_exp.go",
+    "tmserver/internal/handler/death_exp_test.go",
+    "tmserver/internal/handler/dispatch.go",
+    "tmserver/internal/handler/item.go",
+    "tmserver/internal/handler/item_test.go",
+    "tmserver/internal/handler/kefra_event.go",
+    "tmserver/internal/handler/kefra_event_test.go",
+    "tmserver/internal/handler/kefra_persistence_test.go",
+    "tmserver/internal/handler/kefra_test.go",
+    "tmserver/internal/handler/mobai.go",
+    "tmserver/internal/handler/mobkilled.go",
+    "tmserver/internal/handler/movement.go",
+    "tmserver/internal/handler/nightmare.go",
+    "tmserver/internal/handler/nightmare_event_test.go",
+    "tmserver/internal/handler/nightmare_exp.go",
+    "tmserver/internal/handler/nightmare_test.go",
+    "tmserver/internal/handler/npcconfig.go",
+    "tmserver/internal/handler/water.go",
+    "tmserver/internal/handler/water_test.go",
+    "tmserver/internal/level/expreward.go",
+    "tmserver/internal/level/nightmare.go",
+    "tmserver/internal/level/nightmare_test.go",
+    "tmserver/internal/level/water_exp.go",
+    "tmserver/internal/level/water_exp_test.go",
+    "tmserver/internal/world/api.go",
+    "tmserver/internal/world/kefra.go",
+    "tmserver/internal/world/kefra_test.go",
+    "tmserver/internal/world/nightmare.go",
+    "tmserver/internal/world/persistence.go",
+    "tmserver/internal/world/session.go",
+    "tmserver/internal/world/water.go",
+    "tmserver/internal/world/world.go"
+  ],
+  "server_protocol_changes_since_baseline": [],
+  "upstream_login_versions": [
+    {
+      "path": "Projects/TMProject/TMSelectServerScene.cpp",
+      "sha256": "83fde1f5594b99a4262e3e1d6cfd7cdcf479c23f46c4783071e913f243fb2117",
+      "assignments": [
+        {
+          "line": 1417,
+          "value": "1758"
+        }
+      ]
+    },
+    {
+      "path": "Projects/TMProject/TMFieldScene.cpp",
+      "sha256": "ae6bd9b1095ab9e1cb6d363af286bc769f59da46e8409a2108ff8fcf6a212db2",
+      "assignments": [
+        {
+          "line": 18790,
+          "value": "1758"
+        }
+      ]
+    }
+  ]
+}

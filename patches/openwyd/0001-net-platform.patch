@@ -1,0 +1,160 @@
+Network platform and credential hygiene: endpoint only from page
+configuration (no ?host=&port=, no URL override or default), receive-buffer
+compaction with the end-position fix in RefreshRecvBuffer/RefreshSendBuffer,
+no password characters kept in ObjectManager::m_szAccountPass, and PIN
+keypad buffers cleared after each AccountSecure send.
+Base: alanpetry/OpenWyd beb9f69bdea6d81f70af14b5ce85ed064575bb26
+
+diff --git a/Projects/TMProject/CPSock.cpp b/Projects/TMProject/CPSock.cpp
+index f3238cd..b98fe8b 100644
+--- a/Projects/TMProject/CPSock.cpp
++++ b/Projects/TMProject/CPSock.cpp
+@@ -127,33 +127,14 @@ void WydWasmNotifyClose(WydWasmSocket& sock, int error)
+ 		sock.close_notified = true;
+ }
+ 
+-std::string WydUrlEncode(const char* text)
+-{
+-	static const char* hex = "0123456789ABCDEF";
+-	std::string out;
+-	for (const unsigned char ch : std::string(text ? text : ""))
+-	{
+-		if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') ||
+-			ch == '-' || ch == '_' || ch == '.' || ch == '~')
+-		{
+-			out.push_back(static_cast<char>(ch));
+-		}
+-		else
+-		{
+-			out.push_back('%');
+-			out.push_back(hex[(ch >> 4) & 0xF]);
+-			out.push_back(hex[ch & 0xF]);
+-		}
+-	}
+-	return out;
+-}
+-
++// The endpoint comes only from the page (Module.wydSocketProxyUrl), which reads
++// it from the operator's gateway configuration. There is no URL-parameter
++// override and no default: without configuration the client does not connect.
+ std::string WydReadSocketProxyUrl()
+ {
+ 	char* ptr = reinterpret_cast<char*>(EM_ASM_PTR({
+-		const params = new URLSearchParams(globalThis.location ? globalThis.location.search : '');
+ 		const moduleObj = typeof Module !== 'undefined' ? Module : {};
+-		const value = moduleObj.wydSocketProxyUrl || params.get('socketProxy') || 'ws://127.0.0.1:8282/';
++		const value = typeof moduleObj.wydSocketProxyUrl === 'string' ? moduleObj.wydSocketProxyUrl : '';
+ 		const len = lengthBytesUTF8(value) + 1;
+ 		const ptr = _malloc(len);
+ 		stringToUTF8(value, ptr, len);
+@@ -161,7 +142,7 @@ std::string WydReadSocketProxyUrl()
+ 	}));
+ 	std::string value = ptr ? ptr : "";
+ 	if (ptr) std::free(ptr);
+-	return value.empty() ? "ws://127.0.0.1:8282/" : value;
++	return value;
+ }
+ 
+ void WydWasmFlushPending(WydWasmSocket& sock)
+@@ -250,10 +231,14 @@ unsigned int WydSocketOpenForClient(const char* host, int port)
+ 		return 0;
+ 	}
+ 
++	// The gateway maps its URL to a configured server; the browser never names
++	// a TCP host or port. host/port from the scene are recorded for diagnostics only.
+ 	std::string url = WydReadSocketProxyUrl();
+-	url += (url.find('?') == std::string::npos) ? '?' : '&';
+-	url += "host=" + WydUrlEncode(host);
+-	url += "&port=" + std::to_string(port);
++	if (url.empty() || url.find('?') != std::string::npos)
++	{
++		g_wyd_socket_debug.last_error = -1001;
++		return 0;
++	}
+ 	std::snprintf(g_wyd_socket_debug.last_proxy_url, sizeof(g_wyd_socket_debug.last_proxy_url), "%s", url.c_str());
+ 
+ 	EmscriptenWebSocketCreateAttributes attrs;
+@@ -784,6 +769,11 @@ unsigned int CPSock::SingleConnect(char* HostAddr, int Port, int ip, int WSA)
+ 
+ int CPSock::Receive()
+ {
++	// Keep a partial frame at the start of the buffer. Without compaction a
++	// stream that always ends mid-frame advances nRecvPosition until the buffer
++	// is full and the connection stalls (RefreshRecvBuffer had no caller).
++	if (nProcPosition > 0)
++		RefreshRecvBuffer();
+ 	int Rest = RECV_BUFFER_SIZE - nRecvPosition;
+ 	int tReceiveSize = WydSocketRecvBytes(Sock, &pRecvBuffer[nRecvPosition], Rest);
+ 	if (tReceiveSize == -1)
+@@ -1164,8 +1154,10 @@ void CPSock::RefreshRecvBuffer()
+ 		// that copy forward in larger chunks.
+ 		memmove(pRecvBuffer, &pRecvBuffer[nProcPosition], left);
+ 
++		// The kept tail now starts at 0: the new end is its length (the
++		// original "-= left" left the end at the old read position).
+ 		nProcPosition = 0;
+-		nRecvPosition -= left;
++		nRecvPosition = left;
+ 	}
+ }
+ 
+@@ -1181,7 +1173,7 @@ void CPSock::RefreshSendBuffer()
+ 		memmove(pSendBuffer, &pSendBuffer[nSentPosition], left);
+ 
+ 		nSentPosition = 0;
+-		nSendPosition -= left;
++		nSendPosition = left; // same fix as RefreshRecvBuffer
+ 	}
+ }
+ 
+diff --git a/Projects/TMProject/TMSelectCharScene.cpp b/Projects/TMProject/TMSelectCharScene.cpp
+index 6b52be6..a37c908 100644
+--- a/Projects/TMProject/TMSelectCharScene.cpp
++++ b/Projects/TMProject/TMSelectCharScene.cpp
+@@ -415,6 +415,9 @@ int TMSelectCharScene::OnControlEvent(unsigned int idwControlID, unsigned int id
+ 			msLock.Header.Type = MSG_CharPassword_Opcode;
+ 
+ 			g_pSocketManager->SendOneMessage((char*)&msLock, sizeof(msLock));
++			// The PIN must not outlive the send.
++			memset(keypass, 0, sizeof(keypass));
++			memset(keypasschage, 0, sizeof(keypasschage));
+ 			m_pAccountLockDlg->SetVisible(0);
+ 			m_pAccountLockTime = g_pTimerManager->GetServerTime();
+ 			g_AccountLock = 2;
+@@ -439,6 +442,9 @@ int TMSelectCharScene::OnControlEvent(unsigned int idwControlID, unsigned int id
+ 			msLock.Header.Type = MSG_CharPassword_Opcode;
+ 
+ 			g_pSocketManager->SendOneMessage((char*)&msLock, sizeof(msLock));
++			// The PIN must not outlive the send.
++			memset(keypass, 0, sizeof(keypass));
++			memset(keypasschage, 0, sizeof(keypasschage));
+ 			m_pAccountLockDlg->SetVisible(0);
+ 			m_pAccountLockTime = g_pTimerManager->GetServerTime();
+ 			g_AccountLock = 3;
+@@ -464,6 +470,9 @@ int TMSelectCharScene::OnControlEvent(unsigned int idwControlID, unsigned int id
+ 				msLock.Header.Type = MSG_CharPassword_Opcode;
+ 
+ 				g_pSocketManager->SendOneMessage((char*)&msLock, sizeof(msLock));
++				// The PIN must not outlive the send.
++				memset(keypass, 0, sizeof(keypass));
++				memset(keypasschage, 0, sizeof(keypasschage));
+ 				m_pAccountLockDlg->SetVisible(0);
+ 				m_pAccountLockTime = g_pTimerManager->GetServerTime();
+ 			}
+diff --git a/Projects/TMProject/TMSelectServerScene.cpp b/Projects/TMProject/TMSelectServerScene.cpp
+index 474c0ea..41349c4 100644
+--- a/Projects/TMProject/TMSelectServerScene.cpp
++++ b/Projects/TMProject/TMSelectServerScene.cpp
+@@ -1452,9 +1452,9 @@ int TMSelectServerScene::OnControlEvent(unsigned int idwControlID, unsigned int
+ 			sprintf_s(stAccountLogin.AccountName, "%s", pEditID->GetText());
+ 			sprintf_s(stAccountLogin.AccountPass, "%s", pEditPassword->GetText());
+ 			sprintf_s(g_pObjectManager->m_szAccountName, "%s", stAccountLogin.AccountName);
+-			g_pObjectManager->m_szAccountPass[0] = stAccountLogin.AccountPass[0];
+-			g_pObjectManager->m_szAccountPass[1] = stAccountLogin.AccountPass[1];
+-			for (int mm = 2; mm < 16; ++mm)
++			// m_szAccountPass is never read back; do not keep password characters
++			// in a long-lived global.
++			for (int mm = 0; mm < 16; ++mm)
+ 				g_pObjectManager->m_szAccountPass[mm] = rand() % 10 + 48;
+ 
+ 			g_pObjectManager->m_szAccountPass[15] = '\0';

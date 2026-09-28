@@ -2,7 +2,19 @@
 
 Pacote de contexto e prompts para construir nosso cliente WYD no navegador, integrado ao servidor Go [Jean1dev/w2pp-OpenWYD](https://github.com/Jean1dev/w2pp-OpenWYD).
 
-Estado inicial em **28/09/2026**: planejamento e instruções executáveis por agentes; ainda não há cliente, gateway ou build implementado neste repositório.
+Estado em **28/09/2026**: auditoria em andamento e continuidade do OpenWyd escolhida. O runtime do Alan roda em WASM no navegador sobre os assets locais do operador. Um gateway próprio (`gateway/`) e uma camada de dialeto (`client/dialect/`) o conectam ao tm-server Go: o login real no servidor de teste do operador chega à seleção de personagem. Personagem, mundo com servidor, duas sessões e gameplay ainda não foram provados. Veja [progresso](docs/PROGRESS.md), [setup reproduzível](docs/setup.md) e as evidências de [auditoria](docs/evidence/01-auditoria/README.md), [cena](docs/evidence/02-build/README.md) e [protocolo](docs/evidence/03-protocolo/README.md).
+
+Jogar localmente contra o servidor de teste do Railway: `make dev` (ou `npm run dev` no Windows sem `make`). O comando aplica os patches, recompila o runtime só se necessário, monta o site, sobe o gateway e abre o Chrome em `http://127.0.0.1:8290/client.html`.
+
+Verificações locais, com o dataset já importado e o runtime rebuildado com os patches ([setup](docs/setup.md)):
+
+```
+npm run scene             # cena offline
+npm run gateway:test      # gateway WS→TCP
+npm run protocol:vectors  # vetores CPSock independentes contra o codec Go
+npm run protocol:dialect  # tradutor do dialeto (wasm32)
+npm run client:stream     # navegador + gateway + servidor roteirizado
+```
 
 ## Começar
 

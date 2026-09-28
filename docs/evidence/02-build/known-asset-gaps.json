@@ -1,0 +1,123 @@
+{
+  "schema": 2,
+  "scope": "Arquivos que o runtime Alan (base 769) abre e o cliente 7662 do operador não fornece.",
+  "observation": "União observada em .cache/local-scene-evidence.json. A lista varia por execução: a cena de seleção de servidor sorteia modelos e tiles. Por isso o smoke test não cobra esta lista, e sim a regra de que nenhum arquivo entregue no dataset pode falhar ao abrir.",
+  "policy": "Nenhum destes é fabricado ou substituído por primitiva.",
+  "missing": [
+    {
+      "path": "env/mtile07072.wys",
+      "kind": "textura de terreno",
+      "scenes": [
+        "selectserver"
+      ]
+    },
+    {
+      "path": "env/tile05052.wys",
+      "kind": "textura de terreno",
+      "scenes": [
+        "field"
+      ]
+    },
+    {
+      "path": "env/tile06062.wys",
+      "kind": "textura de terreno",
+      "scenes": [
+        "field"
+      ]
+    },
+    {
+      "path": "env/tile07072.wys",
+      "kind": "textura de terreno",
+      "scenes": [
+        "field",
+        "selectserver"
+      ]
+    },
+    {
+      "path": "env/tile08082.wys",
+      "kind": "textura de terreno",
+      "scenes": [
+        "field"
+      ]
+    },
+    {
+      "path": "env/tile14142.wys",
+      "kind": "textura de terreno",
+      "scenes": [
+        "selectserver"
+      ]
+    },
+    {
+      "path": "env/tile17172.wys",
+      "kind": "textura de terreno",
+      "scenes": [
+        "selectserver"
+      ]
+    },
+    {
+      "path": "env/tile19192.wys",
+      "kind": "textura de terreno",
+      "scenes": [
+        "field"
+      ]
+    },
+    {
+      "path": "env/tile23232.wys",
+      "kind": "textura de terreno",
+      "scenes": [
+        "field"
+      ]
+    },
+    {
+      "path": "env/tile24242.wys",
+      "kind": "textura de terreno",
+      "scenes": [
+        "selectserver"
+      ]
+    },
+    {
+      "path": "env/tile25252.wys",
+      "kind": "textura de terreno",
+      "scenes": [
+        "field"
+      ]
+    },
+    {
+      "path": "mesh//abox01.msa",
+      "kind": "animação de modelo",
+      "scenes": [
+        "field"
+      ]
+    },
+    {
+      "path": "mesh//abox02.msa",
+      "kind": "animação de modelo",
+      "scenes": [
+        "field",
+        "selectserver"
+      ]
+    },
+    {
+      "path": "mesh/bird0101.wys",
+      "kind": "recurso de modelo",
+      "scenes": [
+        "field",
+        "selectserver"
+      ]
+    },
+    {
+      "path": "mesh/hs010301.msh",
+      "kind": "recurso de modelo",
+      "scenes": [
+        "selectserver"
+      ]
+    },
+    {
+      "path": "ui/questsubjects4.txt",
+      "kind": "tabela de UI",
+      "scenes": [
+        "field"
+      ]
+    }
+  ]
+}

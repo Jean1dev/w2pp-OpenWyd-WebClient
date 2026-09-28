@@ -1,0 +1,282 @@
+#!/usr/bin/env python3
+"""Synthetic server-dialect fixtures for the client translation layer.
+
+Frames are built here by explicit offsets from docs/compatibility.md and the
+server's documented layouts, NOT by the Go encoders and NOT by the C++
+translator under test. tools/protocol/overlay/zz_ext_dialect_test.go then
+rebuilds the same logical data with the server's real encoders and requires
+byte equality, and the C++ test (tools/protocol/dialect_test.cpp) checks the
+translated runtime structs field by field.
+
+Outputs:
+  docs/evidence/03-protocolo/fixtures/dialect.json   logical data + frames
+  .cache/dialect/dialect_fixtures.h                  the same, as C++ data
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import struct
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT_JSON = ROOT / "docs/evidence/03-protocolo/fixtures/dialect.json"
+OUT_H = ROOT / ".cache/dialect/dialect_fixtures.h"
+
+CLIENT_VERSION = 12000  # effective W2PP_CLIENT_VERSION on the operator's Railway tm-server
+
+
+def header(size: int, opcode: int, ident: int, tick: int = 0x01020304) -> bytearray:
+    b = bytearray(size)
+    struct.pack_into("<HBBHHI", b, 0, size, 0, 0, opcode, ident, tick)
+    return b
+
+
+def put_item(b: bytearray, off: int, it: dict | None) -> None:
+    if not it:
+        return
+    struct.pack_into("<H", b, off, it["index"])
+    for k, (e, v) in enumerate(it.get("eff", [])):
+        b[off + 2 + 2 * k] = e
+        b[off + 3 + 2 * k] = v
+
+
+def put_name(b: bytearray, off: int, name: str, width: int = 16) -> None:
+    raw = name.encode("ascii")[:width]
+    b[off : off + len(raw)] = raw
+
+
+# ---------------- logical data ----------------
+
+SELCHARS = [
+    {"slot": 0, "name": "Guerreiro", "spx": 2100, "spy": 2101, "level": 398, "maxHp": 5000, "hp": 4999,
+     "maxMp": 800, "mp": 799, "str": 200, "int": 50, "dex": 100, "con": 150, "direction": 3,
+     "guild": 77, "coin": 2000000000, "exp": (1 << 32) + 123,
+     "equip": {"0": {"index": 1, "eff": [[43, 5], [0, 0], [0, 0]]},
+               "15": {"index": 3500, "eff": [[1, 2], [3, 4], [5, 6]]}}},
+    {"slot": 1, "name": "Maga", "spx": 2102, "spy": 2103, "level": 0, "maxHp": 80, "hp": 80,
+     "maxMp": 120, "mp": 120, "str": 5, "int": 20, "dex": 8, "con": 5, "direction": 0,
+     "guild": 0, "coin": 0, "exp": 0, "equip": {"0": {"index": 11}}},
+    # slot 2 stays empty
+    {"slot": 3, "name": "Cacadora12345", "spx": 65535, "spy": 1, "level": 32767, "maxHp": 2147483647,
+     "hp": 1, "maxMp": 0, "mp": 0, "str": -1, "int": 32767, "dex": -32768, "con": 0, "direction": 7,
+     "guild": 65535, "coin": -1, "exp": 9_000_000_000_000_000,
+     "equip": {"0": {"index": 31}, "14": {"index": 6499, "eff": [[255, 255], [0, 1], [1, 0]]}}},
+]
+
+CARGO = {"0": {"index": 400}, "119": {"index": 401, "eff": [[9, 9], [0, 0], [0, 0]]},
+         "120": {"index": 402}, "127": {"index": 403, "eff": [[1, 1], [2, 2], [3, 3]]}}
+
+MOB = {
+    "name": "Guerreiro", "pkPoint": 75, "clan": 7, "merchant": 0, "guild": 77, "class": 0, "quest": 0,
+    "coin": 55555, "exp": (1 << 33) + 5, "spx": 2090, "spy": 2091, "level": 398, "ac": 120, "damage": 300,
+    "maxHp": 5000, "maxMp": 800, "hp": 4999, "mp": 799, "str": 200, "int": 50, "dex": 100, "con": 150,
+    "special": [1, 2, 3, 4], "attackRun": 0x34, "direction": 2,
+    "equip": {"0": {"index": 1}, "15": {"index": 3500, "eff": [[1, 2], [3, 4], [5, 6]]}},
+    "carry": {"0": {"index": 400}, "63": {"index": 401, "eff": [[7, 8], [0, 0], [0, 0]]}},
+    "learnedSkill": 0x40000001, "magic": 20, "scoreBonus": 5, "specialBonus": 6, "skillBonus": 7,
+    "critical": 8, "skillBar": [1, 2, 3, 4], "guildLevel": 2, "regenHP": 10, "regenMP": 11,
+    "resist": [1, 2, 3, 4],
+}
+CHAR_LOGIN = {"slot": 1, "clientID": 517, "weather": 2, "loginX": 2100, "loginY": 2101,
+              "shortSkill": list(range(16)), "mob": MOB}
+
+MOB_PLAYER = {"mobID": 5, "name": "Guerreiro", "isPlayer": True, "pkPoint": 75, "curKill": 3, "totKill": 513,
+              "posX": 2100, "posY": 2101, "guild": 77, "guildMemberType": 1, "level": 398, "ac": 120,
+              "damage": 300, "maxHp": 5000, "maxMp": 800, "hp": 4999, "mp": 799, "str": 200, "int": 50,
+              "dex": 100, "con": 150, "merchant": 0, "attackRun": 0x34, "direction": 1, "createType": 2,
+              "equip": {"0": 1, "15": 3500}, "affect": {"0": 0x0101, "31": 0xFFFF},
+              "anct": {"0": 0x80, "15": 0x7F}}
+MOB_NPC = {"mobID": 1234, "name": "Ciclope_Arqueiro", "isPlayer": False, "pkPoint": 0, "curKill": 0, "totKill": 0,
+           "posX": 3000, "posY": 1500, "guild": 0, "guildMemberType": 0, "level": 150, "ac": 50, "damage": 90,
+           "maxHp": 9000, "maxMp": 0, "hp": 9000, "mp": 0, "str": 0, "int": 0, "dex": 0, "con": 0,
+           "merchant": 1, "attackRun": 0x22, "direction": 0, "createType": 0,
+           "equip": {"0": 222}, "affect": {}, "anct": {}}
+
+
+# ---------------- encoders by explicit offset ----------------
+
+def score(b: bytearray, off: int, c: dict, merchant: int = 0, special=(0, 0, 0, 0)) -> None:
+    struct.pack_into("<iii", b, off, c["level"], c.get("ac", 0), c.get("damage", 0))
+    b[off + 12] = merchant
+    b[off + 13] = c.get("attackRun", 0)
+    b[off + 14] = c.get("direction", 0)
+    struct.pack_into("<iiii", b, off + 16, c["maxHp"], c["maxMp"], c["hp"], c["mp"])
+    struct.pack_into("<hhhh", b, off + 32, c["str"], c["int"], c["dex"], c["con"])
+    struct.pack_into("<hhhh", b, off + 40, *special)
+
+
+def selchar(b: bytearray, off: int, chars: list[dict]) -> None:
+    for c in chars:
+        s = c["slot"]
+        struct.pack_into("<H", b, off + 0 + 2 * s, c["spx"] & 0xFFFF)
+        struct.pack_into("<H", b, off + 8 + 2 * s, c["spy"] & 0xFFFF)
+        put_name(b, off + 16 + 16 * s, c["name"])
+        score(b, off + 80 + 48 * s, c)
+        for k, it in c["equip"].items():
+            put_item(b, off + 272 + 128 * s + 8 * int(k), it)
+        struct.pack_into("<H", b, off + 784 + 2 * s, c["guild"])
+        struct.pack_into("<i", b, off + 792 + 4 * s, c["coin"])
+        struct.pack_into("<q", b, off + 808 + 8 * s, c["exp"])
+
+
+def cnf_account_login(chars, cargo, coin, account) -> bytearray:
+    b = header(2008, 0x010A, 30002)
+    struct.pack_into("<i", b, 28, 1)  # "don't recreate starter potions" marker
+    selchar(b, 32, chars)
+    for k, it in cargo.items():
+        put_item(b, 872 + 8 * int(k), it)
+    struct.pack_into("<i", b, 1896, coin)
+    put_name(b, 1900, account)
+    return b
+
+
+def cnf_new_character(chars) -> bytearray:
+    b = header(856, 0x0110, 30001)
+    selchar(b, 16, chars)
+    return b
+
+
+def mob_name(b: bytearray, off: int, name: str, pk: int, cur: int, tot: int) -> None:
+    put_name(b, off, name, 12)
+    b[off + 12] = pk
+    b[off + 13] = cur
+    struct.pack_into("<H", b, off + 14, tot)
+
+
+def struct_mob(b: bytearray, off: int, m: dict) -> None:
+    mob_name(b, off, m["name"], m["pkPoint"], 0, 0)
+    b[off + 16] = m["clan"]
+    b[off + 17] = m["merchant"]
+    struct.pack_into("<H", b, off + 18, m["guild"])
+    b[off + 20] = m["class"]
+    b[off + 24] = m["quest"]
+    struct.pack_into("<i", b, off + 28, m["coin"])
+    struct.pack_into("<q", b, off + 32, m["exp"])
+    struct.pack_into("<hh", b, off + 40, m["spx"], m["spy"])
+    score(b, off + 44, m, m["merchant"], m["special"])
+    score(b, off + 92, m, m["merchant"], m["special"])
+    for k, it in m["equip"].items():
+        put_item(b, off + 140 + 8 * int(k), it)
+    for k, it in m["carry"].items():
+        put_item(b, off + 268 + 8 * int(k), it)
+    struct.pack_into("<iIHHH", b, off + 780, m["learnedSkill"], m["magic"], m["scoreBonus"],
+                     m["specialBonus"], m["skillBonus"])
+    b[off + 794] = m["critical"]
+    b[off + 796 : off + 800] = bytes(m["skillBar"])
+    b[off + 800] = m["guildLevel"]
+    struct.pack_into("<HH", b, off + 802, m["regenHP"], m["regenMP"])
+    b[off + 806 : off + 810] = bytes(m["resist"])
+
+
+def cnf_character_login(c: dict) -> bytearray:
+    b = header(1832, 0x0114, 30000)
+    struct.pack_into("<hh", b, 12, c["loginX"], c["loginY"])
+    struct_mob(b, 16, c["mob"])
+    struct.pack_into("<HHH", b, 1040, c["slot"], c["clientID"], c["weather"])
+    b[1046:1062] = bytes(c["shortSkill"])
+    return b
+
+
+def create_mob(d: dict) -> bytearray:
+    b = header(232, 0x0364, 30000)
+    struct.pack_into("<hhH", b, 12, d["posX"], d["posY"], d["mobID"])
+    if d["isPlayer"]:
+        mob_name(b, 18, d["name"], d["pkPoint"], d["curKill"], d["totKill"])
+    else:
+        put_name(b, 18, d["name"])
+    for k, v in d["equip"].items():
+        struct.pack_into("<H", b, 34 + 2 * int(k), v)
+    for k, v in d["affect"].items():
+        struct.pack_into("<H", b, 66 + 2 * int(k), v)
+    struct.pack_into("<H", b, 130, d["guild"])
+    b[132] = d["guildMemberType"]
+    score(b, 136, d, d["merchant"])
+    struct.pack_into("<H", b, 184, d["createType"])
+    for k, v in d["anct"].items():
+        b[186 + int(k)] = v
+    return b
+
+
+# Outbound expectations: what the translator must emit for runtime structs
+# built by dialect_test.cpp with these values.
+OUT_ACCOUNT = {"pass": "segredo1", "account": "fixture01", "force": 1, "mac": [1, 2, 3, 0xDEADBEEF]}
+OUT_CHARLOGIN = {"slot": 2, "force": 0}
+OUT_DELETE = {"slot": 3, "name": "Cacadora12345", "pass": "12345678901"}
+OUT_SECURE = {"pin": "123456", "change": 1}
+
+
+def out_account_login() -> bytearray:
+    b = header(116, 0x020D, 0)
+    put_name(b, 12, OUT_ACCOUNT["pass"], 12)
+    put_name(b, 24, OUT_ACCOUNT["account"])
+    struct.pack_into("<ii", b, 92, CLIENT_VERSION, OUT_ACCOUNT["force"])
+    struct.pack_into("<4I", b, 100, *OUT_ACCOUNT["mac"])
+    return b
+
+
+def out_character_login() -> bytearray:
+    b = header(20, 0x0213, 0)
+    struct.pack_into("<ii", b, 12, OUT_CHARLOGIN["slot"], OUT_CHARLOGIN["force"])
+    return b
+
+
+def out_delete_character() -> bytearray:
+    b = header(44, 0x0211, 0)
+    struct.pack_into("<i", b, 12, OUT_DELETE["slot"])
+    put_name(b, 16, OUT_DELETE["name"])
+    put_name(b, 32, OUT_DELETE["pass"], 12)
+    return b
+
+
+def out_account_secure() -> bytearray:
+    b = header(32, 0x0FDE, 0)
+    put_name(b, 12, OUT_SECURE["pin"], 6)
+    struct.pack_into("<i", b, 28, OUT_SECURE["change"])
+    return b
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.parse_args()
+    over = [dict(SELCHARS[0], level=40000)]
+    inbound = {
+        "cnf_account_login": (cnf_account_login(SELCHARS, CARGO, 123456789, "fixture01"),
+                              {"chars": SELCHARS, "cargo": CARGO, "coin": 123456789, "account": "fixture01"}),
+        "cnf_account_login_level_overflow": (cnf_account_login(over, {}, 0, "fixture01"),
+                                             {"chars": over, "cargo": {}, "coin": 0, "account": "fixture01"}),
+        "cnf_new_character": (cnf_new_character(SELCHARS[:2]), {"chars": SELCHARS[:2]}),
+        "cnf_character_login": (cnf_character_login(CHAR_LOGIN), CHAR_LOGIN),
+        "create_mob_player": (create_mob(MOB_PLAYER), MOB_PLAYER),
+        "create_mob_npc": (create_mob(MOB_NPC), MOB_NPC),
+    }
+    outbound = {
+        "account_login": (out_account_login(), dict(OUT_ACCOUNT, clientVersion=CLIENT_VERSION)),
+        "character_login": (out_character_login(), OUT_CHARLOGIN),
+        "delete_character": (out_delete_character(), OUT_DELETE),
+        "account_secure": (out_account_secure(), OUT_SECURE),
+    }
+    doc = {
+        "generator": "tools/protocol/gen_fixtures.py",
+        "note": "synthetic; no real account data. wire_hex is the full plaintext frame (header included).",
+        "clientVersion": CLIENT_VERSION,
+        "inbound": {k: {"wire_hex": v[0].hex(), "logical": v[1]} for k, v in inbound.items()},
+        "outbound": {k: {"wire_hex": v[0].hex(), "logical": v[1]} for k, v in outbound.items()},
+    }
+    OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
+    OUT_JSON.write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8", newline="\n")
+
+    OUT_H.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["// Generated by tools/protocol/gen_fixtures.py. Do not edit.", "#pragma once", ""]
+    for group, items in (("in", inbound), ("out", outbound)):
+        for k, (frame, _) in items.items():
+            arr = ", ".join(f"0x{x:02x}" for x in frame)
+            lines.append(f"static const unsigned char k_{group}_{k}[{len(frame)}] = {{{arr}}};")
+    lines.append(f"static const int kClientVersion = {CLIENT_VERSION};")
+    OUT_H.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    print(f"{len(inbound)} inbound + {len(outbound)} outbound fixtures -> {OUT_JSON.relative_to(ROOT)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

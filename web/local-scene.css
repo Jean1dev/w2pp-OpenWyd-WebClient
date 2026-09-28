@@ -1,0 +1,6 @@
+body { margin: 24px; background: #15171b; color: #e6e6e6; font: 16px system-ui; text-align: center; }
+h1 { font-size: 22px; }
+canvas { display: block; margin: auto; max-width: 100%; background: black; outline: none; }
+p { line-height: 1.5; }
+#identity { font: 14px ui-monospace, monospace; color: #9fd3ff; }
+code { font: 13px ui-monospace, monospace; color: #9fd3ff; }

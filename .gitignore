@@ -10,3 +10,7 @@ build/
 assets-local/
 external/
 *.log
+__pycache__/
+*.pyc
+# Operator gateway configuration (targets are private to the operator).
+gateway.local.json
