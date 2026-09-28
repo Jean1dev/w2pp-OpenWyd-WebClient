@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "source": "operator-provided local client directory; read only",
+  "manifest_sha256": "6ccec5e7459da5ef0a9f92976cccbd170a1055d0d4a829bfd9241f37d4445217",
+  "complete_for_upstream_manifest": false,
+  "format_compatibility": "not validated",
+  "binary_size_checks": [
+    {
+      "file": "ItemList.bin",
+      "upstream_record_bytes": 164,
+      "upstream_count": 6500,
+      "upstream_read_bytes": 1066000,
+      "actual_bytes": 910004,
+      "upstream_read_fits": false,
+      "scope": "size only; decoding/semantic compatibility not verified"
+    },
+    {
+      "file": "SkillData.bin",
+      "upstream_record_bytes": 104,
+      "upstream_count": 248,
+      "upstream_read_bytes": 25792,
+      "actual_bytes": 23812,
+      "upstream_read_fits": false,
+      "scope": "size only; decoding/semantic compatibility not verified"
+    }
+  ],
+  "summary": {
+    "files_hashed": 7092,
+    "bytes_hashed": 318725705,
+    "missing_patterns": 20,
+    "upstream_generated_patterns": 2,
+    "rejected": 0,
+    "empty_files": 5
+  },
+  "missing": [
+    {
+      "line": 7,
+      "source": "ItemPrice.bin",
+      "destination": "/ItemPrice.bin"
+    },
+    {
+      "line": 19,
+      "source": "AttributeMap.dat",
+      "destination": "/AttributeMap.dat"
+    },
+    {
+      "line": 23,
+      "source": "config_settings.json",
+      "destination": "/config_settings.json"
+    },
+    {
+      "line": 24,
+      "source": "config_settings_origem.json",
+      "destination": "/config_settings_origem.json"
+    },
+    {
+      "line": 26,
+      "source": "EventCoupon.bin",
+      "destination": "/EventCoupon.bin"
+    },
+    {
+      "line": 28,
+      "source": "Graphics.ini",
+      "destination": "/Graphics.ini"
+    },
+    {
+      "line": 30,
+      "source": "HeightMap.dat",
+      "destination": "/HeightMap.dat"
+    },
+    {
+      "line": 32,
+      "source": "Lang.txt",
+      "destination": "/Lang.txt"
+    },
+    {
+      "line": 33,
+      "source": "MissionItens.bin",
+      "destination": "/MissionItens.bin"
+    },
+    {
+      "line": 34,
+      "source": "MountData.bin",
+      "destination": "/MountData.bin"
+    },
+    {
+      "line": 35,
+      "source": "Music.ini",
+      "destination": "/Music.ini"
+    },
+    {
+      "line": 46,
+      "source": "WNotice.ini",
+      "destination": "/WNotice.ini"
+    },
+    {
+      "line": 56,
+      "source": "UI/*.guimat",
+      "destination": "/UI/"
+    },
+    {
+      "line": 57,
+      "source": "UI/Tahoma.ttf",
+      "destination": "/Tahoma.ttf"
+    },
+    {
+      "line": 58,
+      "source": "UI/FontNanum.ttf",
+      "destination": "/UI/FontNanum.ttf"
+    },
+    {
+      "line": 59,
+      "source": "UI/NanumBarunGothic.ttf",
+      "destination": "/UI/NanumBarunGothic.ttf"
+    },
+    {
+      "line": 60,
+      "source": "UI/Image/*",
+      "destination": "/UI/Image/"
+    },
+    {
+      "line": 61,
+      "source": "UI/Panel/**/*",
+      "destination": "/UI/Panel/"
+    },
+    {
+      "line": 64,
+      "source": "Lang/**/*",
+      "destination": "/Lang/"
+    },
+    {
+      "line": 88,
+      "source": "Mesh/KK01bon",
+      "destination": "/Mesh/KK01bon"
+    }
+  ],
+  "upstream_generated_inputs": [
+    {
+      "line": 93,
+      "source": "webclient/client-wasm/assets/optimized-hd/**/*.owhd",
+      "destination": "/OptimizedHD/",
+      "available": false
+    },
+    {
+      "line": 94,
+      "source": "webclient/client-wasm/assets/optimized-hd/generated-manifest.json",
+      "destination": "/OptimizedHD/generated-manifest.json",
+      "available": false
+    }
+  ],
+  "rejected": [],
+  "empty_files": [
+    "Music.txt",
+    "sound.txt",
+    "guilds.txt",
+    "UI/SelCharScene2fix.bin",
+    "UI/Jewelhandiwork.txt"
+  ],
+  "full_manifest": {
+    "path": ".cache/operator-assets-with-layouts.json",
+    "bytes": 1121127,
+    "sha256": "64b82786ecea1648779d2e502392d9493c6c1265ca8b288a37346e8209920c4b"
+  }
+}

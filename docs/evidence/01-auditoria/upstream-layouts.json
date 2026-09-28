@@ -1,0 +1,8215 @@
+{
+  "method": "Clang record layout; original complete header; no packing overrides",
+  "header_sha256": "348ace5c1682f9fef72554198c8bf439694343e617d49af856ac853ce8557d5f",
+  "compiler": "clang version 23.0.0git (https:/github.com/llvm/llvm-project c6c2ad52586c28e74a724570985a48dc0022d250)\nTarget: x86_64-pc-windows-msvc\nThread model: posix\nInstalledDir: C:\\Users\\User\\orca\\workspaces\\w2pp-OpenWyd-WebClient\\start\\.cache\\toolchains\\emsdk\\upstream\\bin",
+  "targets": {
+    "wasm32-unknown-emscripten": {
+      "MSG_STANDARD": {
+        "size": 12,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned short Size"
+          },
+          {
+            "offset": 2,
+            "declaration": "char KeyWord"
+          },
+          {
+            "offset": 3,
+            "declaration": "char CheckSum"
+          },
+          {
+            "offset": 4,
+            "declaration": "unsigned short Type"
+          },
+          {
+            "offset": 6,
+            "declaration": "unsigned short ID"
+          },
+          {
+            "offset": 8,
+            "declaration": "unsigned int Tick"
+          }
+        ]
+      },
+      "MSG_STANDARDPARM": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Parm"
+          }
+        ]
+      },
+      "MSG_STANDARDPARM2": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Parm1"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Parm2"
+          }
+        ]
+      },
+      "MSG_STANDARDPARM3": {
+        "size": 24,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Parm1"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Parm2"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Parm3"
+          }
+        ]
+      },
+      "STRUCT_SCORE": {
+        "size": 48,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short Level"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Ac"
+          },
+          {
+            "offset": 8,
+            "declaration": "int Damage"
+          },
+          {
+            "offset": 12,
+            "declaration": "char Reserved"
+          },
+          {
+            "offset": 13,
+            "declaration": "char AttackRun"
+          },
+          {
+            "offset": 16,
+            "declaration": "int MaxHp"
+          },
+          {
+            "offset": 20,
+            "declaration": "int MaxMp"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Hp"
+          },
+          {
+            "offset": 28,
+            "declaration": "int Mp"
+          },
+          {
+            "offset": 32,
+            "declaration": "short Str"
+          },
+          {
+            "offset": 34,
+            "declaration": "short Int"
+          },
+          {
+            "offset": 36,
+            "declaration": "short Dex"
+          },
+          {
+            "offset": 38,
+            "declaration": "short Con"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned short[4] Special"
+          }
+        ]
+      },
+      "STRUCT_BONUSEFFECT": {
+        "size": 2,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_BONUSEFFECT::(anonymous at C:\\Users\\User\\orca\\workspaces\\w2pp-OpenWyd-WebClient\\start\\external\\OpenWyd\\Projects\\TMProject\\Basedef.h:89:2) "
+          },
+          {
+            "offset": 0,
+            "declaration": "short sValue"
+          }
+        ]
+      },
+      "STRUCT_ITEM": {
+        "size": 8,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short sIndex"
+          },
+          {
+            "offset": 2,
+            "declaration": "STRUCT_BONUSEFFECT[3] stEffect"
+          }
+        ]
+      },
+      "STRUCT_SELCHAR": {
+        "size": 904,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned short[4] HomeTownX"
+          },
+          {
+            "offset": 8,
+            "declaration": "unsigned short[4] HomeTownY"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[4][16] MobName"
+          },
+          {
+            "offset": 80,
+            "declaration": "STRUCT_SCORE[4] Score"
+          },
+          {
+            "offset": 272,
+            "declaration": "STRUCT_ITEM[4][18] Equip"
+          },
+          {
+            "offset": 848,
+            "declaration": "unsigned short[4] Guild"
+          },
+          {
+            "offset": 856,
+            "declaration": "int[4] Coin"
+          },
+          {
+            "offset": 872,
+            "declaration": "long long[4] Exp"
+          }
+        ]
+      },
+      "STRUCT_MOB": {
+        "size": 1040,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 16,
+            "declaration": "char Clan"
+          },
+          {
+            "offset": 17,
+            "declaration": "char Merchant"
+          },
+          {
+            "offset": 18,
+            "declaration": "unsigned short Guild"
+          },
+          {
+            "offset": 20,
+            "declaration": "char Class"
+          },
+          {
+            "offset": 21,
+            "declaration": "char Rsv"
+          },
+          {
+            "offset": 22,
+            "declaration": "unsigned short Quest"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 32,
+            "declaration": "long long Exp"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned short HomeTownX"
+          },
+          {
+            "offset": 42,
+            "declaration": "unsigned short HomeTownY"
+          },
+          {
+            "offset": 44,
+            "declaration": "struct STRUCT_SCORE BaseScore"
+          },
+          {
+            "offset": 92,
+            "declaration": "struct STRUCT_SCORE CurrentScore"
+          },
+          {
+            "offset": 140,
+            "declaration": "STRUCT_ITEM[18] Equip"
+          },
+          {
+            "offset": 284,
+            "declaration": "STRUCT_ITEM[64] Carry"
+          },
+          {
+            "offset": 796,
+            "declaration": "unsigned int[2] LearnedSkill"
+          },
+          {
+            "offset": 804,
+            "declaration": "short ScoreBonus"
+          },
+          {
+            "offset": 806,
+            "declaration": "short SpecialBonus"
+          },
+          {
+            "offset": 808,
+            "declaration": "short SkillBonus"
+          },
+          {
+            "offset": 810,
+            "declaration": "char Critical"
+          },
+          {
+            "offset": 811,
+            "declaration": "char SaveMana"
+          },
+          {
+            "offset": 812,
+            "declaration": "char[4] ShortSkill"
+          },
+          {
+            "offset": 816,
+            "declaration": "char GuildLevel"
+          },
+          {
+            "offset": 817,
+            "declaration": "char Magic"
+          },
+          {
+            "offset": 818,
+            "declaration": "char RegenHP"
+          },
+          {
+            "offset": 819,
+            "declaration": "char RegenMP"
+          },
+          {
+            "offset": 820,
+            "declaration": "char[4] Resist"
+          },
+          {
+            "offset": 824,
+            "declaration": "char[212] dummy"
+          },
+          {
+            "offset": 1036,
+            "declaration": "unsigned short CurrentKill"
+          },
+          {
+            "offset": 1038,
+            "declaration": "unsigned short TotalKill"
+          }
+        ]
+      },
+      "STRUCT_AFFECT": {
+        "size": 8,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char Type"
+          },
+          {
+            "offset": 1,
+            "declaration": "char Level"
+          },
+          {
+            "offset": 2,
+            "declaration": "short Value"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Time"
+          }
+        ]
+      },
+      "STRUCT_MYBONUSEFFECT": {
+        "size": 4,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char cEffect"
+          },
+          {
+            "offset": 1,
+            "declaration": "char cValue"
+          },
+          {
+            "offset": 2,
+            "declaration": "short sValue"
+          }
+        ]
+      },
+      "STRUCT_MYITEM": {
+        "size": 14,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short sIndex"
+          },
+          {
+            "offset": 2,
+            "declaration": "STRUCT_MYBONUSEFFECT[3] stEffect"
+          }
+        ]
+      },
+      "STRUCT_NEEDITEM": {
+        "size": 8,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Access"
+          },
+          {
+            "offset": 4,
+            "declaration": "int dINDEX"
+          }
+        ]
+      },
+      "STRUCT_POSITION": {
+        "size": 8,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int X"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Y"
+          }
+        ]
+      },
+      "STRUCT_RESULT_ITEMLIST": {
+        "size": 2656,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int dNPCHead"
+          },
+          {
+            "offset": 4,
+            "declaration": "struct STRUCT_POSITION pxy"
+          },
+          {
+            "offset": 12,
+            "declaration": "struct STRUCT_MYITEM stItemInfor"
+          },
+          {
+            "offset": 26,
+            "declaration": "unsigned short sMSG"
+          },
+          {
+            "offset": 28,
+            "declaration": "STRUCT_NEEDITEM[8] dNeedItemList"
+          },
+          {
+            "offset": 92,
+            "declaration": "unsigned int dCost"
+          },
+          {
+            "offset": 96,
+            "declaration": "char[20][128] stSameList"
+          }
+        ]
+      },
+      "STRUCT_OPTION": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int[2] dClass"
+          },
+          {
+            "offset": 8,
+            "declaration": "unsigned int[2] dPOS"
+          }
+        ]
+      },
+      "STRUCT_NEED_ITEMLIST": {
+        "size": 64,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Textnum"
+          },
+          {
+            "offset": 4,
+            "declaration": "unsigned int dVolume"
+          },
+          {
+            "offset": 8,
+            "declaration": "struct STRUCT_MYITEM stGridItem"
+          },
+          {
+            "offset": 24,
+            "declaration": "unsigned int[6] dListIndexArry"
+          },
+          {
+            "offset": 48,
+            "declaration": "struct STRUCT_OPTION stOption"
+          }
+        ]
+      },
+      "STRUCT_REFER": {
+        "size": 12,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int dindex"
+          },
+          {
+            "offset": 4,
+            "declaration": "unsigned int dHavevolume"
+          },
+          {
+            "offset": 8,
+            "declaration": "int bItemListrefer"
+          }
+        ]
+      },
+      "STRUCT_MIXHELP": {
+        "size": 1300,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short[9] Color"
+          },
+          {
+            "offset": 18,
+            "declaration": "short Icon"
+          },
+          {
+            "offset": 20,
+            "declaration": "char[9][128] Help"
+          },
+          {
+            "offset": 1172,
+            "declaration": "char[128] Name"
+          }
+        ]
+      },
+      "STRUCT_MISSIONITEM": {
+        "size": 12,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int dHavevolume"
+          },
+          {
+            "offset": 4,
+            "declaration": "unsigned int[2] dNeedvolume"
+          }
+        ]
+      },
+      "STRUCT_REPURCHASEITEM": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Order"
+          },
+          {
+            "offset": 4,
+            "declaration": "struct STRUCT_ITEM stItem"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Price"
+          }
+        ]
+      },
+      "STRUCT_STATICEFFECT": {
+        "size": 4,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short sEffect"
+          },
+          {
+            "offset": 2,
+            "declaration": "short sValue"
+          }
+        ]
+      },
+      "STRUCT_ITEMLIST": {
+        "size": 164,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[64] Name"
+          },
+          {
+            "offset": 64,
+            "declaration": "short nIndexMesh"
+          },
+          {
+            "offset": 66,
+            "declaration": "short nIndexTexture"
+          },
+          {
+            "offset": 68,
+            "declaration": "short nIndexVisualEffect"
+          },
+          {
+            "offset": 70,
+            "declaration": "short nReqLvl"
+          },
+          {
+            "offset": 72,
+            "declaration": "short nReqStr"
+          },
+          {
+            "offset": 74,
+            "declaration": "short nReqInt"
+          },
+          {
+            "offset": 76,
+            "declaration": "short nReqDex"
+          },
+          {
+            "offset": 78,
+            "declaration": "short nReqCon"
+          },
+          {
+            "offset": 80,
+            "declaration": "STRUCT_STATICEFFECT[12] stEffect"
+          },
+          {
+            "offset": 128,
+            "declaration": "int nPrice"
+          },
+          {
+            "offset": 132,
+            "declaration": "short nUnique"
+          },
+          {
+            "offset": 134,
+            "declaration": "short UNK_1"
+          },
+          {
+            "offset": 136,
+            "declaration": "int nPos"
+          },
+          {
+            "offset": 140,
+            "declaration": "short nExtra"
+          },
+          {
+            "offset": 142,
+            "declaration": "short nGrade"
+          },
+          {
+            "offset": 144,
+            "declaration": "int UNK_2"
+          },
+          {
+            "offset": 148,
+            "declaration": "short mType"
+          },
+          {
+            "offset": 150,
+            "declaration": "short mData"
+          },
+          {
+            "offset": 152,
+            "declaration": "short UNK_3"
+          },
+          {
+            "offset": 154,
+            "declaration": "short UNK_4"
+          },
+          {
+            "offset": 156,
+            "declaration": "unsigned short[4] UnkNewValues"
+          }
+        ]
+      },
+      "STRUCT_EXT1": {
+        "size": 288,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int[8] Data"
+          },
+          {
+            "offset": 32,
+            "declaration": "STRUCT_AFFECT[32] Affect"
+          }
+        ]
+      },
+      "STRUCT_SUBCLASS": {
+        "size": 96,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int[2] LearnedSkill"
+          },
+          {
+            "offset": 8,
+            "declaration": "struct STRUCT_ITEM Equip"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_SCORE CurrentScore"
+          },
+          {
+            "offset": 64,
+            "declaration": "long long Exp"
+          },
+          {
+            "offset": 72,
+            "declaration": "char[20] ShortSkill"
+          },
+          {
+            "offset": 92,
+            "declaration": "short ScoreBonus"
+          },
+          {
+            "offset": 94,
+            "declaration": "short SkillBonus"
+          }
+        ]
+      },
+      "STRUCT_EXT2": {
+        "size": 360,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[12] Quest"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned int LastConnectTime"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_SUBCLASS[2] SubClass"
+          },
+          {
+            "offset": 208,
+            "declaration": "char[16] ItemPassWord"
+          },
+          {
+            "offset": 224,
+            "declaration": "unsigned int ItemPos"
+          },
+          {
+            "offset": 228,
+            "declaration": "int SendLevItem"
+          },
+          {
+            "offset": 232,
+            "declaration": "short AdminGuildItem"
+          },
+          {
+            "offset": 234,
+            "declaration": "char[126] Dummy"
+          }
+        ]
+      },
+      "STRUCT_DAM": {
+        "size": 8,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Damage"
+          }
+        ]
+      },
+      "STRUCT_SPELL": {
+        "size": 104,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int SkillPoint"
+          },
+          {
+            "offset": 4,
+            "declaration": "int TargetType"
+          },
+          {
+            "offset": 8,
+            "declaration": "int ManaSpent"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Delay"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Range"
+          },
+          {
+            "offset": 20,
+            "declaration": "int InstanceType"
+          },
+          {
+            "offset": 24,
+            "declaration": "int InstanceValue"
+          },
+          {
+            "offset": 28,
+            "declaration": "int TickType"
+          },
+          {
+            "offset": 32,
+            "declaration": "int TickValue"
+          },
+          {
+            "offset": 36,
+            "declaration": "int AffectType"
+          },
+          {
+            "offset": 40,
+            "declaration": "int AffectValue"
+          },
+          {
+            "offset": 44,
+            "declaration": "int AffectTime"
+          },
+          {
+            "offset": 48,
+            "declaration": "char[8] Act1"
+          },
+          {
+            "offset": 56,
+            "declaration": "char[8] Act2"
+          },
+          {
+            "offset": 64,
+            "declaration": "int InstanceAttribute"
+          },
+          {
+            "offset": 68,
+            "declaration": "int TickAttribute"
+          },
+          {
+            "offset": 72,
+            "declaration": "int Aggressive"
+          },
+          {
+            "offset": 76,
+            "declaration": "int MaxTarget"
+          },
+          {
+            "offset": 80,
+            "declaration": "int bParty"
+          },
+          {
+            "offset": 84,
+            "declaration": "int AffectResist"
+          },
+          {
+            "offset": 88,
+            "declaration": "int Passive"
+          },
+          {
+            "offset": 92,
+            "declaration": "int ForceDamage"
+          },
+          {
+            "offset": 96,
+            "declaration": "int SkillIndex"
+          },
+          {
+            "offset": 100,
+            "declaration": "int Reserved"
+          }
+        ]
+      },
+      "STRUCT_INITITEM": {
+        "size": 8,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 2,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 4,
+            "declaration": "short sIndex"
+          },
+          {
+            "offset": 6,
+            "declaration": "short Rotate"
+          }
+        ]
+      },
+      "STRUCT_AIRMOVELIST": {
+        "size": 8,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int nX"
+          },
+          {
+            "offset": 4,
+            "declaration": "int nY"
+          }
+        ]
+      },
+      "STRUCT_TOTOLIST": {
+        "size": 96,
+        "alignment": 1,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[32] szTime"
+          },
+          {
+            "offset": 32,
+            "declaration": "char[32] szTeamA"
+          },
+          {
+            "offset": 64,
+            "declaration": "char[32] szTeamB"
+          }
+        ]
+      },
+      "STRUCT_LOTTO": {
+        "size": 8,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short sIndex"
+          },
+          {
+            "offset": 2,
+            "declaration": "char[6] Num"
+          }
+        ]
+      },
+      "STRUCT_SCORE_OLD": {
+        "size": 28,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short Level"
+          },
+          {
+            "offset": 2,
+            "declaration": "short Ac"
+          },
+          {
+            "offset": 4,
+            "declaration": "short Damage"
+          },
+          {
+            "offset": 6,
+            "declaration": "char Reserved"
+          },
+          {
+            "offset": 7,
+            "declaration": "char AttackRun"
+          },
+          {
+            "offset": 8,
+            "declaration": "unsigned short MaxHp"
+          },
+          {
+            "offset": 10,
+            "declaration": "unsigned short MaxMp"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short Hp"
+          },
+          {
+            "offset": 14,
+            "declaration": "unsigned short Mp"
+          },
+          {
+            "offset": 16,
+            "declaration": "short Str"
+          },
+          {
+            "offset": 18,
+            "declaration": "short Int"
+          },
+          {
+            "offset": 20,
+            "declaration": "short Dex"
+          },
+          {
+            "offset": 22,
+            "declaration": "short Con"
+          },
+          {
+            "offset": 24,
+            "declaration": "char[4] Special"
+          }
+        ]
+      },
+      "STRUCT_M_CHECK": {
+        "size": 12,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Type"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Parm1"
+          },
+          {
+            "offset": 8,
+            "declaration": "int Parm2"
+          }
+        ]
+      },
+      "STRUCT_GUILDLIST": {
+        "size": 60,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int GuildIndex"
+          },
+          {
+            "offset": 4,
+            "declaration": "char[4][12] GuildName"
+          },
+          {
+            "offset": 52,
+            "declaration": "char GCount"
+          },
+          {
+            "offset": 53,
+            "declaration": "char Citizen"
+          },
+          {
+            "offset": 54,
+            "declaration": "char Mandle"
+          },
+          {
+            "offset": 56,
+            "declaration": "unsigned int Fame"
+          }
+        ]
+      },
+      "STRUCT_TREASURE": {
+        "size": 52,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short Source"
+          },
+          {
+            "offset": 2,
+            "declaration": "STRUCT_ITEM[5] Target"
+          },
+          {
+            "offset": 42,
+            "declaration": "short[5] Rate"
+          }
+        ]
+      },
+      "STRUCT_TOTODATA": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int index"
+          },
+          {
+            "offset": 4,
+            "declaration": "int A_Score"
+          },
+          {
+            "offset": 8,
+            "declaration": "int B_Score"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned int A_BuyCount"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned int B_BuyCount"
+          },
+          {
+            "offset": 20,
+            "declaration": "unsigned int C_BuyCount"
+          },
+          {
+            "offset": 24,
+            "declaration": "int towshare"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNT": {
+        "size": 212,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[16] AccountPass"
+          },
+          {
+            "offset": 32,
+            "declaration": "char[24] RealName"
+          },
+          {
+            "offset": 56,
+            "declaration": "unsigned int SSN1"
+          },
+          {
+            "offset": 60,
+            "declaration": "unsigned int SSN2"
+          },
+          {
+            "offset": 64,
+            "declaration": "char[102] Temp"
+          },
+          {
+            "offset": 168,
+            "declaration": "STRUCT_AFFECT[2] Affect"
+          },
+          {
+            "offset": 184,
+            "declaration": "unsigned int AccountIndex"
+          },
+          {
+            "offset": 188,
+            "declaration": "unsigned int AccountLastConnectTime"
+          },
+          {
+            "offset": 192,
+            "declaration": "char[16] ItemPassWord"
+          },
+          {
+            "offset": 208,
+            "declaration": "unsigned short GameServer"
+          },
+          {
+            "offset": 210,
+            "declaration": "unsigned short Rsv"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE": {
+        "size": 8000,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT Account"
+          },
+          {
+            "offset": 216,
+            "declaration": "STRUCT_MOB[4] Char"
+          },
+          {
+            "offset": 4376,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 5336,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 5340,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 5404,
+            "declaration": "STRUCT_EXT1[4] Ext1"
+          },
+          {
+            "offset": 6560,
+            "declaration": "STRUCT_EXT2[4] Ext2"
+          }
+        ]
+      },
+      "STRUCT_SUBCLASS_OLD": {
+        "size": 68,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int LearnedSkill"
+          },
+          {
+            "offset": 4,
+            "declaration": "struct STRUCT_ITEM Equip"
+          },
+          {
+            "offset": 12,
+            "declaration": "struct STRUCT_SCORE_OLD CurrentScore"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned int Exp"
+          },
+          {
+            "offset": 44,
+            "declaration": "char[20] ShortSkill"
+          },
+          {
+            "offset": 64,
+            "declaration": "short ScoreBonus"
+          },
+          {
+            "offset": 66,
+            "declaration": "short SkillBonus"
+          }
+        ]
+      },
+      "STRUCT_EXT2_OLD": {
+        "size": 288,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[12] Quest"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned int LastConnectTime"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_SUBCLASS_OLD[2] SubClass"
+          },
+          {
+            "offset": 152,
+            "declaration": "char[16] ItemPassWord"
+          },
+          {
+            "offset": 168,
+            "declaration": "unsigned int ItemPos"
+          },
+          {
+            "offset": 172,
+            "declaration": "int SendLevItem"
+          },
+          {
+            "offset": 176,
+            "declaration": "char[112] dummy"
+          }
+        ]
+      },
+      "STRUCT_REQ": {
+        "size": 6,
+        "alignment": 1,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "_Bool Class"
+          },
+          {
+            "offset": 1,
+            "declaration": "_Bool Level"
+          },
+          {
+            "offset": 2,
+            "declaration": "_Bool Str"
+          },
+          {
+            "offset": 3,
+            "declaration": "_Bool Dex"
+          },
+          {
+            "offset": 4,
+            "declaration": "_Bool Int"
+          },
+          {
+            "offset": 5,
+            "declaration": "_Bool Con"
+          }
+        ]
+      },
+      "STRUCT_LEVSENDITEM": {
+        "size": 68,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int lev"
+          },
+          {
+            "offset": 4,
+            "declaration": "STRUCT_ITEM[4][2] item"
+          }
+        ]
+      },
+      "STRUCT_RANDOMQUIZ": {
+        "size": 256,
+        "alignment": 1,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[128] Question"
+          },
+          {
+            "offset": 128,
+            "declaration": "char[4][32] Answer"
+          }
+        ]
+      },
+      "STRUCT_ITEMHELP": {
+        "size": 1188,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int[9] Color"
+          },
+          {
+            "offset": 36,
+            "declaration": "char[9][128] Help"
+          }
+        ]
+      },
+      "STRUCT_MOB_OLD": {
+        "size": 772,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 16,
+            "declaration": "char Clan"
+          },
+          {
+            "offset": 17,
+            "declaration": "char Merchant"
+          },
+          {
+            "offset": 18,
+            "declaration": "unsigned short Guild"
+          },
+          {
+            "offset": 20,
+            "declaration": "char Class"
+          },
+          {
+            "offset": 21,
+            "declaration": "char Rsv"
+          },
+          {
+            "offset": 22,
+            "declaration": "unsigned short Quest"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 28,
+            "declaration": "unsigned int Exp"
+          },
+          {
+            "offset": 32,
+            "declaration": "unsigned short HomeTownX"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short HomeTownY"
+          },
+          {
+            "offset": 36,
+            "declaration": "struct STRUCT_SCORE_OLD BaseScore"
+          },
+          {
+            "offset": 64,
+            "declaration": "struct STRUCT_SCORE_OLD CurrentScore"
+          },
+          {
+            "offset": 92,
+            "declaration": "STRUCT_ITEM[18] Equip"
+          },
+          {
+            "offset": 236,
+            "declaration": "STRUCT_ITEM[64] Carry"
+          },
+          {
+            "offset": 748,
+            "declaration": "unsigned int LearnedSkill"
+          },
+          {
+            "offset": 752,
+            "declaration": "short ScoreBonus"
+          },
+          {
+            "offset": 754,
+            "declaration": "short SpecialBonus"
+          },
+          {
+            "offset": 756,
+            "declaration": "short SkillBonus"
+          },
+          {
+            "offset": 758,
+            "declaration": "char Critical"
+          },
+          {
+            "offset": 759,
+            "declaration": "char SaveMana"
+          },
+          {
+            "offset": 760,
+            "declaration": "char[4] ShortSkill"
+          },
+          {
+            "offset": 764,
+            "declaration": "char GuildLevel"
+          },
+          {
+            "offset": 765,
+            "declaration": "char Magic"
+          },
+          {
+            "offset": 766,
+            "declaration": "char RegenHP"
+          },
+          {
+            "offset": 767,
+            "declaration": "char RegenMP"
+          },
+          {
+            "offset": 768,
+            "declaration": "char[4] Resist"
+          }
+        ]
+      },
+      "STRUCT_COMBINE": {
+        "size": 68,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Target"
+          },
+          {
+            "offset": 4,
+            "declaration": "int[8] Source"
+          },
+          {
+            "offset": 36,
+            "declaration": "int[8] Refine"
+          }
+        ]
+      },
+      "STRUCT_BEASTBONUS": {
+        "size": 68,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Int_Damage"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Spe_Damage"
+          },
+          {
+            "offset": 8,
+            "declaration": "int Int_Ac"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Spe_Ac"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Int_Hp"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Spe_Hp"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Int_Run"
+          },
+          {
+            "offset": 28,
+            "declaration": "int Spe_Run"
+          },
+          {
+            "offset": 32,
+            "declaration": "int Int_Attack"
+          },
+          {
+            "offset": 36,
+            "declaration": "int Spe_Attack"
+          },
+          {
+            "offset": 40,
+            "declaration": "int Int_Critical"
+          },
+          {
+            "offset": 44,
+            "declaration": "int Spe_Critical"
+          },
+          {
+            "offset": 48,
+            "declaration": "int Int_Resist"
+          },
+          {
+            "offset": 52,
+            "declaration": "int Spe_Regist"
+          },
+          {
+            "offset": 56,
+            "declaration": "int Int_Delay"
+          },
+          {
+            "offset": 60,
+            "declaration": "int Spe_Delay"
+          },
+          {
+            "offset": 64,
+            "declaration": "int SancLevel"
+          }
+        ]
+      },
+      "STRUCT_EXT": {
+        "size": 160,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int[8] Data"
+          },
+          {
+            "offset": 32,
+            "declaration": "STRUCT_AFFECT[12] Affect"
+          },
+          {
+            "offset": 128,
+            "declaration": "char[32] Quest"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE_OLD": {
+        "size": 4968,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT Account"
+          },
+          {
+            "offset": 212,
+            "declaration": "STRUCT_MOB_OLD[4] Char"
+          },
+          {
+            "offset": 3300,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 4260,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 4264,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 4328,
+            "declaration": "STRUCT_EXT[4] Ext"
+          }
+        ]
+      },
+      "STRUCT_EXT1_OLD": {
+        "size": 160,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int[8] Data"
+          },
+          {
+            "offset": 32,
+            "declaration": "STRUCT_AFFECT[16] Affect"
+          }
+        ]
+      },
+      "STRUCT_MISSION": {
+        "size": 1348,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Arrival"
+          },
+          {
+            "offset": 4,
+            "declaration": "STRUCT_ITEM[8] cItem"
+          },
+          {
+            "offset": 68,
+            "declaration": "STRUCT_ITEM[10] rItem"
+          },
+          {
+            "offset": 148,
+            "declaration": "STRUCT_M_CHECK[8][10] Item"
+          },
+          {
+            "offset": 1108,
+            "declaration": "STRUCT_M_CHECK[10] Condition"
+          },
+          {
+            "offset": 1228,
+            "declaration": "STRUCT_M_CHECK[10] Reward"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE_OLD2": {
+        "size": 6120,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT Account"
+          },
+          {
+            "offset": 212,
+            "declaration": "STRUCT_MOB_OLD[4] Char"
+          },
+          {
+            "offset": 3300,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 4260,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 4264,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 4328,
+            "declaration": "STRUCT_EXT1_OLD[4] Ext1"
+          },
+          {
+            "offset": 4968,
+            "declaration": "STRUCT_EXT2_OLD[4] Ext2"
+          }
+        ]
+      },
+      "STRUCT_GUILDZONE": {
+        "size": 84,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int ChargeGuild"
+          },
+          {
+            "offset": 4,
+            "declaration": "int ChallangeGuild"
+          },
+          {
+            "offset": 8,
+            "declaration": "int GuildStartX"
+          },
+          {
+            "offset": 12,
+            "declaration": "int GuildStartY"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_POSITION Start"
+          },
+          {
+            "offset": 24,
+            "declaration": "int vx1"
+          },
+          {
+            "offset": 28,
+            "declaration": "int vy1"
+          },
+          {
+            "offset": 32,
+            "declaration": "int vx2"
+          },
+          {
+            "offset": 36,
+            "declaration": "int vy2"
+          },
+          {
+            "offset": 40,
+            "declaration": "int ax1"
+          },
+          {
+            "offset": 44,
+            "declaration": "int ay1"
+          },
+          {
+            "offset": 48,
+            "declaration": "int ax2"
+          },
+          {
+            "offset": 52,
+            "declaration": "int ay2"
+          },
+          {
+            "offset": 56,
+            "declaration": "int hx"
+          },
+          {
+            "offset": 60,
+            "declaration": "int hy"
+          },
+          {
+            "offset": 64,
+            "declaration": "int gx"
+          },
+          {
+            "offset": 68,
+            "declaration": "int gy"
+          },
+          {
+            "offset": 72,
+            "declaration": "int Tax"
+          },
+          {
+            "offset": 76,
+            "declaration": "int ChargeClan"
+          },
+          {
+            "offset": 80,
+            "declaration": "int ChargeCount"
+          }
+        ]
+      },
+      "STRUCT_SELCHAR_OLD": {
+        "size": 808,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned short[4] HomeTownX"
+          },
+          {
+            "offset": 8,
+            "declaration": "unsigned short[4] HomeTownY"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[4][16] MobName"
+          },
+          {
+            "offset": 80,
+            "declaration": "STRUCT_SCORE_OLD[4] Score"
+          },
+          {
+            "offset": 192,
+            "declaration": "STRUCT_ITEM[4][18] Equip"
+          },
+          {
+            "offset": 768,
+            "declaration": "unsigned short[4] Guild"
+          },
+          {
+            "offset": 776,
+            "declaration": "int[4] Coin"
+          },
+          {
+            "offset": 792,
+            "declaration": "unsigned int[4] Exp"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNT_NEW": {
+        "size": 212,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[16] AccountPass"
+          },
+          {
+            "offset": 32,
+            "declaration": "char[24] RealName"
+          },
+          {
+            "offset": 56,
+            "declaration": "unsigned int SSN1"
+          },
+          {
+            "offset": 60,
+            "declaration": "unsigned int SSN2"
+          },
+          {
+            "offset": 64,
+            "declaration": "char[102] Temp"
+          },
+          {
+            "offset": 168,
+            "declaration": "STRUCT_AFFECT[2] Affect"
+          },
+          {
+            "offset": 184,
+            "declaration": "unsigned int AccountIndex"
+          },
+          {
+            "offset": 188,
+            "declaration": "unsigned int AccountLastConnectTime"
+          },
+          {
+            "offset": 192,
+            "declaration": "char[16] ItemPassWord"
+          },
+          {
+            "offset": 208,
+            "declaration": "unsigned short GameServer"
+          },
+          {
+            "offset": 210,
+            "declaration": "unsigned short Rsv"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE_OLD_NEW": {
+        "size": 4968,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT_NEW Account"
+          },
+          {
+            "offset": 212,
+            "declaration": "STRUCT_MOB_OLD[4] Char"
+          },
+          {
+            "offset": 3300,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 4260,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 4264,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 4328,
+            "declaration": "STRUCT_EXT[4] Ext"
+          }
+        ]
+      },
+      "STRUCT_SAME": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short[8] dINDEX"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned int dAttribute"
+          }
+        ]
+      },
+      "STRUCT_RARE": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int MonsterFace"
+          },
+          {
+            "offset": 4,
+            "declaration": "int DropRate"
+          },
+          {
+            "offset": 8,
+            "declaration": "struct STRUCT_ITEM item"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Count"
+          }
+        ]
+      },
+      "STRUCT_ADMINGUILDITEM": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int lev"
+          },
+          {
+            "offset": 4,
+            "declaration": "int kind"
+          },
+          {
+            "offset": 8,
+            "declaration": "struct STRUCT_ITEM item"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE_NEW": {
+        "size": 8000,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT_NEW Account"
+          },
+          {
+            "offset": 216,
+            "declaration": "STRUCT_MOB[4] Char"
+          },
+          {
+            "offset": 4376,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 5336,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 5340,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 5404,
+            "declaration": "STRUCT_EXT1[4] Ext1"
+          },
+          {
+            "offset": 6560,
+            "declaration": "STRUCT_EXT2[4] Ext2"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE_OLD2_NEW": {
+        "size": 6120,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT_NEW Account"
+          },
+          {
+            "offset": 212,
+            "declaration": "STRUCT_MOB_OLD[4] Char"
+          },
+          {
+            "offset": 3300,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 4260,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 4264,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 4328,
+            "declaration": "STRUCT_EXT1_OLD[4] Ext1"
+          },
+          {
+            "offset": 4968,
+            "declaration": "STRUCT_EXT2_OLD[4] Ext2"
+          }
+        ]
+      },
+      "STRUCT_RUNEQUESTZONE": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int StartX"
+          },
+          {
+            "offset": 4,
+            "declaration": "int StartY"
+          },
+          {
+            "offset": 8,
+            "declaration": "int iLeader"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Type"
+          }
+        ]
+      },
+      "STRUCT_AUTOKICK": {
+        "size": 512,
+        "alignment": 1,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[4][128] route"
+          }
+        ]
+      },
+      "MSG_Action": {
+        "size": 52,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 14,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Effect"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Speed"
+          },
+          {
+            "offset": 24,
+            "declaration": "char[24] Route"
+          },
+          {
+            "offset": 48,
+            "declaration": "unsigned short TargetX"
+          },
+          {
+            "offset": 50,
+            "declaration": "unsigned short TargetY"
+          }
+        ]
+      },
+      "MSG_Motion": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short Motion"
+          },
+          {
+            "offset": 14,
+            "declaration": "short Parm"
+          },
+          {
+            "offset": 16,
+            "declaration": "float Direction"
+          }
+        ]
+      },
+      "MSG_CAPSULEINFO": {
+        "size": 56,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned int CIndex"
+          },
+          {
+            "offset": 16,
+            "declaration": "short Class"
+          },
+          {
+            "offset": 18,
+            "declaration": "short Level"
+          },
+          {
+            "offset": 20,
+            "declaration": "short sStr"
+          },
+          {
+            "offset": 22,
+            "declaration": "short sInt"
+          },
+          {
+            "offset": 24,
+            "declaration": "short sDex"
+          },
+          {
+            "offset": 26,
+            "declaration": "short sCon"
+          },
+          {
+            "offset": 28,
+            "declaration": "short[4] Mastery"
+          },
+          {
+            "offset": 36,
+            "declaration": "short[9] skill"
+          },
+          {
+            "offset": 54,
+            "declaration": "short Quest"
+          }
+        ]
+      },
+      "MSG_Trade": {
+        "size": 156,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "STRUCT_ITEM[15] Item"
+          },
+          {
+            "offset": 132,
+            "declaration": "char[15] CarryPos"
+          },
+          {
+            "offset": 148,
+            "declaration": "int TradeMoney"
+          },
+          {
+            "offset": 152,
+            "declaration": "char MyCheck"
+          },
+          {
+            "offset": 154,
+            "declaration": "unsigned short OpponentID"
+          }
+        ]
+      },
+      "MSG_CombineItem": {
+        "size": 84,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "STRUCT_ITEM[8] Item"
+          },
+          {
+            "offset": 76,
+            "declaration": "char[8] CarryPos"
+          }
+        ]
+      },
+      "MSG_Mission": {
+        "size": 88,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int MissionNo"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_ITEM[8] Item"
+          },
+          {
+            "offset": 80,
+            "declaration": "char[8] CarryPos"
+          }
+        ]
+      },
+      "MSG_CNFAccountLogin": {
+        "size": 1928,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[16] SecretCode"
+          },
+          {
+            "offset": 32,
+            "declaration": "struct STRUCT_SELCHAR SelChar"
+          },
+          {
+            "offset": 936,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 1896,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 1900,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 1916,
+            "declaration": "int SSN1"
+          },
+          {
+            "offset": 1920,
+            "declaration": "int SSN2"
+          }
+        ]
+      },
+      "MSG_UseItem": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int SourType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int SourPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int DestType"
+          },
+          {
+            "offset": 24,
+            "declaration": "int DestPos"
+          },
+          {
+            "offset": 28,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 30,
+            "declaration": "unsigned short GridY"
+          },
+          {
+            "offset": 32,
+            "declaration": "unsigned short ItemID"
+          }
+        ]
+      },
+      "MSG_UseItem2": {
+        "size": 52,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int SourType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int SourPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int DestType"
+          },
+          {
+            "offset": 24,
+            "declaration": "int DestPos"
+          },
+          {
+            "offset": 28,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 30,
+            "declaration": "unsigned short GridY"
+          },
+          {
+            "offset": 32,
+            "declaration": "unsigned short ItemID"
+          },
+          {
+            "offset": 34,
+            "declaration": "char[16] Parm"
+          }
+        ]
+      },
+      "MSG_CAPSULEUSEITEM": {
+        "size": 52,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int SourType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int SourPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int DestType"
+          },
+          {
+            "offset": 24,
+            "declaration": "int DestPos"
+          },
+          {
+            "offset": 28,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 30,
+            "declaration": "unsigned short GridY"
+          },
+          {
+            "offset": 32,
+            "declaration": "unsigned short ItemID"
+          },
+          {
+            "offset": 34,
+            "declaration": "char[16] NewMobname"
+          }
+        ]
+      },
+      "MSG_AutoTrade": {
+        "size": 196,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[24] Desc"
+          },
+          {
+            "offset": 36,
+            "declaration": "STRUCT_ITEM[12] Item"
+          },
+          {
+            "offset": 132,
+            "declaration": "char[12] CarryPos"
+          },
+          {
+            "offset": 144,
+            "declaration": "int[12] TradeMoney"
+          },
+          {
+            "offset": 192,
+            "declaration": "unsigned short Tax"
+          },
+          {
+            "offset": 194,
+            "declaration": "unsigned short TargetID"
+          }
+        ]
+      },
+      "MSG_MOVESTOP": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int NextX"
+          },
+          {
+            "offset": 16,
+            "declaration": "int NextY"
+          },
+          {
+            "offset": 20,
+            "declaration": "int CurrentX"
+          },
+          {
+            "offset": 24,
+            "declaration": "int CurrentY"
+          },
+          {
+            "offset": 28,
+            "declaration": "int LastX"
+          },
+          {
+            "offset": 32,
+            "declaration": "int LastY"
+          }
+        ]
+      },
+      "MSG_BuyToto": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 14,
+            "declaration": "short TargetCarryPos"
+          },
+          {
+            "offset": 16,
+            "declaration": "short MyCarryPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Gindex"
+          },
+          {
+            "offset": 28,
+            "declaration": "int A_Score"
+          },
+          {
+            "offset": 32,
+            "declaration": "int B_Score"
+          }
+        ]
+      },
+      "MSG_CNFRemoveServer": {
+        "size": 80,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 28,
+            "declaration": "char[52] TID"
+          }
+        ]
+      },
+      "MSG_SendItem": {
+        "size": 24,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short DestType"
+          },
+          {
+            "offset": 14,
+            "declaration": "short DestPos"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_ITEM Item"
+          }
+        ]
+      },
+      "MSG_UpdateEquip": {
+        "size": 68,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short[18] sEquip"
+          },
+          {
+            "offset": 48,
+            "declaration": "char[18] Equip2"
+          }
+        ]
+      },
+      "MSG_UpdateAffect": {
+        "size": 268,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "STRUCT_AFFECT[32] Affect"
+          }
+        ]
+      },
+      "MSG_AccountLogin": {
+        "size": 116,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[12] AccountPass"
+          },
+          {
+            "offset": 24,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 40,
+            "declaration": "char[52] TID"
+          },
+          {
+            "offset": 92,
+            "declaration": "int Version"
+          },
+          {
+            "offset": 96,
+            "declaration": "int Force"
+          },
+          {
+            "offset": 100,
+            "declaration": "unsigned int[4] Mac"
+          }
+        ]
+      },
+      "MSG_MessageWhisper": {
+        "size": 160,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 28,
+            "declaration": "char[128] String"
+          },
+          {
+            "offset": 156,
+            "declaration": "short Color"
+          }
+        ]
+      },
+      "MSG_Encode": {
+        "size": 180,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int[42] Parm"
+          }
+        ]
+      },
+      "MSG_MessageChat": {
+        "size": 140,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[128] String"
+          }
+        ]
+      },
+      "MSG_UpdateScore": {
+        "size": 152,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "struct STRUCT_SCORE Score"
+          },
+          {
+            "offset": 60,
+            "declaration": "char Critical"
+          },
+          {
+            "offset": 61,
+            "declaration": "char SaveMana"
+          },
+          {
+            "offset": 62,
+            "declaration": "unsigned short[32] Affect"
+          },
+          {
+            "offset": 126,
+            "declaration": "unsigned short Guild"
+          },
+          {
+            "offset": 128,
+            "declaration": "unsigned short GuildLevel"
+          },
+          {
+            "offset": 130,
+            "declaration": "char[4] Resist"
+          },
+          {
+            "offset": 136,
+            "declaration": "int ReqHp"
+          },
+          {
+            "offset": 140,
+            "declaration": "int ReqMp"
+          },
+          {
+            "offset": 144,
+            "declaration": "unsigned short Magic"
+          },
+          {
+            "offset": 146,
+            "declaration": "unsigned short Rsv"
+          },
+          {
+            "offset": 148,
+            "declaration": "char LearnedSkill"
+          }
+        ]
+      },
+      "MSG_UpdateEtc": {
+        "size": 48,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int FakeExp"
+          },
+          {
+            "offset": 16,
+            "declaration": "long long Exp"
+          },
+          {
+            "offset": 24,
+            "declaration": "unsigned int[2] LearnedSkill"
+          },
+          {
+            "offset": 32,
+            "declaration": "short ScoreBonus"
+          },
+          {
+            "offset": 34,
+            "declaration": "short SpecialBonus"
+          },
+          {
+            "offset": 36,
+            "declaration": "short SkillBonus"
+          },
+          {
+            "offset": 40,
+            "declaration": "int Coin"
+          }
+        ]
+      },
+      "MSG_MessagePanel": {
+        "size": 140,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[128] String"
+          }
+        ]
+      },
+      "MSG_CHARPASSWORD": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[16] ItemPassWord"
+          },
+          {
+            "offset": 28,
+            "declaration": "char State"
+          }
+        ]
+      },
+      "MSG_CharacterLogin": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Slot"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Force"
+          },
+          {
+            "offset": 20,
+            "declaration": "char[16] SecretCode"
+          }
+        ]
+      },
+      "MSG_NewCharacter": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Slot"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 32,
+            "declaration": "int Class"
+          }
+        ]
+      },
+      "MSG_ReqTransper": {
+        "size": 52,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Result"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Slot"
+          },
+          {
+            "offset": 20,
+            "declaration": "char[16] OldName"
+          },
+          {
+            "offset": 36,
+            "declaration": "char[16] NewName"
+          }
+        ]
+      },
+      "MSG_DeleteCharacter": {
+        "size": 48,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Slot"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 32,
+            "declaration": "char[16] Password"
+          }
+        ]
+      },
+      "MSG_CNFNewCharacter": {
+        "size": 920,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_SELCHAR SelChar"
+          }
+        ]
+      },
+      "MSG_CNFDeleteCharacter": {
+        "size": 920,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_SELCHAR SelChar"
+          }
+        ]
+      },
+      "MSG_CNFCharacterLogin": {
+        "size": 1728,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 14,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_MOB MOB"
+          },
+          {
+            "offset": 1056,
+            "declaration": "unsigned short Slot"
+          },
+          {
+            "offset": 1058,
+            "declaration": "unsigned short ClientID"
+          },
+          {
+            "offset": 1060,
+            "declaration": "unsigned short Weather"
+          },
+          {
+            "offset": 1062,
+            "declaration": "char[16] ShortSkill"
+          },
+          {
+            "offset": 1080,
+            "declaration": "struct STRUCT_EXT1 Ext1"
+          },
+          {
+            "offset": 1368,
+            "declaration": "struct STRUCT_EXT2 Ext2"
+          }
+        ]
+      },
+      "MSG_INITGULDNAME": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Parm"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[12] GuildName"
+          }
+        ]
+      },
+      "MSG_MessageLog": {
+        "size": 140,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[128] String"
+          }
+        ]
+      },
+      "MSG_CreateMob": {
+        "size": 236,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 14,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short MobID"
+          },
+          {
+            "offset": 18,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short[18] Equip"
+          },
+          {
+            "offset": 70,
+            "declaration": "unsigned short[32] Affect"
+          },
+          {
+            "offset": 134,
+            "declaration": "unsigned short Guild"
+          },
+          {
+            "offset": 136,
+            "declaration": "char GuildLevel"
+          },
+          {
+            "offset": 140,
+            "declaration": "struct STRUCT_SCORE Score"
+          },
+          {
+            "offset": 188,
+            "declaration": "unsigned short CreateType"
+          },
+          {
+            "offset": 190,
+            "declaration": "char[18] Equip2"
+          },
+          {
+            "offset": 208,
+            "declaration": "char[26] Nick"
+          },
+          {
+            "offset": 234,
+            "declaration": "char Server"
+          }
+        ]
+      },
+      "MSG_CreateMobTrade": {
+        "size": 260,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 14,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short MobID"
+          },
+          {
+            "offset": 18,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short[18] Equip"
+          },
+          {
+            "offset": 70,
+            "declaration": "unsigned short[32] Affect"
+          },
+          {
+            "offset": 134,
+            "declaration": "unsigned short Guild"
+          },
+          {
+            "offset": 136,
+            "declaration": "char GuildLevel"
+          },
+          {
+            "offset": 140,
+            "declaration": "struct STRUCT_SCORE Score"
+          },
+          {
+            "offset": 188,
+            "declaration": "unsigned short CreateType"
+          },
+          {
+            "offset": 190,
+            "declaration": "char[18] Equip2"
+          },
+          {
+            "offset": 208,
+            "declaration": "char[26] Nick"
+          },
+          {
+            "offset": 234,
+            "declaration": "char[24] Desc"
+          },
+          {
+            "offset": 258,
+            "declaration": "char Server"
+          }
+        ]
+      },
+      "MSG_REQMobByID": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short MobID"
+          }
+        ]
+      },
+      "MSG_SetShortSkill": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[20] Skill"
+          }
+        ]
+      },
+      "MSG_ShopList": {
+        "size": 236,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int ShopType"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_ITEM[27] List"
+          },
+          {
+            "offset": 232,
+            "declaration": "int Tax"
+          }
+        ]
+      },
+      "MSG_SwapItem": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char SourType"
+          },
+          {
+            "offset": 13,
+            "declaration": "char SourPos"
+          },
+          {
+            "offset": 14,
+            "declaration": "char DestType"
+          },
+          {
+            "offset": 15,
+            "declaration": "char DestPos"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short TargetID"
+          }
+        ]
+      },
+      "MSG_RepurchaseItems": {
+        "size": 176,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int target"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_REPURCHASEITEM[10] Repurcharse"
+          }
+        ]
+      },
+      "MSG_REQShopList": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short TargetID"
+          }
+        ]
+      },
+      "MSG_Buy": {
+        "size": 24,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 14,
+            "declaration": "short TargetCarryPos"
+          },
+          {
+            "offset": 16,
+            "declaration": "short MyCarryPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Coin"
+          }
+        ]
+      },
+      "MSG_Sell": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 14,
+            "declaration": "short MyType"
+          },
+          {
+            "offset": 16,
+            "declaration": "short MyPos"
+          }
+        ]
+      },
+      "MSG_Attack": {
+        "size": 168,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int FakeExp"
+          },
+          {
+            "offset": 16,
+            "declaration": "int ReqMp"
+          },
+          {
+            "offset": 24,
+            "declaration": "long long CurrentExp"
+          },
+          {
+            "offset": 32,
+            "declaration": "short Rsv"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short PosX"
+          },
+          {
+            "offset": 36,
+            "declaration": "unsigned short PosY"
+          },
+          {
+            "offset": 38,
+            "declaration": "unsigned short TargetX"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned short TargetY"
+          },
+          {
+            "offset": 42,
+            "declaration": "unsigned short AttackerID"
+          },
+          {
+            "offset": 44,
+            "declaration": "unsigned short Progress"
+          },
+          {
+            "offset": 46,
+            "declaration": "char Motion"
+          },
+          {
+            "offset": 47,
+            "declaration": "char FlagLocal"
+          },
+          {
+            "offset": 48,
+            "declaration": "char DoubleCritical"
+          },
+          {
+            "offset": 49,
+            "declaration": "char SkillParm"
+          },
+          {
+            "offset": 52,
+            "declaration": "int CurrentMp"
+          },
+          {
+            "offset": 56,
+            "declaration": "short SkillIndex"
+          },
+          {
+            "offset": 60,
+            "declaration": "STRUCT_DAM[13] Dam"
+          }
+        ]
+      },
+      "MSG_AttackTwo": {
+        "size": 80,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int FakeExp"
+          },
+          {
+            "offset": 16,
+            "declaration": "int ReqMp"
+          },
+          {
+            "offset": 24,
+            "declaration": "long long CurrentExp"
+          },
+          {
+            "offset": 32,
+            "declaration": "short Rsv"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short PosX"
+          },
+          {
+            "offset": 36,
+            "declaration": "unsigned short PosY"
+          },
+          {
+            "offset": 38,
+            "declaration": "unsigned short TargetX"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned short TargetY"
+          },
+          {
+            "offset": 42,
+            "declaration": "unsigned short AttackerID"
+          },
+          {
+            "offset": 44,
+            "declaration": "unsigned short Progress"
+          },
+          {
+            "offset": 46,
+            "declaration": "char Motion"
+          },
+          {
+            "offset": 47,
+            "declaration": "char FlagLocal"
+          },
+          {
+            "offset": 48,
+            "declaration": "char DoubleCritical"
+          },
+          {
+            "offset": 49,
+            "declaration": "char SkillParm"
+          },
+          {
+            "offset": 52,
+            "declaration": "int CurrentMp"
+          },
+          {
+            "offset": 56,
+            "declaration": "short SkillIndex"
+          },
+          {
+            "offset": 60,
+            "declaration": "STRUCT_DAM[2] Dam"
+          }
+        ]
+      },
+      "MSG_AttackOne": {
+        "size": 72,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int FakeExp"
+          },
+          {
+            "offset": 16,
+            "declaration": "int ReqMp"
+          },
+          {
+            "offset": 24,
+            "declaration": "long long CurrentExp"
+          },
+          {
+            "offset": 32,
+            "declaration": "short Rsv"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short PosX"
+          },
+          {
+            "offset": 36,
+            "declaration": "unsigned short PosY"
+          },
+          {
+            "offset": 38,
+            "declaration": "unsigned short TargetX"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned short TargetY"
+          },
+          {
+            "offset": 42,
+            "declaration": "unsigned short AttackerID"
+          },
+          {
+            "offset": 44,
+            "declaration": "unsigned short Progress"
+          },
+          {
+            "offset": 46,
+            "declaration": "char Motion"
+          },
+          {
+            "offset": 47,
+            "declaration": "char FlagLocal"
+          },
+          {
+            "offset": 48,
+            "declaration": "char DoubleCritical"
+          },
+          {
+            "offset": 49,
+            "declaration": "char SkillParm"
+          },
+          {
+            "offset": 52,
+            "declaration": "int CurrentMp"
+          },
+          {
+            "offset": 56,
+            "declaration": "short SkillIndex"
+          },
+          {
+            "offset": 60,
+            "declaration": "STRUCT_DAM[1] Dam"
+          }
+        ]
+      },
+      "MSG_REQParty": {
+        "size": 44,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "struct PARTY Leader"
+          },
+          {
+            "offset": 40,
+            "declaration": "int TargetID"
+          }
+        ]
+      },
+      "MSG_AddParty": {
+        "size": 40,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "struct PARTY Party"
+          }
+        ]
+      },
+      "MSG_CNFParty2": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short LeaderID"
+          },
+          {
+            "offset": 14,
+            "declaration": "char[16] LeaderName"
+          }
+        ]
+      },
+      "MSG_ApplyBonus": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short BonusType"
+          },
+          {
+            "offset": 14,
+            "declaration": "short Detail"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short TargetID"
+          }
+        ]
+      },
+      "MSG_ReqBuy": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Pos"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Price"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Tax"
+          },
+          {
+            "offset": 28,
+            "declaration": "struct STRUCT_ITEM item"
+          }
+        ]
+      },
+      "MSG_CNFMobKill": {
+        "size": 32,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int FakeExp"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short KilledMob"
+          },
+          {
+            "offset": 18,
+            "declaration": "unsigned short Killer"
+          },
+          {
+            "offset": 24,
+            "declaration": "long long Exp"
+          }
+        ]
+      },
+      "MSG_RemoveMob": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int RemoveType"
+          }
+        ]
+      },
+      "MSG_SetHpMode": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Hp"
+          },
+          {
+            "offset": 16,
+            "declaration": "short Mode"
+          }
+        ]
+      },
+      "MSG_SetHpMp": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Hp"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Mp"
+          },
+          {
+            "offset": 20,
+            "declaration": "int ReqHp"
+          },
+          {
+            "offset": 24,
+            "declaration": "int ReqMp"
+          }
+        ]
+      },
+      "MSG_SetHpDam": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Hp"
+          },
+          {
+            "offset": 16,
+            "declaration": "short Dam"
+          }
+        ]
+      },
+      "MSG_Carry": {
+        "size": 528,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "STRUCT_ITEM[64] Carry"
+          },
+          {
+            "offset": 524,
+            "declaration": "int Coin"
+          }
+        ]
+      },
+      "MSG_HellBuy": {
+        "size": 24,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 14,
+            "declaration": "short TargetCarryPos"
+          },
+          {
+            "offset": 16,
+            "declaration": "short MyCarryPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Coin"
+          }
+        ]
+      },
+      "MSG_UpdateItem": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int ItemID"
+          },
+          {
+            "offset": 16,
+            "declaration": "short State"
+          },
+          {
+            "offset": 18,
+            "declaration": "char Height"
+          },
+          {
+            "offset": 19,
+            "declaration": "char dummy"
+          }
+        ]
+      },
+      "MSG_ReqSummon": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Result"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[16] Name"
+          }
+        ]
+      },
+      "MSG_CNFRemoveServerLogin": {
+        "size": 3640,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_SELCHAR SelChar"
+          },
+          {
+            "offset": 920,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 936,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 1896,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 1900,
+            "declaration": "char[16] SecretCode"
+          },
+          {
+            "offset": 1916,
+            "declaration": "int SSN1"
+          },
+          {
+            "offset": 1920,
+            "declaration": "int SSN2"
+          },
+          {
+            "offset": 1924,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 1926,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 1928,
+            "declaration": "struct STRUCT_MOB MOB"
+          },
+          {
+            "offset": 2968,
+            "declaration": "unsigned short Slot"
+          },
+          {
+            "offset": 2970,
+            "declaration": "unsigned short ClientID"
+          },
+          {
+            "offset": 2972,
+            "declaration": "unsigned short Weather"
+          },
+          {
+            "offset": 2974,
+            "declaration": "char[16] ShortSkill"
+          },
+          {
+            "offset": 2992,
+            "declaration": "struct STRUCT_EXT1 Ext1"
+          },
+          {
+            "offset": 3280,
+            "declaration": "struct STRUCT_EXT2 Ext2"
+          }
+        ]
+      },
+      "MSG_EnvEffect": {
+        "size": 24,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short x1"
+          },
+          {
+            "offset": 14,
+            "declaration": "short y1"
+          },
+          {
+            "offset": 16,
+            "declaration": "short x2"
+          },
+          {
+            "offset": 18,
+            "declaration": "short y2"
+          },
+          {
+            "offset": 20,
+            "declaration": "short Effect"
+          },
+          {
+            "offset": 22,
+            "declaration": "short EffectParm"
+          }
+        ]
+      },
+      "MSG_RandomQuiz": {
+        "size": 268,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[128] Question"
+          },
+          {
+            "offset": 140,
+            "declaration": "char[4][32] Answer"
+          }
+        ]
+      },
+      "MSG_LongMessagePanel": {
+        "size": 528,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short Parm1"
+          },
+          {
+            "offset": 14,
+            "declaration": "short Parm2"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[4][128] Line"
+          }
+        ]
+      },
+      "MSG_DropItem": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int SourType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int SourPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Rotate"
+          },
+          {
+            "offset": 24,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 26,
+            "declaration": "unsigned short GridY"
+          },
+          {
+            "offset": 28,
+            "declaration": "unsigned short ItemID"
+          }
+        ]
+      },
+      "MSG_CreateItem": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 14,
+            "declaration": "unsigned short GridY"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short ItemID"
+          },
+          {
+            "offset": 18,
+            "declaration": "struct STRUCT_ITEM Item"
+          },
+          {
+            "offset": 26,
+            "declaration": "char Rotate"
+          },
+          {
+            "offset": 27,
+            "declaration": "char State"
+          },
+          {
+            "offset": 28,
+            "declaration": "char Height"
+          },
+          {
+            "offset": 29,
+            "declaration": "char Create"
+          },
+          {
+            "offset": 30,
+            "declaration": "unsigned short Owner"
+          }
+        ]
+      },
+      "MSG_CNFDropItem": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int SourType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int SourPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Rotate"
+          },
+          {
+            "offset": 24,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 26,
+            "declaration": "unsigned short GridY"
+          }
+        ]
+      },
+      "MSG_CNFGetItem": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int DestType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int DestPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "struct STRUCT_ITEM Item"
+          }
+        ]
+      },
+      "MSG_RMBShopList": {
+        "size": 332,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int ShopType"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_ITEM[39] List"
+          },
+          {
+            "offset": 328,
+            "declaration": "int Tax"
+          }
+        ]
+      },
+      "MSG_GetItem": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int DestType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int DestPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "unsigned short ItemID"
+          },
+          {
+            "offset": 22,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 24,
+            "declaration": "unsigned short GridY"
+          }
+        ]
+      }
+    },
+    "i686-pc-windows-msvc": {
+      "MSG_STANDARD": {
+        "size": 12,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned short Size"
+          },
+          {
+            "offset": 2,
+            "declaration": "char KeyWord"
+          },
+          {
+            "offset": 3,
+            "declaration": "char CheckSum"
+          },
+          {
+            "offset": 4,
+            "declaration": "unsigned short Type"
+          },
+          {
+            "offset": 6,
+            "declaration": "unsigned short ID"
+          },
+          {
+            "offset": 8,
+            "declaration": "unsigned int Tick"
+          }
+        ]
+      },
+      "MSG_STANDARDPARM": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Parm"
+          }
+        ]
+      },
+      "MSG_STANDARDPARM2": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Parm1"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Parm2"
+          }
+        ]
+      },
+      "MSG_STANDARDPARM3": {
+        "size": 24,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Parm1"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Parm2"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Parm3"
+          }
+        ]
+      },
+      "STRUCT_SCORE": {
+        "size": 48,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short Level"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Ac"
+          },
+          {
+            "offset": 8,
+            "declaration": "int Damage"
+          },
+          {
+            "offset": 12,
+            "declaration": "char Reserved"
+          },
+          {
+            "offset": 13,
+            "declaration": "char AttackRun"
+          },
+          {
+            "offset": 16,
+            "declaration": "int MaxHp"
+          },
+          {
+            "offset": 20,
+            "declaration": "int MaxMp"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Hp"
+          },
+          {
+            "offset": 28,
+            "declaration": "int Mp"
+          },
+          {
+            "offset": 32,
+            "declaration": "short Str"
+          },
+          {
+            "offset": 34,
+            "declaration": "short Int"
+          },
+          {
+            "offset": 36,
+            "declaration": "short Dex"
+          },
+          {
+            "offset": 38,
+            "declaration": "short Con"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned short[4] Special"
+          }
+        ]
+      },
+      "STRUCT_BONUSEFFECT": {
+        "size": 2,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_BONUSEFFECT::(anonymous at C:\\Users\\User\\orca\\workspaces\\w2pp-OpenWyd-WebClient\\start\\external\\OpenWyd\\Projects\\TMProject\\Basedef.h:89:2) "
+          },
+          {
+            "offset": 0,
+            "declaration": "short sValue"
+          }
+        ]
+      },
+      "STRUCT_ITEM": {
+        "size": 8,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short sIndex"
+          },
+          {
+            "offset": 2,
+            "declaration": "STRUCT_BONUSEFFECT[3] stEffect"
+          }
+        ]
+      },
+      "STRUCT_SELCHAR": {
+        "size": 904,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned short[4] HomeTownX"
+          },
+          {
+            "offset": 8,
+            "declaration": "unsigned short[4] HomeTownY"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[4][16] MobName"
+          },
+          {
+            "offset": 80,
+            "declaration": "STRUCT_SCORE[4] Score"
+          },
+          {
+            "offset": 272,
+            "declaration": "STRUCT_ITEM[4][18] Equip"
+          },
+          {
+            "offset": 848,
+            "declaration": "unsigned short[4] Guild"
+          },
+          {
+            "offset": 856,
+            "declaration": "int[4] Coin"
+          },
+          {
+            "offset": 872,
+            "declaration": "long long[4] Exp"
+          }
+        ]
+      },
+      "STRUCT_MOB": {
+        "size": 1040,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 16,
+            "declaration": "char Clan"
+          },
+          {
+            "offset": 17,
+            "declaration": "char Merchant"
+          },
+          {
+            "offset": 18,
+            "declaration": "unsigned short Guild"
+          },
+          {
+            "offset": 20,
+            "declaration": "char Class"
+          },
+          {
+            "offset": 21,
+            "declaration": "char Rsv"
+          },
+          {
+            "offset": 22,
+            "declaration": "unsigned short Quest"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 32,
+            "declaration": "long long Exp"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned short HomeTownX"
+          },
+          {
+            "offset": 42,
+            "declaration": "unsigned short HomeTownY"
+          },
+          {
+            "offset": 44,
+            "declaration": "struct STRUCT_SCORE BaseScore"
+          },
+          {
+            "offset": 92,
+            "declaration": "struct STRUCT_SCORE CurrentScore"
+          },
+          {
+            "offset": 140,
+            "declaration": "STRUCT_ITEM[18] Equip"
+          },
+          {
+            "offset": 284,
+            "declaration": "STRUCT_ITEM[64] Carry"
+          },
+          {
+            "offset": 796,
+            "declaration": "unsigned int[2] LearnedSkill"
+          },
+          {
+            "offset": 804,
+            "declaration": "short ScoreBonus"
+          },
+          {
+            "offset": 806,
+            "declaration": "short SpecialBonus"
+          },
+          {
+            "offset": 808,
+            "declaration": "short SkillBonus"
+          },
+          {
+            "offset": 810,
+            "declaration": "char Critical"
+          },
+          {
+            "offset": 811,
+            "declaration": "char SaveMana"
+          },
+          {
+            "offset": 812,
+            "declaration": "char[4] ShortSkill"
+          },
+          {
+            "offset": 816,
+            "declaration": "char GuildLevel"
+          },
+          {
+            "offset": 817,
+            "declaration": "char Magic"
+          },
+          {
+            "offset": 818,
+            "declaration": "char RegenHP"
+          },
+          {
+            "offset": 819,
+            "declaration": "char RegenMP"
+          },
+          {
+            "offset": 820,
+            "declaration": "char[4] Resist"
+          },
+          {
+            "offset": 824,
+            "declaration": "char[212] dummy"
+          },
+          {
+            "offset": 1036,
+            "declaration": "unsigned short CurrentKill"
+          },
+          {
+            "offset": 1038,
+            "declaration": "unsigned short TotalKill"
+          }
+        ]
+      },
+      "STRUCT_AFFECT": {
+        "size": 8,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char Type"
+          },
+          {
+            "offset": 1,
+            "declaration": "char Level"
+          },
+          {
+            "offset": 2,
+            "declaration": "short Value"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Time"
+          }
+        ]
+      },
+      "STRUCT_MYBONUSEFFECT": {
+        "size": 4,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char cEffect"
+          },
+          {
+            "offset": 1,
+            "declaration": "char cValue"
+          },
+          {
+            "offset": 2,
+            "declaration": "short sValue"
+          }
+        ]
+      },
+      "STRUCT_MYITEM": {
+        "size": 14,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short sIndex"
+          },
+          {
+            "offset": 2,
+            "declaration": "STRUCT_MYBONUSEFFECT[3] stEffect"
+          }
+        ]
+      },
+      "STRUCT_NEEDITEM": {
+        "size": 8,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Access"
+          },
+          {
+            "offset": 4,
+            "declaration": "int dINDEX"
+          }
+        ]
+      },
+      "STRUCT_POSITION": {
+        "size": 8,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int X"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Y"
+          }
+        ]
+      },
+      "STRUCT_RESULT_ITEMLIST": {
+        "size": 2656,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int dNPCHead"
+          },
+          {
+            "offset": 4,
+            "declaration": "struct STRUCT_POSITION pxy"
+          },
+          {
+            "offset": 12,
+            "declaration": "struct STRUCT_MYITEM stItemInfor"
+          },
+          {
+            "offset": 26,
+            "declaration": "unsigned short sMSG"
+          },
+          {
+            "offset": 28,
+            "declaration": "STRUCT_NEEDITEM[8] dNeedItemList"
+          },
+          {
+            "offset": 92,
+            "declaration": "unsigned int dCost"
+          },
+          {
+            "offset": 96,
+            "declaration": "char[20][128] stSameList"
+          }
+        ]
+      },
+      "STRUCT_OPTION": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int[2] dClass"
+          },
+          {
+            "offset": 8,
+            "declaration": "unsigned int[2] dPOS"
+          }
+        ]
+      },
+      "STRUCT_NEED_ITEMLIST": {
+        "size": 64,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Textnum"
+          },
+          {
+            "offset": 4,
+            "declaration": "unsigned int dVolume"
+          },
+          {
+            "offset": 8,
+            "declaration": "struct STRUCT_MYITEM stGridItem"
+          },
+          {
+            "offset": 24,
+            "declaration": "unsigned int[6] dListIndexArry"
+          },
+          {
+            "offset": 48,
+            "declaration": "struct STRUCT_OPTION stOption"
+          }
+        ]
+      },
+      "STRUCT_REFER": {
+        "size": 12,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int dindex"
+          },
+          {
+            "offset": 4,
+            "declaration": "unsigned int dHavevolume"
+          },
+          {
+            "offset": 8,
+            "declaration": "int bItemListrefer"
+          }
+        ]
+      },
+      "STRUCT_MIXHELP": {
+        "size": 1300,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short[9] Color"
+          },
+          {
+            "offset": 18,
+            "declaration": "short Icon"
+          },
+          {
+            "offset": 20,
+            "declaration": "char[9][128] Help"
+          },
+          {
+            "offset": 1172,
+            "declaration": "char[128] Name"
+          }
+        ]
+      },
+      "STRUCT_MISSIONITEM": {
+        "size": 12,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int dHavevolume"
+          },
+          {
+            "offset": 4,
+            "declaration": "unsigned int[2] dNeedvolume"
+          }
+        ]
+      },
+      "STRUCT_REPURCHASEITEM": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Order"
+          },
+          {
+            "offset": 4,
+            "declaration": "struct STRUCT_ITEM stItem"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Price"
+          }
+        ]
+      },
+      "STRUCT_STATICEFFECT": {
+        "size": 4,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short sEffect"
+          },
+          {
+            "offset": 2,
+            "declaration": "short sValue"
+          }
+        ]
+      },
+      "STRUCT_ITEMLIST": {
+        "size": 164,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[64] Name"
+          },
+          {
+            "offset": 64,
+            "declaration": "short nIndexMesh"
+          },
+          {
+            "offset": 66,
+            "declaration": "short nIndexTexture"
+          },
+          {
+            "offset": 68,
+            "declaration": "short nIndexVisualEffect"
+          },
+          {
+            "offset": 70,
+            "declaration": "short nReqLvl"
+          },
+          {
+            "offset": 72,
+            "declaration": "short nReqStr"
+          },
+          {
+            "offset": 74,
+            "declaration": "short nReqInt"
+          },
+          {
+            "offset": 76,
+            "declaration": "short nReqDex"
+          },
+          {
+            "offset": 78,
+            "declaration": "short nReqCon"
+          },
+          {
+            "offset": 80,
+            "declaration": "STRUCT_STATICEFFECT[12] stEffect"
+          },
+          {
+            "offset": 128,
+            "declaration": "int nPrice"
+          },
+          {
+            "offset": 132,
+            "declaration": "short nUnique"
+          },
+          {
+            "offset": 134,
+            "declaration": "short UNK_1"
+          },
+          {
+            "offset": 136,
+            "declaration": "int nPos"
+          },
+          {
+            "offset": 140,
+            "declaration": "short nExtra"
+          },
+          {
+            "offset": 142,
+            "declaration": "short nGrade"
+          },
+          {
+            "offset": 144,
+            "declaration": "int UNK_2"
+          },
+          {
+            "offset": 148,
+            "declaration": "short mType"
+          },
+          {
+            "offset": 150,
+            "declaration": "short mData"
+          },
+          {
+            "offset": 152,
+            "declaration": "short UNK_3"
+          },
+          {
+            "offset": 154,
+            "declaration": "short UNK_4"
+          },
+          {
+            "offset": 156,
+            "declaration": "unsigned short[4] UnkNewValues"
+          }
+        ]
+      },
+      "STRUCT_EXT1": {
+        "size": 288,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int[8] Data"
+          },
+          {
+            "offset": 32,
+            "declaration": "STRUCT_AFFECT[32] Affect"
+          }
+        ]
+      },
+      "STRUCT_SUBCLASS": {
+        "size": 96,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int[2] LearnedSkill"
+          },
+          {
+            "offset": 8,
+            "declaration": "struct STRUCT_ITEM Equip"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_SCORE CurrentScore"
+          },
+          {
+            "offset": 64,
+            "declaration": "long long Exp"
+          },
+          {
+            "offset": 72,
+            "declaration": "char[20] ShortSkill"
+          },
+          {
+            "offset": 92,
+            "declaration": "short ScoreBonus"
+          },
+          {
+            "offset": 94,
+            "declaration": "short SkillBonus"
+          }
+        ]
+      },
+      "STRUCT_EXT2": {
+        "size": 360,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[12] Quest"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned int LastConnectTime"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_SUBCLASS[2] SubClass"
+          },
+          {
+            "offset": 208,
+            "declaration": "char[16] ItemPassWord"
+          },
+          {
+            "offset": 224,
+            "declaration": "unsigned int ItemPos"
+          },
+          {
+            "offset": 228,
+            "declaration": "int SendLevItem"
+          },
+          {
+            "offset": 232,
+            "declaration": "short AdminGuildItem"
+          },
+          {
+            "offset": 234,
+            "declaration": "char[126] Dummy"
+          }
+        ]
+      },
+      "STRUCT_DAM": {
+        "size": 8,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Damage"
+          }
+        ]
+      },
+      "STRUCT_SPELL": {
+        "size": 104,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int SkillPoint"
+          },
+          {
+            "offset": 4,
+            "declaration": "int TargetType"
+          },
+          {
+            "offset": 8,
+            "declaration": "int ManaSpent"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Delay"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Range"
+          },
+          {
+            "offset": 20,
+            "declaration": "int InstanceType"
+          },
+          {
+            "offset": 24,
+            "declaration": "int InstanceValue"
+          },
+          {
+            "offset": 28,
+            "declaration": "int TickType"
+          },
+          {
+            "offset": 32,
+            "declaration": "int TickValue"
+          },
+          {
+            "offset": 36,
+            "declaration": "int AffectType"
+          },
+          {
+            "offset": 40,
+            "declaration": "int AffectValue"
+          },
+          {
+            "offset": 44,
+            "declaration": "int AffectTime"
+          },
+          {
+            "offset": 48,
+            "declaration": "char[8] Act1"
+          },
+          {
+            "offset": 56,
+            "declaration": "char[8] Act2"
+          },
+          {
+            "offset": 64,
+            "declaration": "int InstanceAttribute"
+          },
+          {
+            "offset": 68,
+            "declaration": "int TickAttribute"
+          },
+          {
+            "offset": 72,
+            "declaration": "int Aggressive"
+          },
+          {
+            "offset": 76,
+            "declaration": "int MaxTarget"
+          },
+          {
+            "offset": 80,
+            "declaration": "int bParty"
+          },
+          {
+            "offset": 84,
+            "declaration": "int AffectResist"
+          },
+          {
+            "offset": 88,
+            "declaration": "int Passive"
+          },
+          {
+            "offset": 92,
+            "declaration": "int ForceDamage"
+          },
+          {
+            "offset": 96,
+            "declaration": "int SkillIndex"
+          },
+          {
+            "offset": 100,
+            "declaration": "int Reserved"
+          }
+        ]
+      },
+      "STRUCT_INITITEM": {
+        "size": 8,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 2,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 4,
+            "declaration": "short sIndex"
+          },
+          {
+            "offset": 6,
+            "declaration": "short Rotate"
+          }
+        ]
+      },
+      "STRUCT_AIRMOVELIST": {
+        "size": 8,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int nX"
+          },
+          {
+            "offset": 4,
+            "declaration": "int nY"
+          }
+        ]
+      },
+      "STRUCT_TOTOLIST": {
+        "size": 96,
+        "alignment": 1,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[32] szTime"
+          },
+          {
+            "offset": 32,
+            "declaration": "char[32] szTeamA"
+          },
+          {
+            "offset": 64,
+            "declaration": "char[32] szTeamB"
+          }
+        ]
+      },
+      "STRUCT_LOTTO": {
+        "size": 8,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short sIndex"
+          },
+          {
+            "offset": 2,
+            "declaration": "char[6] Num"
+          }
+        ]
+      },
+      "STRUCT_SCORE_OLD": {
+        "size": 28,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short Level"
+          },
+          {
+            "offset": 2,
+            "declaration": "short Ac"
+          },
+          {
+            "offset": 4,
+            "declaration": "short Damage"
+          },
+          {
+            "offset": 6,
+            "declaration": "char Reserved"
+          },
+          {
+            "offset": 7,
+            "declaration": "char AttackRun"
+          },
+          {
+            "offset": 8,
+            "declaration": "unsigned short MaxHp"
+          },
+          {
+            "offset": 10,
+            "declaration": "unsigned short MaxMp"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short Hp"
+          },
+          {
+            "offset": 14,
+            "declaration": "unsigned short Mp"
+          },
+          {
+            "offset": 16,
+            "declaration": "short Str"
+          },
+          {
+            "offset": 18,
+            "declaration": "short Int"
+          },
+          {
+            "offset": 20,
+            "declaration": "short Dex"
+          },
+          {
+            "offset": 22,
+            "declaration": "short Con"
+          },
+          {
+            "offset": 24,
+            "declaration": "char[4] Special"
+          }
+        ]
+      },
+      "STRUCT_M_CHECK": {
+        "size": 12,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Type"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Parm1"
+          },
+          {
+            "offset": 8,
+            "declaration": "int Parm2"
+          }
+        ]
+      },
+      "STRUCT_GUILDLIST": {
+        "size": 60,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int GuildIndex"
+          },
+          {
+            "offset": 4,
+            "declaration": "char[4][12] GuildName"
+          },
+          {
+            "offset": 52,
+            "declaration": "char GCount"
+          },
+          {
+            "offset": 53,
+            "declaration": "char Citizen"
+          },
+          {
+            "offset": 54,
+            "declaration": "char Mandle"
+          },
+          {
+            "offset": 56,
+            "declaration": "unsigned int Fame"
+          }
+        ]
+      },
+      "STRUCT_TREASURE": {
+        "size": 52,
+        "alignment": 2,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short Source"
+          },
+          {
+            "offset": 2,
+            "declaration": "STRUCT_ITEM[5] Target"
+          },
+          {
+            "offset": 42,
+            "declaration": "short[5] Rate"
+          }
+        ]
+      },
+      "STRUCT_TOTODATA": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int index"
+          },
+          {
+            "offset": 4,
+            "declaration": "int A_Score"
+          },
+          {
+            "offset": 8,
+            "declaration": "int B_Score"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned int A_BuyCount"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned int B_BuyCount"
+          },
+          {
+            "offset": 20,
+            "declaration": "unsigned int C_BuyCount"
+          },
+          {
+            "offset": 24,
+            "declaration": "int towshare"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNT": {
+        "size": 212,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[16] AccountPass"
+          },
+          {
+            "offset": 32,
+            "declaration": "char[24] RealName"
+          },
+          {
+            "offset": 56,
+            "declaration": "unsigned int SSN1"
+          },
+          {
+            "offset": 60,
+            "declaration": "unsigned int SSN2"
+          },
+          {
+            "offset": 64,
+            "declaration": "char[102] Temp"
+          },
+          {
+            "offset": 168,
+            "declaration": "STRUCT_AFFECT[2] Affect"
+          },
+          {
+            "offset": 184,
+            "declaration": "unsigned int AccountIndex"
+          },
+          {
+            "offset": 188,
+            "declaration": "unsigned int AccountLastConnectTime"
+          },
+          {
+            "offset": 192,
+            "declaration": "char[16] ItemPassWord"
+          },
+          {
+            "offset": 208,
+            "declaration": "unsigned short GameServer"
+          },
+          {
+            "offset": 210,
+            "declaration": "unsigned short Rsv"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE": {
+        "size": 8000,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT Account"
+          },
+          {
+            "offset": 216,
+            "declaration": "STRUCT_MOB[4] Char"
+          },
+          {
+            "offset": 4376,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 5336,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 5340,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 5404,
+            "declaration": "STRUCT_EXT1[4] Ext1"
+          },
+          {
+            "offset": 6560,
+            "declaration": "STRUCT_EXT2[4] Ext2"
+          }
+        ]
+      },
+      "STRUCT_SUBCLASS_OLD": {
+        "size": 68,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned int LearnedSkill"
+          },
+          {
+            "offset": 4,
+            "declaration": "struct STRUCT_ITEM Equip"
+          },
+          {
+            "offset": 12,
+            "declaration": "struct STRUCT_SCORE_OLD CurrentScore"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned int Exp"
+          },
+          {
+            "offset": 44,
+            "declaration": "char[20] ShortSkill"
+          },
+          {
+            "offset": 64,
+            "declaration": "short ScoreBonus"
+          },
+          {
+            "offset": 66,
+            "declaration": "short SkillBonus"
+          }
+        ]
+      },
+      "STRUCT_EXT2_OLD": {
+        "size": 288,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[12] Quest"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned int LastConnectTime"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_SUBCLASS_OLD[2] SubClass"
+          },
+          {
+            "offset": 152,
+            "declaration": "char[16] ItemPassWord"
+          },
+          {
+            "offset": 168,
+            "declaration": "unsigned int ItemPos"
+          },
+          {
+            "offset": 172,
+            "declaration": "int SendLevItem"
+          },
+          {
+            "offset": 176,
+            "declaration": "char[112] dummy"
+          }
+        ]
+      },
+      "STRUCT_REQ": {
+        "size": 6,
+        "alignment": 1,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "_Bool Class"
+          },
+          {
+            "offset": 1,
+            "declaration": "_Bool Level"
+          },
+          {
+            "offset": 2,
+            "declaration": "_Bool Str"
+          },
+          {
+            "offset": 3,
+            "declaration": "_Bool Dex"
+          },
+          {
+            "offset": 4,
+            "declaration": "_Bool Int"
+          },
+          {
+            "offset": 5,
+            "declaration": "_Bool Con"
+          }
+        ]
+      },
+      "STRUCT_LEVSENDITEM": {
+        "size": 68,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int lev"
+          },
+          {
+            "offset": 4,
+            "declaration": "STRUCT_ITEM[4][2] item"
+          }
+        ]
+      },
+      "STRUCT_RANDOMQUIZ": {
+        "size": 256,
+        "alignment": 1,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[128] Question"
+          },
+          {
+            "offset": 128,
+            "declaration": "char[4][32] Answer"
+          }
+        ]
+      },
+      "STRUCT_ITEMHELP": {
+        "size": 1188,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int[9] Color"
+          },
+          {
+            "offset": 36,
+            "declaration": "char[9][128] Help"
+          }
+        ]
+      },
+      "STRUCT_MOB_OLD": {
+        "size": 772,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 16,
+            "declaration": "char Clan"
+          },
+          {
+            "offset": 17,
+            "declaration": "char Merchant"
+          },
+          {
+            "offset": 18,
+            "declaration": "unsigned short Guild"
+          },
+          {
+            "offset": 20,
+            "declaration": "char Class"
+          },
+          {
+            "offset": 21,
+            "declaration": "char Rsv"
+          },
+          {
+            "offset": 22,
+            "declaration": "unsigned short Quest"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 28,
+            "declaration": "unsigned int Exp"
+          },
+          {
+            "offset": 32,
+            "declaration": "unsigned short HomeTownX"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short HomeTownY"
+          },
+          {
+            "offset": 36,
+            "declaration": "struct STRUCT_SCORE_OLD BaseScore"
+          },
+          {
+            "offset": 64,
+            "declaration": "struct STRUCT_SCORE_OLD CurrentScore"
+          },
+          {
+            "offset": 92,
+            "declaration": "STRUCT_ITEM[18] Equip"
+          },
+          {
+            "offset": 236,
+            "declaration": "STRUCT_ITEM[64] Carry"
+          },
+          {
+            "offset": 748,
+            "declaration": "unsigned int LearnedSkill"
+          },
+          {
+            "offset": 752,
+            "declaration": "short ScoreBonus"
+          },
+          {
+            "offset": 754,
+            "declaration": "short SpecialBonus"
+          },
+          {
+            "offset": 756,
+            "declaration": "short SkillBonus"
+          },
+          {
+            "offset": 758,
+            "declaration": "char Critical"
+          },
+          {
+            "offset": 759,
+            "declaration": "char SaveMana"
+          },
+          {
+            "offset": 760,
+            "declaration": "char[4] ShortSkill"
+          },
+          {
+            "offset": 764,
+            "declaration": "char GuildLevel"
+          },
+          {
+            "offset": 765,
+            "declaration": "char Magic"
+          },
+          {
+            "offset": 766,
+            "declaration": "char RegenHP"
+          },
+          {
+            "offset": 767,
+            "declaration": "char RegenMP"
+          },
+          {
+            "offset": 768,
+            "declaration": "char[4] Resist"
+          }
+        ]
+      },
+      "STRUCT_COMBINE": {
+        "size": 68,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Target"
+          },
+          {
+            "offset": 4,
+            "declaration": "int[8] Source"
+          },
+          {
+            "offset": 36,
+            "declaration": "int[8] Refine"
+          }
+        ]
+      },
+      "STRUCT_BEASTBONUS": {
+        "size": 68,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Int_Damage"
+          },
+          {
+            "offset": 4,
+            "declaration": "int Spe_Damage"
+          },
+          {
+            "offset": 8,
+            "declaration": "int Int_Ac"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Spe_Ac"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Int_Hp"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Spe_Hp"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Int_Run"
+          },
+          {
+            "offset": 28,
+            "declaration": "int Spe_Run"
+          },
+          {
+            "offset": 32,
+            "declaration": "int Int_Attack"
+          },
+          {
+            "offset": 36,
+            "declaration": "int Spe_Attack"
+          },
+          {
+            "offset": 40,
+            "declaration": "int Int_Critical"
+          },
+          {
+            "offset": 44,
+            "declaration": "int Spe_Critical"
+          },
+          {
+            "offset": 48,
+            "declaration": "int Int_Resist"
+          },
+          {
+            "offset": 52,
+            "declaration": "int Spe_Regist"
+          },
+          {
+            "offset": 56,
+            "declaration": "int Int_Delay"
+          },
+          {
+            "offset": 60,
+            "declaration": "int Spe_Delay"
+          },
+          {
+            "offset": 64,
+            "declaration": "int SancLevel"
+          }
+        ]
+      },
+      "STRUCT_EXT": {
+        "size": 160,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int[8] Data"
+          },
+          {
+            "offset": 32,
+            "declaration": "STRUCT_AFFECT[12] Affect"
+          },
+          {
+            "offset": 128,
+            "declaration": "char[32] Quest"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE_OLD": {
+        "size": 4968,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT Account"
+          },
+          {
+            "offset": 212,
+            "declaration": "STRUCT_MOB_OLD[4] Char"
+          },
+          {
+            "offset": 3300,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 4260,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 4264,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 4328,
+            "declaration": "STRUCT_EXT[4] Ext"
+          }
+        ]
+      },
+      "STRUCT_EXT1_OLD": {
+        "size": 160,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int[8] Data"
+          },
+          {
+            "offset": 32,
+            "declaration": "STRUCT_AFFECT[16] Affect"
+          }
+        ]
+      },
+      "STRUCT_MISSION": {
+        "size": 1348,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int Arrival"
+          },
+          {
+            "offset": 4,
+            "declaration": "STRUCT_ITEM[8] cItem"
+          },
+          {
+            "offset": 68,
+            "declaration": "STRUCT_ITEM[10] rItem"
+          },
+          {
+            "offset": 148,
+            "declaration": "STRUCT_M_CHECK[8][10] Item"
+          },
+          {
+            "offset": 1108,
+            "declaration": "STRUCT_M_CHECK[10] Condition"
+          },
+          {
+            "offset": 1228,
+            "declaration": "STRUCT_M_CHECK[10] Reward"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE_OLD2": {
+        "size": 6120,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT Account"
+          },
+          {
+            "offset": 212,
+            "declaration": "STRUCT_MOB_OLD[4] Char"
+          },
+          {
+            "offset": 3300,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 4260,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 4264,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 4328,
+            "declaration": "STRUCT_EXT1_OLD[4] Ext1"
+          },
+          {
+            "offset": 4968,
+            "declaration": "STRUCT_EXT2_OLD[4] Ext2"
+          }
+        ]
+      },
+      "STRUCT_GUILDZONE": {
+        "size": 84,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int ChargeGuild"
+          },
+          {
+            "offset": 4,
+            "declaration": "int ChallangeGuild"
+          },
+          {
+            "offset": 8,
+            "declaration": "int GuildStartX"
+          },
+          {
+            "offset": 12,
+            "declaration": "int GuildStartY"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_POSITION Start"
+          },
+          {
+            "offset": 24,
+            "declaration": "int vx1"
+          },
+          {
+            "offset": 28,
+            "declaration": "int vy1"
+          },
+          {
+            "offset": 32,
+            "declaration": "int vx2"
+          },
+          {
+            "offset": 36,
+            "declaration": "int vy2"
+          },
+          {
+            "offset": 40,
+            "declaration": "int ax1"
+          },
+          {
+            "offset": 44,
+            "declaration": "int ay1"
+          },
+          {
+            "offset": 48,
+            "declaration": "int ax2"
+          },
+          {
+            "offset": 52,
+            "declaration": "int ay2"
+          },
+          {
+            "offset": 56,
+            "declaration": "int hx"
+          },
+          {
+            "offset": 60,
+            "declaration": "int hy"
+          },
+          {
+            "offset": 64,
+            "declaration": "int gx"
+          },
+          {
+            "offset": 68,
+            "declaration": "int gy"
+          },
+          {
+            "offset": 72,
+            "declaration": "int Tax"
+          },
+          {
+            "offset": 76,
+            "declaration": "int ChargeClan"
+          },
+          {
+            "offset": 80,
+            "declaration": "int ChargeCount"
+          }
+        ]
+      },
+      "STRUCT_SELCHAR_OLD": {
+        "size": 808,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "unsigned short[4] HomeTownX"
+          },
+          {
+            "offset": 8,
+            "declaration": "unsigned short[4] HomeTownY"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[4][16] MobName"
+          },
+          {
+            "offset": 80,
+            "declaration": "STRUCT_SCORE_OLD[4] Score"
+          },
+          {
+            "offset": 192,
+            "declaration": "STRUCT_ITEM[4][18] Equip"
+          },
+          {
+            "offset": 768,
+            "declaration": "unsigned short[4] Guild"
+          },
+          {
+            "offset": 776,
+            "declaration": "int[4] Coin"
+          },
+          {
+            "offset": 792,
+            "declaration": "unsigned int[4] Exp"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNT_NEW": {
+        "size": 212,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[16] AccountPass"
+          },
+          {
+            "offset": 32,
+            "declaration": "char[24] RealName"
+          },
+          {
+            "offset": 56,
+            "declaration": "unsigned int SSN1"
+          },
+          {
+            "offset": 60,
+            "declaration": "unsigned int SSN2"
+          },
+          {
+            "offset": 64,
+            "declaration": "char[102] Temp"
+          },
+          {
+            "offset": 168,
+            "declaration": "STRUCT_AFFECT[2] Affect"
+          },
+          {
+            "offset": 184,
+            "declaration": "unsigned int AccountIndex"
+          },
+          {
+            "offset": 188,
+            "declaration": "unsigned int AccountLastConnectTime"
+          },
+          {
+            "offset": 192,
+            "declaration": "char[16] ItemPassWord"
+          },
+          {
+            "offset": 208,
+            "declaration": "unsigned short GameServer"
+          },
+          {
+            "offset": 210,
+            "declaration": "unsigned short Rsv"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE_OLD_NEW": {
+        "size": 4968,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT_NEW Account"
+          },
+          {
+            "offset": 212,
+            "declaration": "STRUCT_MOB_OLD[4] Char"
+          },
+          {
+            "offset": 3300,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 4260,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 4264,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 4328,
+            "declaration": "STRUCT_EXT[4] Ext"
+          }
+        ]
+      },
+      "STRUCT_SAME": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "short[8] dINDEX"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned int dAttribute"
+          }
+        ]
+      },
+      "STRUCT_RARE": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int MonsterFace"
+          },
+          {
+            "offset": 4,
+            "declaration": "int DropRate"
+          },
+          {
+            "offset": 8,
+            "declaration": "struct STRUCT_ITEM item"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Count"
+          }
+        ]
+      },
+      "STRUCT_ADMINGUILDITEM": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int lev"
+          },
+          {
+            "offset": 4,
+            "declaration": "int kind"
+          },
+          {
+            "offset": 8,
+            "declaration": "struct STRUCT_ITEM item"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE_NEW": {
+        "size": 8000,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT_NEW Account"
+          },
+          {
+            "offset": 216,
+            "declaration": "STRUCT_MOB[4] Char"
+          },
+          {
+            "offset": 4376,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 5336,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 5340,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 5404,
+            "declaration": "STRUCT_EXT1[4] Ext1"
+          },
+          {
+            "offset": 6560,
+            "declaration": "STRUCT_EXT2[4] Ext2"
+          }
+        ]
+      },
+      "STRUCT_ACCOUNTFILE_OLD2_NEW": {
+        "size": 6120,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct STRUCT_ACCOUNT_NEW Account"
+          },
+          {
+            "offset": 212,
+            "declaration": "STRUCT_MOB_OLD[4] Char"
+          },
+          {
+            "offset": 3300,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 4260,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 4264,
+            "declaration": "char[4][16] ShortSkill"
+          },
+          {
+            "offset": 4328,
+            "declaration": "STRUCT_EXT1_OLD[4] Ext1"
+          },
+          {
+            "offset": 4968,
+            "declaration": "STRUCT_EXT2_OLD[4] Ext2"
+          }
+        ]
+      },
+      "STRUCT_RUNEQUESTZONE": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "int StartX"
+          },
+          {
+            "offset": 4,
+            "declaration": "int StartY"
+          },
+          {
+            "offset": 8,
+            "declaration": "int iLeader"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Type"
+          }
+        ]
+      },
+      "STRUCT_AUTOKICK": {
+        "size": 512,
+        "alignment": 1,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "char[4][128] route"
+          }
+        ]
+      },
+      "MSG_Action": {
+        "size": 52,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 14,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Effect"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Speed"
+          },
+          {
+            "offset": 24,
+            "declaration": "char[24] Route"
+          },
+          {
+            "offset": 48,
+            "declaration": "unsigned short TargetX"
+          },
+          {
+            "offset": 50,
+            "declaration": "unsigned short TargetY"
+          }
+        ]
+      },
+      "MSG_Motion": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short Motion"
+          },
+          {
+            "offset": 14,
+            "declaration": "short Parm"
+          },
+          {
+            "offset": 16,
+            "declaration": "float Direction"
+          }
+        ]
+      },
+      "MSG_CAPSULEINFO": {
+        "size": 56,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned int CIndex"
+          },
+          {
+            "offset": 16,
+            "declaration": "short Class"
+          },
+          {
+            "offset": 18,
+            "declaration": "short Level"
+          },
+          {
+            "offset": 20,
+            "declaration": "short sStr"
+          },
+          {
+            "offset": 22,
+            "declaration": "short sInt"
+          },
+          {
+            "offset": 24,
+            "declaration": "short sDex"
+          },
+          {
+            "offset": 26,
+            "declaration": "short sCon"
+          },
+          {
+            "offset": 28,
+            "declaration": "short[4] Mastery"
+          },
+          {
+            "offset": 36,
+            "declaration": "short[9] skill"
+          },
+          {
+            "offset": 54,
+            "declaration": "short Quest"
+          }
+        ]
+      },
+      "MSG_Trade": {
+        "size": 156,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "STRUCT_ITEM[15] Item"
+          },
+          {
+            "offset": 132,
+            "declaration": "char[15] CarryPos"
+          },
+          {
+            "offset": 148,
+            "declaration": "int TradeMoney"
+          },
+          {
+            "offset": 152,
+            "declaration": "char MyCheck"
+          },
+          {
+            "offset": 154,
+            "declaration": "unsigned short OpponentID"
+          }
+        ]
+      },
+      "MSG_CombineItem": {
+        "size": 84,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "STRUCT_ITEM[8] Item"
+          },
+          {
+            "offset": 76,
+            "declaration": "char[8] CarryPos"
+          }
+        ]
+      },
+      "MSG_Mission": {
+        "size": 88,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int MissionNo"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_ITEM[8] Item"
+          },
+          {
+            "offset": 80,
+            "declaration": "char[8] CarryPos"
+          }
+        ]
+      },
+      "MSG_CNFAccountLogin": {
+        "size": 1928,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[16] SecretCode"
+          },
+          {
+            "offset": 32,
+            "declaration": "struct STRUCT_SELCHAR SelChar"
+          },
+          {
+            "offset": 936,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 1896,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 1900,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 1916,
+            "declaration": "int SSN1"
+          },
+          {
+            "offset": 1920,
+            "declaration": "int SSN2"
+          }
+        ]
+      },
+      "MSG_UseItem": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int SourType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int SourPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int DestType"
+          },
+          {
+            "offset": 24,
+            "declaration": "int DestPos"
+          },
+          {
+            "offset": 28,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 30,
+            "declaration": "unsigned short GridY"
+          },
+          {
+            "offset": 32,
+            "declaration": "unsigned short ItemID"
+          }
+        ]
+      },
+      "MSG_UseItem2": {
+        "size": 52,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int SourType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int SourPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int DestType"
+          },
+          {
+            "offset": 24,
+            "declaration": "int DestPos"
+          },
+          {
+            "offset": 28,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 30,
+            "declaration": "unsigned short GridY"
+          },
+          {
+            "offset": 32,
+            "declaration": "unsigned short ItemID"
+          },
+          {
+            "offset": 34,
+            "declaration": "char[16] Parm"
+          }
+        ]
+      },
+      "MSG_CAPSULEUSEITEM": {
+        "size": 52,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int SourType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int SourPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int DestType"
+          },
+          {
+            "offset": 24,
+            "declaration": "int DestPos"
+          },
+          {
+            "offset": 28,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 30,
+            "declaration": "unsigned short GridY"
+          },
+          {
+            "offset": 32,
+            "declaration": "unsigned short ItemID"
+          },
+          {
+            "offset": 34,
+            "declaration": "char[16] NewMobname"
+          }
+        ]
+      },
+      "MSG_AutoTrade": {
+        "size": 196,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[24] Desc"
+          },
+          {
+            "offset": 36,
+            "declaration": "STRUCT_ITEM[12] Item"
+          },
+          {
+            "offset": 132,
+            "declaration": "char[12] CarryPos"
+          },
+          {
+            "offset": 144,
+            "declaration": "int[12] TradeMoney"
+          },
+          {
+            "offset": 192,
+            "declaration": "unsigned short Tax"
+          },
+          {
+            "offset": 194,
+            "declaration": "unsigned short TargetID"
+          }
+        ]
+      },
+      "MSG_MOVESTOP": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int NextX"
+          },
+          {
+            "offset": 16,
+            "declaration": "int NextY"
+          },
+          {
+            "offset": 20,
+            "declaration": "int CurrentX"
+          },
+          {
+            "offset": 24,
+            "declaration": "int CurrentY"
+          },
+          {
+            "offset": 28,
+            "declaration": "int LastX"
+          },
+          {
+            "offset": 32,
+            "declaration": "int LastY"
+          }
+        ]
+      },
+      "MSG_BuyToto": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 14,
+            "declaration": "short TargetCarryPos"
+          },
+          {
+            "offset": 16,
+            "declaration": "short MyCarryPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Gindex"
+          },
+          {
+            "offset": 28,
+            "declaration": "int A_Score"
+          },
+          {
+            "offset": 32,
+            "declaration": "int B_Score"
+          }
+        ]
+      },
+      "MSG_CNFRemoveServer": {
+        "size": 80,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 28,
+            "declaration": "char[52] TID"
+          }
+        ]
+      },
+      "MSG_SendItem": {
+        "size": 24,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short DestType"
+          },
+          {
+            "offset": 14,
+            "declaration": "short DestPos"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_ITEM Item"
+          }
+        ]
+      },
+      "MSG_UpdateEquip": {
+        "size": 68,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short[18] sEquip"
+          },
+          {
+            "offset": 48,
+            "declaration": "char[18] Equip2"
+          }
+        ]
+      },
+      "MSG_UpdateAffect": {
+        "size": 268,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "STRUCT_AFFECT[32] Affect"
+          }
+        ]
+      },
+      "MSG_AccountLogin": {
+        "size": 116,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[12] AccountPass"
+          },
+          {
+            "offset": 24,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 40,
+            "declaration": "char[52] TID"
+          },
+          {
+            "offset": 92,
+            "declaration": "int Version"
+          },
+          {
+            "offset": 96,
+            "declaration": "int Force"
+          },
+          {
+            "offset": 100,
+            "declaration": "unsigned int[4] Mac"
+          }
+        ]
+      },
+      "MSG_MessageWhisper": {
+        "size": 160,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 28,
+            "declaration": "char[128] String"
+          },
+          {
+            "offset": 156,
+            "declaration": "short Color"
+          }
+        ]
+      },
+      "MSG_Encode": {
+        "size": 180,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int[42] Parm"
+          }
+        ]
+      },
+      "MSG_MessageChat": {
+        "size": 140,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[128] String"
+          }
+        ]
+      },
+      "MSG_UpdateScore": {
+        "size": 152,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "struct STRUCT_SCORE Score"
+          },
+          {
+            "offset": 60,
+            "declaration": "char Critical"
+          },
+          {
+            "offset": 61,
+            "declaration": "char SaveMana"
+          },
+          {
+            "offset": 62,
+            "declaration": "unsigned short[32] Affect"
+          },
+          {
+            "offset": 126,
+            "declaration": "unsigned short Guild"
+          },
+          {
+            "offset": 128,
+            "declaration": "unsigned short GuildLevel"
+          },
+          {
+            "offset": 130,
+            "declaration": "char[4] Resist"
+          },
+          {
+            "offset": 136,
+            "declaration": "int ReqHp"
+          },
+          {
+            "offset": 140,
+            "declaration": "int ReqMp"
+          },
+          {
+            "offset": 144,
+            "declaration": "unsigned short Magic"
+          },
+          {
+            "offset": 146,
+            "declaration": "unsigned short Rsv"
+          },
+          {
+            "offset": 148,
+            "declaration": "char LearnedSkill"
+          }
+        ]
+      },
+      "MSG_UpdateEtc": {
+        "size": 48,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int FakeExp"
+          },
+          {
+            "offset": 16,
+            "declaration": "long long Exp"
+          },
+          {
+            "offset": 24,
+            "declaration": "unsigned int[2] LearnedSkill"
+          },
+          {
+            "offset": 32,
+            "declaration": "short ScoreBonus"
+          },
+          {
+            "offset": 34,
+            "declaration": "short SpecialBonus"
+          },
+          {
+            "offset": 36,
+            "declaration": "short SkillBonus"
+          },
+          {
+            "offset": 40,
+            "declaration": "int Coin"
+          }
+        ]
+      },
+      "MSG_MessagePanel": {
+        "size": 140,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[128] String"
+          }
+        ]
+      },
+      "MSG_CHARPASSWORD": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[16] ItemPassWord"
+          },
+          {
+            "offset": 28,
+            "declaration": "char State"
+          }
+        ]
+      },
+      "MSG_CharacterLogin": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Slot"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Force"
+          },
+          {
+            "offset": 20,
+            "declaration": "char[16] SecretCode"
+          }
+        ]
+      },
+      "MSG_NewCharacter": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Slot"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 32,
+            "declaration": "int Class"
+          }
+        ]
+      },
+      "MSG_ReqTransper": {
+        "size": 52,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Result"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Slot"
+          },
+          {
+            "offset": 20,
+            "declaration": "char[16] OldName"
+          },
+          {
+            "offset": 36,
+            "declaration": "char[16] NewName"
+          }
+        ]
+      },
+      "MSG_DeleteCharacter": {
+        "size": 48,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Slot"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 32,
+            "declaration": "char[16] Password"
+          }
+        ]
+      },
+      "MSG_CNFNewCharacter": {
+        "size": 920,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_SELCHAR SelChar"
+          }
+        ]
+      },
+      "MSG_CNFDeleteCharacter": {
+        "size": 920,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_SELCHAR SelChar"
+          }
+        ]
+      },
+      "MSG_CNFCharacterLogin": {
+        "size": 1728,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 14,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_MOB MOB"
+          },
+          {
+            "offset": 1056,
+            "declaration": "unsigned short Slot"
+          },
+          {
+            "offset": 1058,
+            "declaration": "unsigned short ClientID"
+          },
+          {
+            "offset": 1060,
+            "declaration": "unsigned short Weather"
+          },
+          {
+            "offset": 1062,
+            "declaration": "char[16] ShortSkill"
+          },
+          {
+            "offset": 1080,
+            "declaration": "struct STRUCT_EXT1 Ext1"
+          },
+          {
+            "offset": 1368,
+            "declaration": "struct STRUCT_EXT2 Ext2"
+          }
+        ]
+      },
+      "MSG_INITGULDNAME": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Parm"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[12] GuildName"
+          }
+        ]
+      },
+      "MSG_MessageLog": {
+        "size": 140,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[128] String"
+          }
+        ]
+      },
+      "MSG_CreateMob": {
+        "size": 236,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 14,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short MobID"
+          },
+          {
+            "offset": 18,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short[18] Equip"
+          },
+          {
+            "offset": 70,
+            "declaration": "unsigned short[32] Affect"
+          },
+          {
+            "offset": 134,
+            "declaration": "unsigned short Guild"
+          },
+          {
+            "offset": 136,
+            "declaration": "char GuildLevel"
+          },
+          {
+            "offset": 140,
+            "declaration": "struct STRUCT_SCORE Score"
+          },
+          {
+            "offset": 188,
+            "declaration": "unsigned short CreateType"
+          },
+          {
+            "offset": 190,
+            "declaration": "char[18] Equip2"
+          },
+          {
+            "offset": 208,
+            "declaration": "char[26] Nick"
+          },
+          {
+            "offset": 234,
+            "declaration": "char Server"
+          }
+        ]
+      },
+      "MSG_CreateMobTrade": {
+        "size": 260,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 14,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short MobID"
+          },
+          {
+            "offset": 18,
+            "declaration": "char[16] MobName"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short[18] Equip"
+          },
+          {
+            "offset": 70,
+            "declaration": "unsigned short[32] Affect"
+          },
+          {
+            "offset": 134,
+            "declaration": "unsigned short Guild"
+          },
+          {
+            "offset": 136,
+            "declaration": "char GuildLevel"
+          },
+          {
+            "offset": 140,
+            "declaration": "struct STRUCT_SCORE Score"
+          },
+          {
+            "offset": 188,
+            "declaration": "unsigned short CreateType"
+          },
+          {
+            "offset": 190,
+            "declaration": "char[18] Equip2"
+          },
+          {
+            "offset": 208,
+            "declaration": "char[26] Nick"
+          },
+          {
+            "offset": 234,
+            "declaration": "char[24] Desc"
+          },
+          {
+            "offset": 258,
+            "declaration": "char Server"
+          }
+        ]
+      },
+      "MSG_REQMobByID": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short MobID"
+          }
+        ]
+      },
+      "MSG_SetShortSkill": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[20] Skill"
+          }
+        ]
+      },
+      "MSG_ShopList": {
+        "size": 236,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int ShopType"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_ITEM[27] List"
+          },
+          {
+            "offset": 232,
+            "declaration": "int Tax"
+          }
+        ]
+      },
+      "MSG_SwapItem": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char SourType"
+          },
+          {
+            "offset": 13,
+            "declaration": "char SourPos"
+          },
+          {
+            "offset": 14,
+            "declaration": "char DestType"
+          },
+          {
+            "offset": 15,
+            "declaration": "char DestPos"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short TargetID"
+          }
+        ]
+      },
+      "MSG_RepurchaseItems": {
+        "size": 176,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int target"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_REPURCHASEITEM[10] Repurcharse"
+          }
+        ]
+      },
+      "MSG_REQShopList": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short TargetID"
+          }
+        ]
+      },
+      "MSG_Buy": {
+        "size": 24,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 14,
+            "declaration": "short TargetCarryPos"
+          },
+          {
+            "offset": 16,
+            "declaration": "short MyCarryPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Coin"
+          }
+        ]
+      },
+      "MSG_Sell": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 14,
+            "declaration": "short MyType"
+          },
+          {
+            "offset": 16,
+            "declaration": "short MyPos"
+          }
+        ]
+      },
+      "MSG_Attack": {
+        "size": 168,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int FakeExp"
+          },
+          {
+            "offset": 16,
+            "declaration": "int ReqMp"
+          },
+          {
+            "offset": 24,
+            "declaration": "long long CurrentExp"
+          },
+          {
+            "offset": 32,
+            "declaration": "short Rsv"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short PosX"
+          },
+          {
+            "offset": 36,
+            "declaration": "unsigned short PosY"
+          },
+          {
+            "offset": 38,
+            "declaration": "unsigned short TargetX"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned short TargetY"
+          },
+          {
+            "offset": 42,
+            "declaration": "unsigned short AttackerID"
+          },
+          {
+            "offset": 44,
+            "declaration": "unsigned short Progress"
+          },
+          {
+            "offset": 46,
+            "declaration": "char Motion"
+          },
+          {
+            "offset": 47,
+            "declaration": "char FlagLocal"
+          },
+          {
+            "offset": 48,
+            "declaration": "char DoubleCritical"
+          },
+          {
+            "offset": 49,
+            "declaration": "char SkillParm"
+          },
+          {
+            "offset": 52,
+            "declaration": "int CurrentMp"
+          },
+          {
+            "offset": 56,
+            "declaration": "short SkillIndex"
+          },
+          {
+            "offset": 60,
+            "declaration": "STRUCT_DAM[13] Dam"
+          }
+        ]
+      },
+      "MSG_AttackTwo": {
+        "size": 80,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int FakeExp"
+          },
+          {
+            "offset": 16,
+            "declaration": "int ReqMp"
+          },
+          {
+            "offset": 24,
+            "declaration": "long long CurrentExp"
+          },
+          {
+            "offset": 32,
+            "declaration": "short Rsv"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short PosX"
+          },
+          {
+            "offset": 36,
+            "declaration": "unsigned short PosY"
+          },
+          {
+            "offset": 38,
+            "declaration": "unsigned short TargetX"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned short TargetY"
+          },
+          {
+            "offset": 42,
+            "declaration": "unsigned short AttackerID"
+          },
+          {
+            "offset": 44,
+            "declaration": "unsigned short Progress"
+          },
+          {
+            "offset": 46,
+            "declaration": "char Motion"
+          },
+          {
+            "offset": 47,
+            "declaration": "char FlagLocal"
+          },
+          {
+            "offset": 48,
+            "declaration": "char DoubleCritical"
+          },
+          {
+            "offset": 49,
+            "declaration": "char SkillParm"
+          },
+          {
+            "offset": 52,
+            "declaration": "int CurrentMp"
+          },
+          {
+            "offset": 56,
+            "declaration": "short SkillIndex"
+          },
+          {
+            "offset": 60,
+            "declaration": "STRUCT_DAM[2] Dam"
+          }
+        ]
+      },
+      "MSG_AttackOne": {
+        "size": 72,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int FakeExp"
+          },
+          {
+            "offset": 16,
+            "declaration": "int ReqMp"
+          },
+          {
+            "offset": 24,
+            "declaration": "long long CurrentExp"
+          },
+          {
+            "offset": 32,
+            "declaration": "short Rsv"
+          },
+          {
+            "offset": 34,
+            "declaration": "unsigned short PosX"
+          },
+          {
+            "offset": 36,
+            "declaration": "unsigned short PosY"
+          },
+          {
+            "offset": 38,
+            "declaration": "unsigned short TargetX"
+          },
+          {
+            "offset": 40,
+            "declaration": "unsigned short TargetY"
+          },
+          {
+            "offset": 42,
+            "declaration": "unsigned short AttackerID"
+          },
+          {
+            "offset": 44,
+            "declaration": "unsigned short Progress"
+          },
+          {
+            "offset": 46,
+            "declaration": "char Motion"
+          },
+          {
+            "offset": 47,
+            "declaration": "char FlagLocal"
+          },
+          {
+            "offset": 48,
+            "declaration": "char DoubleCritical"
+          },
+          {
+            "offset": 49,
+            "declaration": "char SkillParm"
+          },
+          {
+            "offset": 52,
+            "declaration": "int CurrentMp"
+          },
+          {
+            "offset": 56,
+            "declaration": "short SkillIndex"
+          },
+          {
+            "offset": 60,
+            "declaration": "STRUCT_DAM[1] Dam"
+          }
+        ]
+      },
+      "MSG_REQParty": {
+        "size": 44,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "struct PARTY Leader"
+          },
+          {
+            "offset": 40,
+            "declaration": "int TargetID"
+          }
+        ]
+      },
+      "MSG_AddParty": {
+        "size": 40,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "struct PARTY Party"
+          }
+        ]
+      },
+      "MSG_CNFParty2": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short LeaderID"
+          },
+          {
+            "offset": 14,
+            "declaration": "char[16] LeaderName"
+          }
+        ]
+      },
+      "MSG_ApplyBonus": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short BonusType"
+          },
+          {
+            "offset": 14,
+            "declaration": "short Detail"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short TargetID"
+          }
+        ]
+      },
+      "MSG_ReqBuy": {
+        "size": 36,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Pos"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Price"
+          },
+          {
+            "offset": 24,
+            "declaration": "int Tax"
+          },
+          {
+            "offset": 28,
+            "declaration": "struct STRUCT_ITEM item"
+          }
+        ]
+      },
+      "MSG_CNFMobKill": {
+        "size": 32,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int FakeExp"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short KilledMob"
+          },
+          {
+            "offset": 18,
+            "declaration": "unsigned short Killer"
+          },
+          {
+            "offset": 24,
+            "declaration": "long long Exp"
+          }
+        ]
+      },
+      "MSG_RemoveMob": {
+        "size": 16,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int RemoveType"
+          }
+        ]
+      },
+      "MSG_SetHpMode": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Hp"
+          },
+          {
+            "offset": 16,
+            "declaration": "short Mode"
+          }
+        ]
+      },
+      "MSG_SetHpMp": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Hp"
+          },
+          {
+            "offset": 16,
+            "declaration": "int Mp"
+          },
+          {
+            "offset": 20,
+            "declaration": "int ReqHp"
+          },
+          {
+            "offset": 24,
+            "declaration": "int ReqMp"
+          }
+        ]
+      },
+      "MSG_SetHpDam": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Hp"
+          },
+          {
+            "offset": 16,
+            "declaration": "short Dam"
+          }
+        ]
+      },
+      "MSG_Carry": {
+        "size": 528,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "STRUCT_ITEM[64] Carry"
+          },
+          {
+            "offset": 524,
+            "declaration": "int Coin"
+          }
+        ]
+      },
+      "MSG_HellBuy": {
+        "size": 24,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short TargetID"
+          },
+          {
+            "offset": 14,
+            "declaration": "short TargetCarryPos"
+          },
+          {
+            "offset": 16,
+            "declaration": "short MyCarryPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Coin"
+          }
+        ]
+      },
+      "MSG_UpdateItem": {
+        "size": 20,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int ItemID"
+          },
+          {
+            "offset": 16,
+            "declaration": "short State"
+          },
+          {
+            "offset": 18,
+            "declaration": "char Height"
+          },
+          {
+            "offset": 19,
+            "declaration": "char dummy"
+          }
+        ]
+      },
+      "MSG_ReqSummon": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int Result"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[16] Name"
+          }
+        ]
+      },
+      "MSG_CNFRemoveServerLogin": {
+        "size": 3640,
+        "alignment": 8,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 16,
+            "declaration": "struct STRUCT_SELCHAR SelChar"
+          },
+          {
+            "offset": 920,
+            "declaration": "char[16] AccountName"
+          },
+          {
+            "offset": 936,
+            "declaration": "STRUCT_ITEM[120] Cargo"
+          },
+          {
+            "offset": 1896,
+            "declaration": "int Coin"
+          },
+          {
+            "offset": 1900,
+            "declaration": "char[16] SecretCode"
+          },
+          {
+            "offset": 1916,
+            "declaration": "int SSN1"
+          },
+          {
+            "offset": 1920,
+            "declaration": "int SSN2"
+          },
+          {
+            "offset": 1924,
+            "declaration": "short PosX"
+          },
+          {
+            "offset": 1926,
+            "declaration": "short PosY"
+          },
+          {
+            "offset": 1928,
+            "declaration": "struct STRUCT_MOB MOB"
+          },
+          {
+            "offset": 2968,
+            "declaration": "unsigned short Slot"
+          },
+          {
+            "offset": 2970,
+            "declaration": "unsigned short ClientID"
+          },
+          {
+            "offset": 2972,
+            "declaration": "unsigned short Weather"
+          },
+          {
+            "offset": 2974,
+            "declaration": "char[16] ShortSkill"
+          },
+          {
+            "offset": 2992,
+            "declaration": "struct STRUCT_EXT1 Ext1"
+          },
+          {
+            "offset": 3280,
+            "declaration": "struct STRUCT_EXT2 Ext2"
+          }
+        ]
+      },
+      "MSG_EnvEffect": {
+        "size": 24,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short x1"
+          },
+          {
+            "offset": 14,
+            "declaration": "short y1"
+          },
+          {
+            "offset": 16,
+            "declaration": "short x2"
+          },
+          {
+            "offset": 18,
+            "declaration": "short y2"
+          },
+          {
+            "offset": 20,
+            "declaration": "short Effect"
+          },
+          {
+            "offset": 22,
+            "declaration": "short EffectParm"
+          }
+        ]
+      },
+      "MSG_RandomQuiz": {
+        "size": 268,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "char[128] Question"
+          },
+          {
+            "offset": 140,
+            "declaration": "char[4][32] Answer"
+          }
+        ]
+      },
+      "MSG_LongMessagePanel": {
+        "size": 528,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "short Parm1"
+          },
+          {
+            "offset": 14,
+            "declaration": "short Parm2"
+          },
+          {
+            "offset": 16,
+            "declaration": "char[4][128] Line"
+          }
+        ]
+      },
+      "MSG_DropItem": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int SourType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int SourPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Rotate"
+          },
+          {
+            "offset": 24,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 26,
+            "declaration": "unsigned short GridY"
+          },
+          {
+            "offset": 28,
+            "declaration": "unsigned short ItemID"
+          }
+        ]
+      },
+      "MSG_CreateItem": {
+        "size": 32,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 14,
+            "declaration": "unsigned short GridY"
+          },
+          {
+            "offset": 16,
+            "declaration": "unsigned short ItemID"
+          },
+          {
+            "offset": 18,
+            "declaration": "struct STRUCT_ITEM Item"
+          },
+          {
+            "offset": 26,
+            "declaration": "char Rotate"
+          },
+          {
+            "offset": 27,
+            "declaration": "char State"
+          },
+          {
+            "offset": 28,
+            "declaration": "char Height"
+          },
+          {
+            "offset": 29,
+            "declaration": "char Create"
+          },
+          {
+            "offset": 30,
+            "declaration": "unsigned short Owner"
+          }
+        ]
+      },
+      "MSG_CNFDropItem": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int SourType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int SourPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "int Rotate"
+          },
+          {
+            "offset": 24,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 26,
+            "declaration": "unsigned short GridY"
+          }
+        ]
+      },
+      "MSG_CNFGetItem": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int DestType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int DestPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "struct STRUCT_ITEM Item"
+          }
+        ]
+      },
+      "MSG_RMBShopList": {
+        "size": 332,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int ShopType"
+          },
+          {
+            "offset": 16,
+            "declaration": "STRUCT_ITEM[39] List"
+          },
+          {
+            "offset": 328,
+            "declaration": "int Tax"
+          }
+        ]
+      },
+      "MSG_GetItem": {
+        "size": 28,
+        "alignment": 4,
+        "fields": [
+          {
+            "offset": 0,
+            "declaration": "struct MSG_STANDARD Header"
+          },
+          {
+            "offset": 12,
+            "declaration": "int DestType"
+          },
+          {
+            "offset": 16,
+            "declaration": "int DestPos"
+          },
+          {
+            "offset": 20,
+            "declaration": "unsigned short ItemID"
+          },
+          {
+            "offset": 22,
+            "declaration": "unsigned short GridX"
+          },
+          {
+            "offset": 24,
+            "declaration": "unsigned short GridY"
+          }
+        ]
+      }
+    }
+  }
+}

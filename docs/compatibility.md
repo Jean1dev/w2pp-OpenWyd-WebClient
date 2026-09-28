@@ -1,0 +1,98 @@
+# Compatibilidade OpenWyd ↔ servidor Go
+
+Data: 28/09/2026. SHAs fixados em `dependencies.lock.json`. Estado: **auditoria parcial; não há cliente integrado**.
+
+Fontes principais: servidor `tmserver/internal/protocol/` e `tmserver/internal/handler/`; cliente `Projects/TMProject/Basedef.h`, `CPSock.cpp`, `TMSelectServerScene.cpp`, `TMSelectCharScene.cpp`, `TMFieldScene.cpp`, `TMHuman.cpp`. O [inventário](evidence/01-auditoria/source-inventory.json) lista 102 constantes de opcode Go, 61 atribuições diretas no dispatcher e 69 declarações de opcode upstream. Rotas montadas em loops não estão na contagem de atribuições diretas. Igualdade de opcode não é compatibilidade.
+
+## Convenções e transporte
+
+Nas tabelas, `T/B` = tamanho total/body, em bytes. `bN` é offset depois do header; `@N` é offset absoluto do pacote ou relativo à estrutura nomeada. `i/u` indicam inteiro com/sem sinal. Valores Go são **confirmados em fonte**, não capturas Windows. Valores ABI upstream são **confirmados em execução do probe Clang**, não execução do jogo. Campos não auditados ficam explícitos, sem completar por suposição.
+
+Header: 12 bytes; Size u16@0, KeyWord u8@2, CheckSum u8@3, Type u16@4, ID u16@6, Tick u32@8. Little-endian. Handshake C→S `11 F3 11 1F`, uma vez por conexão. Frame entre 12 e 8192 bytes. Transformação/checksum a partir de @4. O codec Go sinaliza checksum incorreto, mas não o rejeita automaticamente. Framing é fluxo TCP; uma mensagem WS não delimita necessariamente um pacote CPSock.
+
+Provas ainda necessárias no cliente: vetores independentes do encoder, handshake fragmentado, header/body repartidos em todos os pontos, múltiplos frames no mesmo chunk, EOF parcial, tamanhos 0/11/8193, checksum inválido e bytes desconhecidos. Não usar logs de login real como fixture. O servidor tem apenas `_schema_example.json` com hex vazio; sucesso dos testes existentes não comprova paridade de capturas.
+
+## Estruturas compartilhadas e ABI
+
+O [probe](evidence/01-auditoria/upstream-layouts.json) mede 135 records diretamente do header original, nos alvos `wasm32-unknown-emscripten` e `i686-pc-windows-msvc`. O segundo é a ABI MSVC modelada por Clang, não uma execução de `cl.exe`. A única declaração auxiliar é HWND, usado por um global extern, não pelos records medidos. Não se força pack(1).
+
+| Estrutura | Go / Alan | Campos e divergência | Verificação necessária |
+|---|---|---|---|
+| ITEM | 8 / 8 | índice i16/u16@0 conforme codec; 3 pares efeito/valor u8@2..7; Alan também interpreta união short | índices extremos, efeitos e vazio; preservar bytes |
+| SCORE | 48 / 48 | Go Level i32@0; Alan short@0 + padding; Ac@4, Damage@8, HP/MP i32@16/20/24/28, atributos i16@32..38. Go Merchant/AttackRun/Direction@12/13/14; Alan Reserved/AttackRun@12/13, padding@14..15 | igualdade de tamanho não basta; sinal, Level e Merchant/Direction |
+| SELCHAR | 840 / 904 | 4 slots; XY i16/u16 arrays@0/8, nomes[4][16]@16, score[4]@80; equipamentos@272 são [4][16] Go e [4][18] Alan; Guild@784/848, Coin@792/856, Exp i64@808/872 | quatro classes, slot vazio, último equipamento, exp >32 bits |
+| MOB | 816 / 1040 | BaseScore@44 e CurrentScore@92 coincidem; Equip@140 [16]/[18]; Carry[64]@268/284; skills e bônus posteriores deslocados. Go Coin@28; Alan@24. Alan tem dummy[212]@824 e contadores finais | snapshot persistido, nível, ouro, equipamentos/carry e skills sem memcpy |
+| Capacidade banco | 128 / 120 | pacote Go contém 1024 bytes de itens; Alan reserva 960 | slots 119, 120, 127; ampliar capacidade/UI interna |
+
+Comentários genéricos de `messages.go` dizem pack(1), enquanto codecs como selchar/mob/party preservam padding natural e outros codecs usam offsets packed. Não aplicar uma regra única de packing. O que o Go efetivamente lê/escreve é o contrato atual; desvios do legado precisam de investigação separada.
+
+## Login, seleção e entrada no mundo
+
+| Pacote / direção / opcode | Go T/B | Alan total | Layout e divergência | Teste necessário |
+|---|---:|---:|---|---|
+| AccountLogin C→S `020D` | 116/104 | 116 | senha[12]b0, conta[16]b12, reservado[52]b28, versão i32b80, force/save i32b84, adapter[4]i32b88. Alan envia 1758 em seleção e retorno do Field; Compose Go exige 12000 | igualdade byte a byte com credenciais sintéticas; versão incorreta; nenhum segredo em logs/storage/URL |
+| CNFAccountLogin S→C `010A` | 2008/1996 | 1928 | SELCHAR@32; banco Go@872, Alan@936; Coin@1896 e AccountName@1900 coincidem apesar da divergência! Go escreve marcador@28=1; Alan reserva SecretCode[16]@12 | quatro slots e 128 itens; não concluir compatibilidade pelos campos finais |
+| AccountSecure C→S `0FDE` | 32/20 | 32 | Go token[6]b0, reservado[10]b6, ChangeNumeric i32b16. Alan ItemPassWord[16] + State char + padding | criação/validação/rejeição de PIN, cauda e memória transitória |
+| CreateCharacter C→S `020F` | 36/24 | 36 | Slot i32b0, nome[16]b4, classe i32b20 | quatro classes, slot inválido, nome inválido |
+| DeleteCharacter C→S `0211` | 44/32 | 48 | Slot i32b0, nome[16]b4, senha[12]b20; Alan senha[16] | falha de credencial e atualização da seleção |
+| CNFNew/Delete S→C `0110/0112` | 856/844 | 920 | SELCHAR@16; 4 bytes padding após header | resultado confirmado, não antecipar criação/exclusão |
+| CharacterLogin C→S `0213` | 20/8 | 36 | Slot i32b0, Force i32b4; Alan acrescenta SecretCode[16] | enviar tamanho canônico mesmo que decoder Go aceite bytes extras |
+| CNFCharacterLogin S→C `0114` | 1832/1820 | 1728 | XY i16b0/2; MOB@16; Slot/ClientID/Weather Go@1040/1042/1044, Alan@1056/1058/1060; ShortSkill[16] Go@1046; extensões Alan diferentes | mapear cada campo efetivamente consumido; spawn real, equipamento, relogin |
+| CharacterLogout C→S `0215`; confirmação S→C `0116` | confirmação 12/0 | consumidor a revisar | `character.go` responde sem body após salvar/cancelar estados | retorno à seleção, cancelamento de trade e relogin |
+| Falhas S→C `0119/011A/011C/0FDF` | 12/0 | consumidor a revisar | `character.go`, `login.go`, `misc.go` enviam body nil; mapear recusas de personagem, sessão duplicada e PIN | não permanecer em UI de sucesso após erro |
+
+## Mundo, combate e estado
+
+| Pacote / direção / opcode | Go T/B | Alan total | Campos / divergência | Teste necessário |
+|---|---:|---:|---|---|
+| CreateMob S→C `0364` | 232/220 | 236 | XY@12/14, ID@16, nome[16]@18; Equip u16[16]@34 vs [18]; Affect[32]@66 vs70; Guild@130 vs134; Score@136 vs140; CreateType@184 vs188; anct[16]@186 vs equip2[18]@190 | jogador e NPC, classe, HP, guild/refino, ID ≥1000; nome de jogador contém PK em bytes12..15 |
+| RemoveMob S→C `0165` | 16/4 | conferir consumidor | tipo i32b0; entidade no header.ID, ao contrário do spawn | morte, logout e saída de visão |
+| Action C↔S `036C/0366/0368` | 52/40 | 52 | XY i16b0/2, Effect i32b4, Speed i32b8, Route[24]b12, TargetXY i16b36/38; Alan destino u16 | duas sessões, tick sincronizado, teleporte/ilusão; posição continua autoritativa |
+| Motion C↔S `036A` | 20/8 | 20 | Go motion/parm u16b0/2, NotUsed i32b4 zero; Alan short/short + Direction float32b4 | distinguir broadcast de efeito e direção recebida; animação sem resultado de combate local |
+| UpdateEquip S→C `036B` | 60/48 | 68 | Equip u16[16]b0, anct u8[16]b32 vs arrays18 | troca equipamento vista pela segunda sessão |
+| UpdateScore S→C `0336` | 152/140 | 152 | SCORE b0; critical/save b48/49; affect u16[32]b50; guild b114/116; resist[4]b118; HP/MP i32b124/128; Go Magic i32b132, cauda[4]b136; Alan Magic u16 e LearnedSkill | não sobrescrever skills com 0xCC da cauda Go; limites e buffs |
+| UpdateEtc S→C `0337` | 48/36 | 48 | Hold b0, Exp i64b4, Learn i64b12, bônus u16b20/22/24, Magic u16b26, Coin i32b28. Alan tem 2 máscaras u32 e padding no lugar de Magic | experiência >32 bits, gold e skill points |
+| Attack C↔S `0367/039D/039E` | `60+8N` / `48+8N`, N≤13 | 168/72/80 | HP i32b4; Exp i64b12; XY b22..28; attacker u16b30; progress b32; motion b34; critical b36; MP i32b40; skill i16b44; ReqMp i16b46; Dam[N] {target i32,damage i32}b48. Alan chama @16 de ReqMp e não declara ReqMp@58 | HP, miss/block negativos, um/dois/13 alvos; não ecoar dano predito como confirmado |
+| SetHpMp S→C `0181` | 28/16 | conferir consumidor | HP/MP/ReqHP/ReqMP i32b0/4/8/12 | dano, cura, morte e poção |
+| SetHpDam S→C `018A` | 20/8 | conferir consumidor | HP i32b0, dano i32b4 | HoT/DoT e sinal |
+| SendAffect S→C `03B9` | 268/256 | conferir consumidor | 32 entradas de 8 bytes em `affect.go` | tipo/valor/duração e expiração |
+| ReqTeleport/ChangeCity/Restart C→S `0290/0291/0289` | 12/0 suficiente para handlers | consumidor a revisar | handlers ignoram body; teleporte usa posição autoritativa; ChangeCity chama `villageAt`, que atualmente sempre retorna -1 | custo, cidade persistida, morte e relogin; registrar ChangeCity inoperante |
+
+## Itens, economia, chat e grupo
+
+| Pacote / direção / opcode | Go T/B | Layout / diferença confirmada | Teste necessário |
+|---|---:|---|---|
+| SendItem S→C `0182` | 24/12 | lugar u16b0, slot u16b2, ITEM b4; Alan também 24 | slots equip/carry/cargo, remoção índice zero |
+| UpdateCarry S→C `0185` | 528/516 | ITEM[64]b0 + Coin i32b512 | inventário completo e gold após relogin |
+| UseItem C↔S `0373` | 34/22 | source/destination type/pos i32b0/4/8/12; XY u16b16/18; WarpID u16b20. Alan sizeof36 inclui cauda padding e nome ItemID | mover/equipar/consumir; não enviar padding por sizeof |
+| TradingItem C→S `0376` | 20/8 | destPlace/destSlot/srcPlace/srcSlot u8b0..3, WarpID i32b4 | inversão origem/destino, banco128 |
+| DropItem C→S `0272` | 28/16 | source type/pos/rotation i32b0/4/8, XY u16b12/14 | remover apenas após resposta válida |
+| GetItem C→S `0270` | 24/12 | Go ItemID i32b0, destType/pos i32b4/8, marcado UNVERIFIED; Alan total28: destType/pos@12/16, ItemID u16@20, XY@22/24 | dependência de backend; validar contra legado/captura antes de codec final |
+| CNFDrop/CNFGet S→C `0175/0171` | atual16/4 | `handler/item.go` envia apenas slot i32; Alan espera28 (source/pos/rotate/XY ou destType/pos/ITEM). Spawn do item no chão está explicitamente adiado | bloqueia prova de drop/coleta real; entrega separada no servidor |
+| DeleteItem/SplitItem C→S `02E4/02E5` | 20/8;24/12 | Slot i32b0, SIndex i32b4; Split acrescenta Num i32b8; consumidor Alan ainda a revisar | limites, quantidade e operação repetida |
+| REQShopList C→S `027B` | mínimo14/2 aceito | handler lê Target u16b0; comentário do codec descreve total16 | distinguir mínimo aceito de layout canônico |
+| ShopList S→C `017C` | 236/224 | shopType i32b0; ITEM[27]b4; tax i32b220. Mapeamento carry NPC (i%9)+(i/9)*27 | 3 abas e preços autoritativos; não usar RMBShopList de 39 itens |
+| Buy/Sell C↔S `0379/037A` | mínimo18/6 aceito | target u16b0, posição NPC/tipo i16b2, posição própria i16b4; buy ecoa comprimento recebido | revisar tamanhos canônicos legados, gold e quantidade nos dois lados |
+| Deposit/Withdraw C↔S `0388/0387` | 16/4 canônico | quantia i32b0 via StandardParm | negativo, saldo insuficiente, repetição/interrupção |
+| UpdateCargoCoin S→C `0339` | atual57/45 | `cargo.go` escreve Coin i32b0 e marca offset UNVERIFIED. Header legado diz usar MSG_STANDARDPARM; 57 também é base decimal do opcode, não prova de tamanho | provável divergência do backend, confirmar antes de corrigir; não adotar 57 como tamanho legado comprovado |
+| Trade C↔S `0383` | 154/142 | ITEM[15]b0; slots[15]b120; money i32b135; check u8b139; opponent u16b140. Alan total156: money@148 vs Go@147, check@152 vs151, opponent@154 vs152 | duas sessões; confirmação, cancelamento, interrupção e conservação de saldos |
+| QuitTrade C↔S `0384` | resposta12/0 | `trade.go` envia nil aos dois participantes; revisar consumidor | cancelamento por movimento/logout |
+| MessageChat C↔S `0333` | canônico108/96 | Go texto96 vs Alan128 (total140) | string terminada, limite e encoding legado |
+| MessageWhisper C↔S `0334` | `28+N` / `16+N` | decoder Go lê nome16 b0 e todo o restante como texto; handler encaminha payload original. Alan sizeof160: nome16, texto128, cor short e padding | destino inválido, encoding, NUL e cauda de cor |
+| MessagePanel S→C `0101` | 140/128 | texto128, tamanho também disponível no Alan | erros legíveis, NUL e texto longo |
+| SendReqParty C↔S `037F` | 48/36 | class/pos u8b0/1; level/maxHP/HP u16b2/4/6; party i16b8; nome16 b10; Unk i32b28; target i16b32, padding. Alan MSG_REQParty total44, TargetID i32@40 | convite válido/inválido, líder e limites de HP |
+| AcceptParty C↔S `03AB` | 32/20 | líder i16b0, nome16 b2, padding2 final | convite expirado e aceitação duplicada |
+| CNFAddParty S→C `037D` | 40/28 | leader/level/maxHP/HP/party u16b0/2/4/6/8, nome16 b10, target u16b26 | atualizar slots e identidade real da entidade |
+| RemoveParty S→C `037E` | 16/4 | leader i16b0 + unk i16b2; C→S usa StandardParm | sair, expulsar e limpar UI de todos |
+| SetShortSkill C→S `0378` | 32/20 mínimo | SkillBar[4]b0 e ShortSkill[16]b4; `skill.go` persiste/ecoará no login, sem resposta imediata | atualizar atalhos e relogar |
+| ApplyBonus C→S `0277` | 18/6 | tipo i16b0, detalhe i16b2, target u16b4; Alan estrutura total20 com padding | atributos/mastery, saldo de pontos e alvo inválido |
+
+## Cobertura restante e dependências
+
+Também é necessário adaptar **formatos de assets**, não só pacotes: o loader original lê arrays crus de STRUCT_ITEMLIST(164)×6500 e STRUCT_SPELL(104)×248 e aplica XOR 0x5A. Os arquivos do operador têm 910.004 e 23.812 bytes, insuficientes para essas leituras. A correspondência exata com os registros 7662 e a conversão de campos estão pendentes; não completar o buffer com zeros para mascarar a incompatibilidade. Ver [preflight de assets](evidence/01-auditoria/assets-summary.json).
+
+A matriz começa pelos fluxos do primeiro marco e expande os principais caminhos de gameplay, mas **não fecha ainda cada consumidor**. O inventário de opcodes e o dump completo de fields/sizeof permitem continuar sem perder os casos não mapeados. Permanecem revisão semântica/capturas de falhas, whisper, atalhos, teleporte, shop/party no Alan, autotrade, refinamentos e mensagens auxiliares visuais. Não habilitar um pacote só porque seu número aparece em ambos os inventários.
+
+Dependências do servidor devem ser entregas separadas com testes: contrato de coleta e confirmações; spawn de item no chão; banco/UpdateCargoCoin; reconciliação entre padding legado e codecs atuais de trade/use/attack. A suspeita de tamanho57 confundido com opcode em CargoCoin é **hipótese fundamentada**, não correção aplicada.
+
+As cenas fazem casts diretos de mensagens (`TMFieldScene::OnPacket`, `TMHuman::OnPacketUpdateScore`). O trabalho da etapa 3 deve instalar a tradução antes desses consumidores, auditar envios que usam sizeof e limitar conversões de campos. A etapa 1 permanece **Em andamento** enquanto a matriz e o caminho de build não estiverem suficientemente verificados; nenhuma prova multiplayer foi produzida.

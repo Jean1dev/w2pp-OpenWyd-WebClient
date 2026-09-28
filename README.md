@@ -2,7 +2,7 @@
 
 Pacote de contexto e prompts para construir nosso cliente WYD no navegador, integrado ao servidor Go [Jean1dev/w2pp-OpenWYD](https://github.com/Jean1dev/w2pp-OpenWYD).
 
-Estado inicial em **28/09/2026**: planejamento e instruções executáveis por agentes; ainda não há cliente, gateway ou build implementado neste repositório.
+Estado em **28/09/2026**: auditoria em andamento e continuidade do OpenWyd escolhida. O runtime do Alan já compilou/linkou localmente em WASM; ainda não há cliente adaptado, cena validada ou gateway implementado. Veja [progresso](docs/PROGRESS.md), [setup reproduzível](docs/setup.md) e [evidências](docs/evidence/01-auditoria/README.md).
 
 ## Começar
 

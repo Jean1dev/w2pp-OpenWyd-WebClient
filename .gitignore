@@ -10,3 +10,5 @@ build/
 assets-local/
 external/
 *.log
+__pycache__/
+*.pyc

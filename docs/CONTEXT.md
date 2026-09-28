@@ -1,5 +1,7 @@
 # Contexto técnico e decisões iniciais
 
+Atualização de execução em 28/09/2026: a continuidade do OpenWyd foi confirmada pelo usuário. Servidor-alvo `98286fdf`, Emscripten6.0.0 compilado/linkado localmente e incompatibilidades adicionais de assets identificadas. O [ADR001](decisions/001-client-architecture.md), a [matriz](compatibility.md) e as [evidências](evidence/01-auditoria/README.md) complementam/superam hipóteses históricas abaixo; não há gameplay validado.
+
 ## Objetivo e escopo
 
 Ter nossa versão jogável de WYD no navegador, ligada ao servidor Go existente. Primeiro desktop web; depois melhorias de experiência e mobile. Electron, novos sistemas de economia, automação Idle e mudança de regras não fazem parte do primeiro marco.
