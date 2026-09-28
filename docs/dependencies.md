@@ -13,7 +13,9 @@ Auditoria: 28/09/2026. O arquivo `dependencies.lock.json` fixa revisões; caminh
 | emsdk | tag 6.0.0, commit `d223ae73c6998296e3ab27cf81dc2c2c9fd383de` | https://github.com/emscripten-core/emsdk; release `772bb4648be4a897ca062d6adc65bc70223d2703`; instalação apenas em `.cache/toolchains/emsdk` |
 | Node do emsdk | 22.16.0 | Dependência selecionada pelo SDK fixado; não é um requisito inferido do app de inspeção |
 | Python do emsdk | 3.13.3 | Instalado pelo SDK no Windows; scripts de auditoria executados com Python 3.14 local |
-| Playwright | upstream declara `^1.54.2` | Intervalo não é versão fixa. Não instalado ou usado nesta auditoria; fixar versão efetivamente resolvida antes de smoke de browser |
+| Playwright | 1.54.2 | Fixado em `package.json`; usado nos smokes de cena e de conexão (Chromium headless) |
+| github.com/coder/websocket | v1.8.15, `go.sum` `h1:6B2JPeOG…NUA=` | Única dependência do `gateway/`; licença ISC no próprio módulo. Escolhida por ser mantida, sem cgo e com `NetConn`; `NetConn` desativa o limite de leitura e o gateway o restaura (ver ADR 002) |
+| Railway CLI | `@railway/cli` 5.63.1 via `npx` | Uso somente leitura no ambiente do operador: status, variáveis redigidas, deploys e logs. Sem deploy, restart ou mudança de variáveis |
 
 ## Direitos: achados confirmados em fonte
 

@@ -87,3 +87,47 @@ As wrappers shell upstream de build completo validam o manifesto e depois geram 
 Concluir a revisão dos consumidores ainda pendentes na matriz; definir e testar loaders 7662 para ItemList/SkillData, mapear somente dados realmente necessários e resolver a geração local do atlas com proveniência. Em seguida, importar os assets em diretório ignorado e montar uma cena Field real. Antes de servir o harness, substituir credenciais persistidas/query string e destinos de rede de demonstração. Não abrir o harness upstream contra seus servidores públicos.
 
 O link usa WebGL 1–2 e crescimento de memória, sem flag de pthreads; não foi identificada exigência de SharedArrayBuffer nesse comando. Headers de hospedagem, smoke Chromium/Firefox, resolução e coordenadas da cena serão validados quando houver aplicação servida. Nenhuma URL de demo/deploy foi criada.
+
+## Etapa 3 — protocolo, gateway e cliente conectado
+
+Revisão: 28/09/2026. **Confirmado em execução** nesta máquina, com os comandos abaixo (detalhes em [evidências](evidence/03-protocolo/README.md)).
+
+```powershell
+python tools/apply_openwyd_patches.py          # copia client/dialect/* e aplica patches/openwyd/*.patch (recusa SHA diferente do lock)
+npm run gateway:test                           # go vet + testes do gateway (sem -race: não há gcc/cgo aqui)
+npm run protocol:vectors                       # SHA-256 da tabela, vetores independentes, Go overlay (transporte + dialeto)
+npm run protocol:dialect                       # teste C++ do tradutor em wasm32 (em++ → node)
+
+# rebuild do runtime com os patches (mesmos comandos da etapa 1)
+$env:EMSDK = (Resolve-Path .cache/toolchains/emsdk).Path
+python external/OpenWyd/webclient/client-wasm/tools/build_tmproject_wasm_objects.py --repo-root external/OpenWyd --jobs 6
+python external/OpenWyd/webclient/client-wasm/tools/link_tmproject_wasm_startup.py --repo-root external/OpenWyd --dev --jobs 6 --link-opt-level O2
+
+npm run scene                                  # regressão da cena offline
+npm run client:stream                          # navegador + gateway + servidor roteirizado
+```
+
+`go test -overlay` injeta testes no pacote de protocolo do servidor sem alterar `external/server`. Para desfazer os patches no checkout: `git -C external/OpenWyd reset --hard` e remover `Projects/TMProject/WydDialect.*`.
+
+### Gateway e página conectada
+
+Copie `gateway/config.example.json` para um arquivo local e defina os canais do operador: `name`, `target` (host:porta TCP, nunca vindo do navegador), `publicWsUrl` e `clientVersion`. Com `staticDir` apontando para `.cache/local-scene`, o gateway serve `client.html` na mesma origem do WebSocket:
+
+```powershell
+$env:GOTOOLCHAIN = "local"; $env:GOMODCACHE = (Resolve-Path .cache/gomod).Path
+.cache/toolchains/go/bin/go.exe -C gateway build -o ../.cache/bin/wydgateway.exe ./cmd/wydgateway
+.cache/bin/wydgateway.exe -config gateway.local.json
+# abrir http://127.0.0.1:8290/client.html
+```
+
+`ClientVersion` depende do ambiente: 12000 no tm-server do Railway (variável `W2PP_CLIENT_VERSION` lida em 28/09/2026); 7640 no executável sem flag. Fora do loopback, use TLS (`tlsCert`/`tlsKey`) e `wss://`; `allowInsecure` existe só para desenvolvimento local.
+
+### Login real no ambiente do operador
+
+A conta de teste fica em `.env`, ignorado pelo Git, com `W2PP_TEST_ACCOUNT`/`W2PP_TEST_PASSWORD`. Ela foi criada no portal do operador a pedido do usuário. O destino vem da Railway CLI em modo somente leitura:
+
+```powershell
+npx -y @railway/cli@5.63.1 link --project 08049b1a-6753-4274-b436-0dff658a5df1 --environment production --service tm-server
+npx -y @railway/cli@5.63.1 variables --service tm-server --json   # ler só RAILWAY_TCP_PROXY_* e W2PP_CLIENT_VERSION; não imprimir segredos
+node tools/verify_client_stream.mjs --mode server --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env
+```

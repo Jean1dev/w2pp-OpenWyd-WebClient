@@ -1,0 +1,9 @@
+{
+ "kind": "transport",
+ "v": 1,
+ "note": "synthetic; encoded by tools/protocol/cpsock_ref.py from the C++ table",
+ "iKeyWord": 3,
+ "plain_hex": "10000300640333759f1c6c7effffffff",
+ "wire_hex": "1000038d60f4176ea51b587bffece7ff",
+ "checksum": 141
+}

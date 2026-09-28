@@ -1,6 +1,6 @@
 # Compatibilidade OpenWyd ↔ servidor Go
 
-Data: 28/09/2026. SHAs fixados em `dependencies.lock.json`. Estado: **auditoria parcial; não há cliente integrado**.
+Data: 28/09/2026. SHAs fixados em `dependencies.lock.json`. Estado: **auditoria parcial; cliente integrado até a seleção de personagem** (etapa 3, [evidências](evidence/03-protocolo/README.md), [ADR 002](decisions/002-gateway-and-dialect.md)).
 
 Fontes principais: servidor `tmserver/internal/protocol/` e `tmserver/internal/handler/`; cliente `Projects/TMProject/Basedef.h`, `CPSock.cpp`, `TMSelectServerScene.cpp`, `TMSelectCharScene.cpp`, `TMFieldScene.cpp`, `TMHuman.cpp`. O [inventário](evidence/01-auditoria/source-inventory.json) lista 102 constantes de opcode Go, 61 atribuições diretas no dispatcher e 69 declarações de opcode upstream. Rotas montadas em loops não estão na contagem de atribuições diretas. Igualdade de opcode não é compatibilidade.
 
@@ -10,7 +10,7 @@ Nas tabelas, `T/B` = tamanho total/body, em bytes. `bN` é offset depois do head
 
 Header: 12 bytes; Size u16@0, KeyWord u8@2, CheckSum u8@3, Type u16@4, ID u16@6, Tick u32@8. Little-endian. Handshake C→S `11 F3 11 1F`, uma vez por conexão. Frame entre 12 e 8192 bytes. Transformação/checksum a partir de @4. O codec Go sinaliza checksum incorreto, mas não o rejeita automaticamente. Framing é fluxo TCP; uma mensagem WS não delimita necessariamente um pacote CPSock.
 
-Provas ainda necessárias no cliente: vetores independentes do encoder, handshake fragmentado, header/body repartidos em todos os pontos, múltiplos frames no mesmo chunk, EOF parcial, tamanhos 0/11/8193, checksum inválido e bytes desconhecidos. Não usar logs de login real como fixture. O servidor tem apenas `_schema_example.json` com hex vazio; sucesso dos testes existentes não comprova paridade de capturas.
+Etapa 3 (**confirmado em execução**): a tabela tem o mesmo SHA-256 `e47996fe5e92de5d86d503d5415665f1f464bf344370c709be450607dd97cf8f` no C++ do Alan, no Go e no snapshot do legado. Há 97 vetores e 28 fluxos adversariais, gerados por uma referência independente e aceitos pelo codec e pelo `Framer` Go via overlay, e 1002 frames enquadrados pelo runtime WASM com cortes no meio do frame. O cliente enviava o INITCODE e o servidor não envia nenhum, confirmado nos logs do Railway. **Confirmado em fonte:** o cliente verifica checksum; um erro de checksum encerra o laço de leitura de `NewApp.cpp` e descarta o frame. Continua valendo que nenhum vetor é captura do cliente Windows: a paridade com o 7662 original não foi provada.
 
 ## Estruturas compartilhadas e ABI
 
@@ -32,7 +32,7 @@ Comentários genéricos de `messages.go` dizem pack(1), enquanto codecs como sel
 |---|---:|---:|---|---|
 | AccountLogin C→S `020D` | 116/104 | 116 | senha[12]b0, conta[16]b12, reservado[52]b28, versão i32b80, force/save i32b84, adapter[4]i32b88. Alan envia 1758 em seleção e retorno do Field; Compose Go exige 12000 | igualdade byte a byte com credenciais sintéticas; versão incorreta; nenhum segredo em logs/storage/URL |
 | CNFAccountLogin S→C `010A` | 2008/1996 | 1928 | SELCHAR@32; banco Go@872, Alan@936; Coin@1896 e AccountName@1900 coincidem apesar da divergência! Go escreve marcador@28=1; Alan reserva SecretCode[16]@12 | quatro slots e 128 itens; não concluir compatibilidade pelos campos finais |
-| AccountSecure C→S `0FDE` | 32/20 | 32 | Go token[6]b0, reservado[10]b6, ChangeNumeric i32b16. Alan ItemPassWord[16] + State char + padding | criação/validação/rejeição de PIN, cauda e memória transitória |
+| AccountSecure C→S `0FDE` | 32/20 | 32 | Go token[6]b0, reservado[10]b6, ChangeNumeric i32b16. Alan ItemPassWord[16]@12 + State char@28 + padding. Tradutor: token = 6 primeiros dígitos (teclado limita a 6; excesso recusado), ChangeNumeric = State; apagado após envio | teste unitário OK; criação/validação/rejeição reais pendentes. Atenção: verificação de conta sem PIN **define** o PIN digitado |
 | CreateCharacter C→S `020F` | 36/24 | 36 | Slot i32b0, nome[16]b4, classe i32b20 | quatro classes, slot inválido, nome inválido |
 | DeleteCharacter C→S `0211` | 44/32 | 48 | Slot i32b0, nome[16]b4, senha[12]b20; Alan senha[16] | falha de credencial e atualização da seleção |
 | CNFNew/Delete S→C `0110/0112` | 856/844 | 920 | SELCHAR@16; 4 bytes padding após header | resultado confirmado, não antecipar criação/exclusão |
@@ -95,4 +95,19 @@ A matriz começa pelos fluxos do primeiro marco e expande os principais caminhos
 
 Dependências do servidor devem ser entregas separadas com testes: contrato de coleta e confirmações; spawn de item no chão; banco/UpdateCargoCoin; reconciliação entre padding legado e codecs atuais de trade/use/attack. A suspeita de tamanho57 confundido com opcode em CargoCoin é **hipótese fundamentada**, não correção aplicada.
 
-As cenas fazem casts diretos de mensagens (`TMFieldScene::OnPacket`, `TMHuman::OnPacketUpdateScore`). O trabalho da etapa 3 deve instalar a tradução antes desses consumidores, auditar envios que usam sizeof e limitar conversões de campos. A etapa 1 permanece **Em andamento** enquanto a matriz e o caminho de build não estiverem suficientemente verificados; nenhuma prova multiplayer foi produzida.
+As cenas fazem casts diretos de mensagens (`TMFieldScene::OnPacket`, `TMHuman::OnPacketUpdateScore`). A etapa 3 instalou a tradução antes desses consumidores (`client/dialect/WydDialect.cpp`, ganchos em `CPSock::SendDialect` e `NewApp.cpp`). A etapa 1 permanece **Em andamento**; nenhuma prova multiplayer foi produzida.
+
+## Tradução instalada no cliente (etapa 3)
+
+Qualquer opcode que não esteja abaixo é **descartado e contado** nas duas direções, e o page probe lista os opcodes descartados. O mesmo número de opcode nos dois dialetos não habilita um pacote.
+
+| Direção | Opcode | Ação | Prova |
+|---|---|---|---|
+| S→C | `010A` CNFAccountLogin 2008 → runtime (SELCHAR 840→904, banco 128, SecretCode zerado) | traduz; Level fora de `short` recusa | Railway + roteirizado + unitário |
+| S→C | `0110`/`0112` CNFNew/Delete 856 → 920 | traduz | unitário |
+| S→C | `0114` CNFCharacterLogin 1832 → 1728 (MOB 816→1040 campo a campo; Coin@28→@24; Magic/Regen narrowing contado; Quest/Rsv/LearnedSkill[1]/Ext zerados — hipótese) | traduz | unitário |
+| S→C | `0364` CreateMob 232 → 236 (Equip 16→18, AnctCode→Equip2, GuildMemberType→GuildLevel; cauda 202..231 contada se não zero) | traduz | unitário |
+| S→C | `0165` 16, `036C/0366/0368` 52, `0101` 140, `0102` 16, header-only `0116/0119/011A/011B/011C/011D/0FDE/0FDF` | repassa se o tamanho for exato | unitário; `0101` no roteirizado |
+| C→S | `020D` AccountLogin 116 (Version = ClientVersion do canal; TID zerado; senha apagada) | traduz | Railway + roteirizado + unitário |
+| C→S | `0213` CharacterLogin 36 → 20; `0211` DeleteCharacter 48 → 44 (senha ≤ 12); `0FDE` AccountSecure 32 | traduz | unitário + decoders Go |
+| C→S | `020F` 36, `036C/0366/0368` 52, `0215` 12, `03A0` 12 | repassa se o tamanho for exato | unitário; `03A0` no roteirizado |

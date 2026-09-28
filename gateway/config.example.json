@@ -1,0 +1,24 @@
+{
+  "listen": "127.0.0.1:8290",
+  "allowInsecure": true,
+  "allowedOrigins": ["http://127.0.0.1:8290"],
+  "staticDir": ".cache/local-scene",
+  "defaultChannel": "local",
+  "channels": [
+    {
+      "name": "local",
+      "target": "127.0.0.1:8281",
+      "publicWsUrl": "ws://127.0.0.1:8290/ws/local",
+      "clientVersion": 7640
+    }
+  ],
+  "limits": {
+    "maxConns": 64,
+    "maxConnsPerIP": 4,
+    "maxMessageBytes": 65536,
+    "bufferBytes": 16384,
+    "idleTimeout": "10m",
+    "dialTimeout": "10s",
+    "writeTimeout": "15s"
+  }
+}

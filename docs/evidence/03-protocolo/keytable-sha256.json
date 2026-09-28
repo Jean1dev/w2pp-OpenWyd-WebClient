@@ -1,0 +1,10 @@
+{
+  "spec_source": "reference/server/protocol-spec.md",
+  "spec_table_sha256": "e47996fe5e92de5d86d503d5415665f1f464bf344370c709be450607dd97cf8f",
+  "cpp_source": "external/OpenWyd/Projects/TMProject/CPSock.cpp",
+  "cpp_table_sha256": "e47996fe5e92de5d86d503d5415665f1f464bf344370c709be450607dd97cf8f",
+  "go_source": "external/server/tmserver/internal/protocol/keytable.go",
+  "go_table_sha256": "e47996fe5e92de5d86d503d5415665f1f464bf344370c709be450607dd97cf8f",
+  "table_bytes": 512,
+  "identical": true
+}

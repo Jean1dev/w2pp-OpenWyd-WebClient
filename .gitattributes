@@ -3,3 +3,6 @@
 *.json text eol=lf
 # Preserve snapshot bytes so manifest hashes remain valid across platforms.
 reference/server/*.md -text
+# Patches must apply byte-for-byte to the upstream checkout.
+patches/**/*.patch -text -whitespace
+Makefile text eol=lf

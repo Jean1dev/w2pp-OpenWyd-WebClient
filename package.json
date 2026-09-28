@@ -7,6 +7,11 @@
   },
   "scripts": {
     "scene": "python tools/build_local_scene.py --page-only && node tools/verify_local_scene.mjs",
-    "scene:package": "python tools/build_local_scene.py && node tools/verify_local_scene.mjs"
+    "scene:package": "python tools/build_local_scene.py && node tools/verify_local_scene.mjs",
+    "gateway:test": "python tools/gateway_test.py",
+    "protocol:vectors": "python tools/protocol/cpsock_ref.py --check && python tools/protocol/gen_vectors.py && python tools/protocol/run_go_vectors.py",
+    "protocol:dialect": "python tools/apply_openwyd_patches.py && python tools/protocol/run_dialect_test.py",
+    "client:stream": "python tools/build_local_scene.py --page-only && node tools/verify_client_stream.mjs",
+    "dev": "node tools/dev_railway.mjs"
   }
 }

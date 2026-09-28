@@ -1,0 +1,15 @@
+Bank capacity 128 (server contract). The cargo UI still shows 3x40 slots;
+items in 120..127 are kept and counted by WydDialect (WYD_STAT_CARGO_HIDDEN).
+
+diff --git a/Projects/TMProject/Basedef.h b/Projects/TMProject/Basedef.h
+index 19c7fd3..62f3aed 100644
+--- a/Projects/TMProject/Basedef.h
++++ b/Projects/TMProject/Basedef.h
+@@ -1,6 +1,6 @@
+ #pragma once
+ 
+-constexpr int MAX_CARGO = 120;
++constexpr int MAX_CARGO = 128; // server bank holds 128 slots; the UI shows 3x40 (see WydDialect)
+ constexpr auto MAX_CARRY = 64;
+ constexpr auto MAX_VISIBLE_CARRY = MAX_CARRY - 4;
+ constexpr int MAX_STRING = 2000;

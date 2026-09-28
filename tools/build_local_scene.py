@@ -23,8 +23,11 @@ def main():
     wasm = runtime.with_suffix(".wasm")
     site = ROOT / ".cache/local-scene"
     site.mkdir(parents=True, exist_ok=True)
-    for path in (ROOT / "web").glob("local-scene.*"):
-        shutil.copyfile(path, site / ("index.html" if path.suffix == ".html" else path.name))
+    # The offline scene is the index; the connected client (client.html) shares
+    # the same runtime and dataset and is served by the gateway (gateway/).
+    for path in (ROOT / "web").glob("*.*"):
+        name = "index.html" if path.name == "local-scene.html" else path.name
+        shutil.copyfile(path, site / name)
     shutil.copyfile(runtime, site / "runtime.js")
     shutil.copyfile(wasm, site / wasm.name)
     streaming = ROOT / 'assets-local/streaming'

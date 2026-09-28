@@ -1,0 +1,167 @@
+Server dialect hooks: every outbound message passes WydDialectOutbound
+before CPSock obfuscation and every inbound frame passes WydDialectInbound
+before scene dispatch. WydDialect.{h,cpp} are copied from client/dialect by
+tools/apply_openwyd_patches.py.
+
+diff --git a/Projects/TMProject/CPSock.cpp b/Projects/TMProject/CPSock.cpp
+index 8295813..7990775 100644
+--- a/Projects/TMProject/CPSock.cpp
++++ b/Projects/TMProject/CPSock.cpp
+@@ -4,6 +4,7 @@
+ #include "Basedef.h"
+ #include "TMGlobal.h"
+ #include "TMLog.h"
++#include "WydDialect.h"
+ 
+ #include <cstdio>
+ #include <cstdint>
+@@ -1086,20 +1087,52 @@ bool CPSock::SendMessageA()
+ 	return false;
+ }
+ 
+-int CPSock::SendOneMessage(char* Msg, int Size)
++// Every scene-built message crosses the server dialect before obfuscation:
++// translated, sent as-is when the layout is verified identical, or dropped.
++// Credential fields are wiped from the scene struct, the translated copy and
++// the send buffer once the bytes have left CPSock.
++int CPSock::SendDialect(char* Msg, int Size, int Keyword, bool bKeyword)
+ {
+-	WydSocketRecordSentOpcode(Msg, Size);
+-	AddMessage(Msg, Size);
++	char wire[WYD_DIALECT_MAX_FRAME];
++	int wireSize = 0;
++	const int dialect = WydDialectOutbound(Msg, Size, wire, sizeof(wire), &wireSize);
++	if (dialect == WYD_DIALECT_DROP)
++	{
++		WydDialectScrubOutbound(Msg, Size);
++		return 0;
++	}
+ 
+-	return SendMessageA();
++	char* out = dialect == WYD_DIALECT_TRANSLATED ? wire : Msg;
++	const int outSize = dialect == WYD_DIALECT_TRANSLATED ? wireSize : Size;
++	const int bufferAt = nSendPosition;
++	WydSocketRecordSentOpcode(out, outSize);
++	if (bKeyword)
++		AddMessage(out, outSize, Keyword);
++	else
++		AddMessage(out, outSize);
++
++	const int result = SendMessageA();
++	if (WydDialectIsCredential(Msg, Size) && bufferAt + outSize <= SEND_BUFFER_SIZE)
++	{
++		volatile char* sent = pSendBuffer + bufferAt;
++		for (int i = 0; i < outSize; ++i)
++			sent[i] = 0;
++	}
++	WydDialectScrubOutbound(Msg, Size);
++	volatile char* scratch = wire;
++	for (int i = 0; i < wireSize; ++i)
++		scratch[i] = 0;
++	return result;
+ }
+ 
+-int CPSock::SendOneMessageKeyword(char* Msg, int Size, int Keyword)
++int CPSock::SendOneMessage(char* Msg, int Size)
+ {
+-	WydSocketRecordSentOpcode(Msg, Size);
+-	AddMessage(Msg, Size, Keyword);
++	return SendDialect(Msg, Size, 0, false);
++}
+ 
+-	return SendMessageA();
++int CPSock::SendOneMessageKeyword(char* Msg, int Size, int Keyword)
++{
++	return SendDialect(Msg, Size, Keyword, true);
+ }
+ 
+ int CPSock::AddMessage2(char* pMsg, int Size)
+diff --git a/Projects/TMProject/CPSock.h b/Projects/TMProject/CPSock.h
+index a4dc1ef..c6d53c3 100644
+--- a/Projects/TMProject/CPSock.h
++++ b/Projects/TMProject/CPSock.h
+@@ -25,6 +25,7 @@ public:
+ 	bool SendMessageA();
+ 	int SendOneMessage(char* Msg, int Size);
+ 	int SendOneMessageKeyword(char* Msg, int Size, int Keyword);
++	int SendDialect(char* Msg, int Size, int Keyword, bool bKeyword);
+ 	int AddMessage2(char* pMsg, int Size);
+ 	char* ReadMessage2(int* ErrorCode, int* ErrorType);
+ 	void RefreshRecvBuffer();
+diff --git a/Projects/TMProject/NewApp.cpp b/Projects/TMProject/NewApp.cpp
+index 493f8e4..c77e829 100644
+--- a/Projects/TMProject/NewApp.cpp
++++ b/Projects/TMProject/NewApp.cpp
+@@ -33,6 +33,7 @@ extern "C" void wyd_d3d9_optimized_end_world_begin_ui();
+ #include "TMFieldScene.h"
+ #include "SControlContainer.h"
+ #include "OpenWydOptimized.h"
++#include "WydDialect.h"
+ 
+ #if defined(OPENWYD_COMPARE) && defined(_DEBUG) && !defined(__EMSCRIPTEN__)
+ #include "OpenWydCompare.h"
+@@ -45,6 +46,10 @@ extern "C" void wyd_d3d9_optimized_end_world_begin_ui();
+ 
+ const char ClassName[4] = "WYD";
+ 
++// Runtime-layout copy of the inbound frame being dispatched. Consumers use it
++// synchronously; the next frame overwrites it.
++alignas(8) static char g_WydDialectInbound[WYD_DIALECT_MAX_FRAME];
++
+ namespace {
+ 
+ void WasmInitLog(const char* msg)
+@@ -1606,7 +1611,15 @@ HRESULT NewApp::MsgProc(HWND hWnd, DWORD uMsg, DWORD wParam, int lParam)
+ 				}
+ 				g_pLastFixTime = dwServerTime;
+ 			}
+-			m_pObjectManager->OnPacketEvent(pStd->Type, Msg);
++			// Scenes cast packets to runtime structs: translate the server
++			// dialect first; unverified layouts never reach a consumer.
++			int nDialectSize = 0;
++			const int nDialect = WydDialectInbound(Msg, pStd->Size, g_WydDialectInbound,
++				sizeof(g_WydDialectInbound), &nDialectSize);
++			if (nDialect == WYD_DIALECT_DROP)
++				continue;
++			m_pObjectManager->OnPacketEvent(pStd->Type,
++				nDialect == WYD_DIALECT_TRANSLATED ? g_WydDialectInbound : Msg);
+ 		}
+ 	}
+ 	break;
+@@ -1664,7 +1677,15 @@ HRESULT NewApp::MsgProc(HWND hWnd, DWORD uMsg, DWORD wParam, int lParam)
+ 				}
+ 				g_pLastFixTime = dwServerTime;
+ 			}
+-			m_pObjectManager->OnPacketEvent(pStd->Type, Msg);
++			// Scenes cast packets to runtime structs: translate the server
++			// dialect first; unverified layouts never reach a consumer.
++			int nDialectSize = 0;
++			const int nDialect = WydDialectInbound(Msg, pStd->Size, g_WydDialectInbound,
++				sizeof(g_WydDialectInbound), &nDialectSize);
++			if (nDialect == WYD_DIALECT_DROP)
++				continue;
++			m_pObjectManager->OnPacketEvent(pStd->Type,
++				nDialect == WYD_DIALECT_TRANSLATED ? g_WydDialectInbound : Msg);
+ 		}
+ 	}
+ 	break;
+diff --git a/Projects/TMProject/TMProject.vcxproj b/Projects/TMProject/TMProject.vcxproj
+index 95f325a..262a4e5 100644
+--- a/Projects/TMProject/TMProject.vcxproj
++++ b/Projects/TMProject/TMProject.vcxproj
+@@ -178,6 +178,7 @@
+     <ClInclude Include="CFrame.h" />
+     <ClInclude Include="CMesh.h" />
+     <ClInclude Include="CPSock.h" />
++    <ClInclude Include="WydDialect.h" />
+     <ClInclude Include="D3DDevice.h" />
+     <ClInclude Include="D3DEnumeration.h" />
+     <ClInclude Include="D3DSettings.h" />
+@@ -308,6 +309,7 @@
+     <ClCompile Include="CFrame.cpp" />
+     <ClCompile Include="CMesh.cpp" />
+     <ClCompile Include="CPSock.cpp" />
++    <ClCompile Include="WydDialect.cpp" />
+     <ClCompile Include="D3DDevice.cpp" />
+     <ClCompile Include="D3DEnumeration.cpp">
+       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>

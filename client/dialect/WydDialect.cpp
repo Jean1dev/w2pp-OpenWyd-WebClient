@@ -1,0 +1,615 @@
+// See WydDialect.h. Wire offsets below are absolute frame offsets (header
+// included) of the Go tmserver codecs at the pinned revision:
+//   tmserver/internal/protocol/{selchar,mob,createmob,messages}.go
+// and docs/compatibility.md. Runtime-side values are written by field, so the
+// runtime's own ABI decides its layout; static_asserts pin the layouts that
+// pass-through frames rely on.
+#if !defined(WYD_DIALECT_STANDALONE)
+#include "pch.h"
+#endif
+#include "WydDialect.h"
+#include "Basedef.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+
+namespace
+{
+// ---- runtime layout contract (measured by tools/probe_upstream_layouts.py) ----
+static_assert(sizeof(MSG_STANDARD) == 12, "header");
+static_assert(sizeof(STRUCT_ITEM) == 8, "STRUCT_ITEM");
+static_assert(sizeof(STRUCT_SCORE) == 48, "STRUCT_SCORE");
+static_assert(MAX_CARGO >= 128, "cargo must hold the server's 128 slots (patch 0003)");
+// Pass-through frames: byte layout must equal the server's.
+static_assert(sizeof(MSG_Action) == 52 && offsetof(MSG_Action, PosX) == 12 &&
+	offsetof(MSG_Action, Effect) == 16 && offsetof(MSG_Action, Speed) == 20 &&
+	offsetof(MSG_Action, Route) == 24 && offsetof(MSG_Action, TargetX) == 48, "MSG_Action");
+static_assert(sizeof(MSG_MessagePanel) == 140 && offsetof(MSG_MessagePanel, String) == 12, "MessagePanel");
+static_assert(sizeof(MSG_RemoveMob) == 16 && offsetof(MSG_RemoveMob, RemoveType) == 12, "RemoveMob");
+static_assert(sizeof(MSG_STANDARDPARM) == 16 && offsetof(MSG_STANDARDPARM, Parm) == 12, "StandardParm");
+static_assert(sizeof(MSG_NewCharacter) == 36 && offsetof(MSG_NewCharacter, Slot) == 12 &&
+	offsetof(MSG_NewCharacter, MobName) == 16 && offsetof(MSG_NewCharacter, Class) == 32, "NewCharacter");
+// Translated frames: sizes the scenes expect.
+static_assert(sizeof(MSG_AccountLogin) == 116, "AccountLogin");
+static_assert(sizeof(MSG_CharacterLogin) == 36, "CharacterLogin");
+static_assert(sizeof(MSG_DeleteCharacter) == 48 && offsetof(MSG_DeleteCharacter, Password) == 32, "DeleteCharacter");
+static_assert(sizeof(MSG_CHARPASSWORD) == 32 && offsetof(MSG_CHARPASSWORD, ItemPassWord) == 12 &&
+	offsetof(MSG_CHARPASSWORD, State) == 28, "AccountSecure");
+static_assert(sizeof(STRUCT_SELCHAR) == 904, "STRUCT_SELCHAR");
+static_assert(sizeof(STRUCT_MOB) == 1040, "STRUCT_MOB");
+static_assert(sizeof(MSG_CreateMob) == 236, "MSG_CreateMob");
+
+// ---- server wire contract ----
+constexpr int kHeader = 12;
+constexpr int kItem = 8;
+constexpr int kScore = 48;
+constexpr int kEquipWire = 16;
+constexpr int kCargoWire = 128;
+constexpr int kCargoVisible = 120; // 3 pages x 40 cells in TMFieldScene
+
+constexpr int kCNFAccountLogin = 2008;
+constexpr int kCNFSelChar = 856; // CNFNewCharacter / CNFDeleteCharacter
+constexpr int kCNFCharacterLogin = 1832;
+constexpr int kCreateMob = 232;
+
+constexpr int kAccountLoginWire = 116;
+constexpr int kCharacterLoginWire = 20;
+constexpr int kDeleteCharacterWire = 44;
+constexpr int kAccountSecureWire = 32;
+constexpr int kPinDigits = 6; // server NumericToken[6]; the keypad stops at 6
+
+enum : unsigned short
+{
+	OpMessagePanel = 0x101,
+	OpMessageBoxOk = 0x102,
+	OpCNFAccountLogin = 0x10A,
+	OpCNFNewCharacter = 0x110,
+	OpCNFDeleteCharacter = 0x112,
+	OpCNFCharacterLogin = 0x114,
+	OpCNFCharacterLogout = 0x116,
+	OpCharacterLoginFail = 0x119,
+	OpNewCharacterFail = 0x11A,
+	OpDeleteCharacterFail = 0x11B,
+	OpAlreadyPlaying = 0x11C,
+	OpAlreadyPlaying2 = 0x11D,
+	OpRemoveMob = 0x165,
+	OpAccountLogin = 0x20D,
+	OpNewCharacter = 0x20F,
+	OpDeleteCharacter = 0x211,
+	OpCharacterLogin = 0x213,
+	OpCharacterLogout = 0x215,
+	OpCreateMob = 0x364,
+	OpActionStop = 0x366,
+	OpAction2 = 0x368,
+	OpAction = 0x36C,
+	OpPing = 0x3A0,
+	OpAccountSecure = 0xFDE,
+	OpAccountSecureFail = 0xFDF,
+};
+
+int g_clientVersion = 0;
+unsigned int g_stats[WYD_STAT_COUNT];
+// FNV-1a over every inbound frame's bytes [4, Size): lets a test prove which
+// frames the runtime framed, in order, without exposing payload.
+std::uint32_t g_inHash = 2166136261u;
+unsigned int g_inFrames = 0;
+
+struct DropLog
+{
+	int count;
+	unsigned int opcode[WYD_DIALECT_DROP_LOG];
+	unsigned int times[WYD_DIALECT_DROP_LOG];
+};
+DropLog g_drops[2];
+
+void Count(int stat, unsigned int n = 1) { g_stats[stat] += n; }
+
+void LogDrop(int outbound, unsigned int opcode)
+{
+	DropLog& d = g_drops[outbound ? 1 : 0];
+	for (int i = 0; i < d.count; ++i)
+	{
+		if (d.opcode[i] == opcode)
+		{
+			++d.times[i];
+			return;
+		}
+	}
+	if (d.count < WYD_DIALECT_DROP_LOG)
+	{
+		d.opcode[d.count] = opcode;
+		d.times[d.count] = 1;
+		++d.count;
+	}
+}
+
+// Little-endian reads from the wire, independent of host struct layout.
+std::uint8_t U8(const char* p, int off) { return static_cast<std::uint8_t>(p[off]); }
+std::uint16_t U16(const char* p, int off) { return static_cast<std::uint16_t>(U8(p, off) | (U8(p, off + 1) << 8)); }
+std::uint32_t U32(const char* p, int off) { return U16(p, off) | (static_cast<std::uint32_t>(U16(p, off + 2)) << 16); }
+std::uint64_t U64(const char* p, int off) { return U32(p, off) | (static_cast<std::uint64_t>(U32(p, off + 4)) << 32); }
+std::int16_t I16(const char* p, int off) { return static_cast<std::int16_t>(U16(p, off)); }
+std::int32_t I32(const char* p, int off) { return static_cast<std::int32_t>(U32(p, off)); }
+
+void Put16(char* p, int off, std::uint16_t v)
+{
+	p[off] = static_cast<char>(v & 0xFF);
+	p[off + 1] = static_cast<char>(v >> 8);
+}
+void Put32(char* p, int off, std::uint32_t v)
+{
+	Put16(p, off, static_cast<std::uint16_t>(v));
+	Put16(p, off + 2, static_cast<std::uint16_t>(v >> 16));
+}
+
+void CountNonZero(const char* p, int from, int to)
+{
+	for (int i = from; i < to; ++i)
+	{
+		if (p[i])
+		{
+			Count(WYD_STAT_UNMAPPED_NONZERO);
+			return;
+		}
+	}
+}
+
+// Narrowing with an explicit rule: out-of-range values become 0 and are counted.
+char NarrowChar(std::int64_t v)
+{
+	if (v < -128 || v > 127)
+	{
+		Count(WYD_STAT_FIELD_ZEROED);
+		return 0;
+	}
+	return static_cast<char>(v);
+}
+
+void ReadItem(const char* w, int off, STRUCT_ITEM& it)
+{
+	it.sIndex = I16(w, off);
+	for (int k = 0; k < 3; ++k)
+	{
+		it.stEffect[k].cEffect = U8(w, off + 2 + k * 2);
+		it.stEffect[k].cValue = U8(w, off + 3 + k * 2);
+	}
+}
+
+// Level is int32 on the wire and short in the runtime: refuse, never truncate.
+bool ReadScore(const char* w, int off, STRUCT_SCORE& s)
+{
+	std::int32_t level = I32(w, off + 0);
+	if (level < -32768 || level > 32767)
+		return false;
+	std::memset(&s, 0, sizeof(s));
+	s.Level = static_cast<short>(level);
+	s.Ac = I32(w, off + 4);
+	s.Damage = I32(w, off + 8);
+	s.Reserved = static_cast<char>(U8(w, off + 12)); // server: Merchant
+	s.AttackRun = static_cast<char>(U8(w, off + 13));
+	// off+14 Direction has no runtime field (padding in STRUCT_SCORE).
+	s.MaxHp = I32(w, off + 16);
+	s.MaxMp = I32(w, off + 20);
+	s.Hp = I32(w, off + 24);
+	s.Mp = I32(w, off + 28);
+	s.Str = I16(w, off + 32);
+	s.Int = I16(w, off + 34);
+	s.Dex = I16(w, off + 36);
+	s.Con = I16(w, off + 38);
+	for (int i = 0; i < 4; ++i)
+		s.Special[i] = U16(w, off + 40 + i * 2);
+	return true;
+}
+
+// STRUCT_SELCHAR: 840 bytes on the wire, 904 in the runtime (Equip[4][18]).
+bool ReadSelChar(const char* w, int off, STRUCT_SELCHAR& sc)
+{
+	std::memset(&sc, 0, sizeof(sc));
+	for (int s = 0; s < 4; ++s)
+	{
+		sc.HomeTownX[s] = U16(w, off + 0 + s * 2);
+		sc.HomeTownY[s] = U16(w, off + 8 + s * 2);
+		std::memcpy(sc.MobName[s], w + off + 16 + s * 16, 16);
+		if (!ReadScore(w, off + 80 + s * kScore, sc.Score[s]))
+			return false;
+		for (int i = 0; i < kEquipWire; ++i)
+			ReadItem(w, off + 272 + s * kEquipWire * kItem + i * kItem, sc.Equip[s][i]);
+		// Equip[s][16..17] do not exist in this dialect: left empty.
+		sc.Guild[s] = U16(w, off + 784 + s * 2);
+		sc.Coin[s] = I32(w, off + 792 + s * 4);
+		sc.Exp[s] = static_cast<long long>(U64(w, off + 808 + s * 8));
+	}
+	return true;
+}
+
+// STRUCT_MOB: 816 bytes on the wire, 1040 in the runtime.
+bool ReadMob(const char* w, int off, STRUCT_MOB& m)
+{
+	std::memset(&m, 0, sizeof(m));
+	std::memcpy(m.MobName, w + off, 16);
+	m.Clan = static_cast<char>(U8(w, off + 16));
+	m.Merchant = static_cast<char>(U8(w, off + 17));
+	m.Guild = U16(w, off + 18);
+	m.Class = static_cast<char>(U8(w, off + 20));
+	// Rsv/Quest (@22..27) are template padding on the server side, and the raw
+	// login encoder overwrites @24 with gold; the runtime reads neither for the
+	// own character, so both stay zero.
+	m.Coin = I32(w, off + 28);
+	m.Exp = static_cast<long long>(U64(w, off + 32));
+	m.HomeTownX = U16(w, off + 40);
+	m.HomeTownY = U16(w, off + 42);
+	if (!ReadScore(w, off + 44, m.BaseScore) || !ReadScore(w, off + 92, m.CurrentScore))
+		return false;
+	for (int i = 0; i < kEquipWire; ++i)
+		ReadItem(w, off + 140 + i * kItem, m.Equip[i]);
+	for (int i = 0; i < 64; ++i)
+		ReadItem(w, off + 268 + i * kItem, m.Carry[i]);
+	m.LearnedSkill[0] = U32(w, off + 780);
+	// The server's Magic (@784, u32) is not a second learned-skill mask; the
+	// runtime keeps a one-byte Magic. LearnedSkill[1] has no server source.
+	m.Magic = NarrowChar(U32(w, off + 784));
+	m.ScoreBonus = I16(w, off + 788);
+	m.SpecialBonus = I16(w, off + 790);
+	m.SkillBonus = I16(w, off + 792);
+	m.Critical = static_cast<char>(U8(w, off + 794));
+	m.SaveMana = static_cast<char>(U8(w, off + 795));
+	std::memcpy(m.ShortSkill, w + off + 796, 4);
+	m.GuildLevel = static_cast<char>(U8(w, off + 800));
+	m.RegenHP = NarrowChar(U16(w, off + 802));
+	m.RegenMP = NarrowChar(U16(w, off + 804));
+	std::memcpy(m.Resist, w + off + 806, 4);
+	return true;
+}
+
+int Fail(int stat, int outbound, unsigned int opcode)
+{
+	Count(stat);
+	LogDrop(outbound, opcode);
+	return WYD_DIALECT_DROP;
+}
+
+template <typename T>
+T* Begin(const char* wire, char* out, int outCap, int* outSize)
+{
+	if (outCap < static_cast<int>(sizeof(T)))
+		return nullptr;
+	std::memset(out, 0, sizeof(T));
+	std::memcpy(out, wire, kHeader); // Type, ID and server tick are kept
+	auto* msg = reinterpret_cast<T*>(out);
+	msg->Header.Size = static_cast<unsigned short>(sizeof(T));
+	*outSize = static_cast<int>(sizeof(T));
+	return msg;
+}
+
+int InCNFAccountLogin(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_CNFAccountLogin>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpCNFAccountLogin);
+	// SecretCode seeds the runtime's keyword queues; this server sends none
+	// (@12..27 zero, @28 = "don't recreate starter potions" marker).
+	if (!ReadSelChar(w, 32, m->SelChar))
+		return Fail(WYD_STAT_IN_DROP_RANGE, 0, OpCNFAccountLogin);
+	for (int i = 0; i < kCargoWire; ++i)
+	{
+		ReadItem(w, 872 + i * kItem, m->Cargo[i]);
+		if (i >= kCargoVisible && m->Cargo[i].sIndex)
+			Count(WYD_STAT_CARGO_HIDDEN);
+	}
+	m->Coin = I32(w, 1896);
+	std::memcpy(m->AccountName, w + 1900, 16);
+	CountNonZero(w, 1916, kCNFAccountLogin);
+	return WYD_DIALECT_TRANSLATED;
+}
+
+int InCNFSelChar(const char* w, char* out, int outCap, int* outSize, unsigned short op)
+{
+	// CNFNewCharacter and CNFDeleteCharacter share the same layout.
+	static_assert(sizeof(MSG_CNFNewCharacter) == sizeof(MSG_CNFDeleteCharacter), "selchar replies");
+	auto* m = Begin<MSG_CNFNewCharacter>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	if (!ReadSelChar(w, 16, m->SelChar))
+		return Fail(WYD_STAT_IN_DROP_RANGE, 0, op);
+	return WYD_DIALECT_TRANSLATED;
+}
+
+int InCNFCharacterLogin(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_CNFCharacterLogin>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpCNFCharacterLogin);
+	m->PosX = I16(w, 12);
+	m->PosY = I16(w, 14);
+	if (!ReadMob(w, 16, m->MOB))
+		return Fail(WYD_STAT_IN_DROP_RANGE, 0, OpCNFCharacterLogin);
+	m->Slot = U16(w, 16 + 1024);
+	m->ClientID = U16(w, 16 + 1026);
+	m->Weather = U16(w, 16 + 1028);
+	std::memcpy(m->ShortSkill, w + 16 + 1030, 16);
+	// Ext1/Ext2 have no server source; left zero (Ext1.Data[0] is "fake exp").
+	CountNonZero(w, 16 + 1046, kCNFCharacterLogin);
+	return WYD_DIALECT_TRANSLATED;
+}
+
+int InCreateMob(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_CreateMob>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpCreateMob);
+	m->PosX = I16(w, 12);
+	m->PosY = I16(w, 14);
+	m->MobID = U16(w, 16);
+	std::memcpy(m->MobName, w + 18, 16);
+	for (int i = 0; i < kEquipWire; ++i)
+		m->Equip[i] = U16(w, 34 + i * 2);
+	for (int i = 0; i < 32; ++i)
+		m->Affect[i] = U16(w, 66 + i * 2);
+	m->Guild = U16(w, 130);
+	m->GuildLevel = static_cast<char>(U8(w, 132)); // server: GuildMemberType
+	if (!ReadScore(w, 136, m->Score))
+		return Fail(WYD_STAT_IN_DROP_RANGE, 0, OpCreateMob);
+	m->CreateType = U16(w, 184);
+	std::memcpy(m->Equip2, w + 186, kEquipWire); // AnctCode[16]
+	CountNonZero(w, 202, kCreateMob);
+	return WYD_DIALECT_TRANSLATED;
+}
+
+int PassIfSize(int wireSize, int want, unsigned short op)
+{
+	if (wireSize != want)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	Count(WYD_STAT_IN_PASS);
+	return WYD_DIALECT_PASS;
+}
+
+int Translated(int result)
+{
+	if (result == WYD_DIALECT_TRANSLATED)
+		Count(WYD_STAT_IN_TRANSLATED);
+	return result;
+}
+} // namespace
+
+int WydDialectInbound(const char* wire, int wireSize, char* out, int outCap, int* outSize)
+{
+	*outSize = 0;
+	if (!wire || wireSize < kHeader)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, 0);
+	for (int i = 4; i < wireSize; ++i)
+		g_inHash = (g_inHash ^ U8(wire, i)) * 16777619u;
+	++g_inFrames;
+	const unsigned short op = U16(wire, 4);
+	auto exact = [&](int want) { return wireSize == want; };
+
+	switch (op)
+	{
+	case OpCNFAccountLogin:
+		return exact(kCNFAccountLogin) ? Translated(InCNFAccountLogin(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpCNFNewCharacter:
+	case OpCNFDeleteCharacter:
+		return exact(kCNFSelChar) ? Translated(InCNFSelChar(wire, out, outCap, outSize, op))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpCNFCharacterLogin:
+		return exact(kCNFCharacterLogin) ? Translated(InCNFCharacterLogin(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpCreateMob:
+		return exact(kCreateMob) ? Translated(InCreateMob(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpRemoveMob:
+		return PassIfSize(wireSize, 16, op);
+	case OpAction:
+	case OpActionStop:
+	case OpAction2:
+		return PassIfSize(wireSize, 52, op);
+	case OpMessagePanel:
+		return PassIfSize(wireSize, 140, op);
+	case OpMessageBoxOk: // notice index (StandardParm)
+		return PassIfSize(wireSize, 16, op);
+	case OpCNFCharacterLogout:
+	case OpCharacterLoginFail:
+	case OpNewCharacterFail:
+	case OpDeleteCharacterFail:
+	case OpAlreadyPlaying:
+	case OpAlreadyPlaying2:
+	case OpAccountSecure:
+	case OpAccountSecureFail:
+		// Header-only replies; consumers read only Type.
+		return PassIfSize(wireSize, kHeader, op);
+	default:
+		return Fail(WYD_STAT_IN_DROP_UNKNOWN, 0, op);
+	}
+}
+
+namespace
+{
+int OutFail(int stat, unsigned short op) { return Fail(stat, 1, op); }
+
+int OutPass(int msgSize, int want, unsigned short op)
+{
+	if (msgSize != want)
+		return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+	Count(WYD_STAT_OUT_PASS);
+	return WYD_DIALECT_PASS;
+}
+
+int OutDone(int* outSize, int size)
+{
+	*outSize = size;
+	Count(WYD_STAT_OUT_TRANSLATED);
+	return WYD_DIALECT_TRANSLATED;
+}
+} // namespace
+
+int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int* outSize)
+{
+	*outSize = 0;
+	if (!msg || msgSize < kHeader)
+		return OutFail(WYD_STAT_OUT_DROP_SIZE, 0);
+	const unsigned short op = U16(msg, 4);
+
+	switch (op)
+	{
+	case OpAccountLogin:
+	{
+		if (msgSize != static_cast<int>(sizeof(MSG_AccountLogin)) || outCap < kAccountLoginWire)
+			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		if (g_clientVersion <= 0)
+			return OutFail(WYD_STAT_OUT_DROP_NO_VERSION, op);
+		const auto* in = reinterpret_cast<const MSG_AccountLogin*>(msg);
+		std::memset(out, 0, kAccountLoginWire);
+		std::memcpy(out, msg, kHeader);
+		std::memcpy(out + 12, in->AccountPass, 12);
+		std::memcpy(out + 24, in->AccountName, 16);
+		// @40..91 reserved: zero (the runtime's TID is not part of this dialect).
+		Put32(out, 92, static_cast<std::uint32_t>(g_clientVersion));
+		Put32(out, 96, static_cast<std::uint32_t>(in->Force));
+		for (int i = 0; i < 4; ++i)
+			Put32(out, 100 + i * 4, in->Mac[i]);
+		return OutDone(outSize, kAccountLoginWire);
+	}
+	case OpCharacterLogin:
+	{
+		// The runtime appends SecretCode[16]; the server contract is 20 bytes.
+		if (msgSize != static_cast<int>(sizeof(MSG_CharacterLogin)) || outCap < kCharacterLoginWire)
+			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		const auto* in = reinterpret_cast<const MSG_CharacterLogin*>(msg);
+		std::memset(out, 0, kCharacterLoginWire);
+		std::memcpy(out, msg, kHeader);
+		Put32(out, 12, static_cast<std::uint32_t>(in->Slot));
+		Put32(out, 16, static_cast<std::uint32_t>(in->Force));
+		return OutDone(outSize, kCharacterLoginWire);
+	}
+	case OpDeleteCharacter:
+	{
+		if (msgSize != static_cast<int>(sizeof(MSG_DeleteCharacter)) || outCap < kDeleteCharacterWire)
+			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		const auto* in = reinterpret_cast<const MSG_DeleteCharacter*>(msg);
+		// Server password field is 12 bytes; a longer password cannot be sent.
+		for (int i = 12; i < 16; ++i)
+			if (in->Password[i])
+				return OutFail(WYD_STAT_OUT_DROP_RANGE, op);
+		std::memset(out, 0, kDeleteCharacterWire);
+		std::memcpy(out, msg, kHeader);
+		Put32(out, 12, static_cast<std::uint32_t>(in->Slot));
+		std::memcpy(out + 16, in->MobName, 16);
+		std::memcpy(out + 32, in->Password, 12);
+		return OutDone(outSize, kDeleteCharacterWire);
+	}
+	case OpAccountSecure:
+	{
+		// Runtime: ItemPassWord[16] + State char. Server: NumericToken[6],
+		// reserved[10], ChangeNumeric int32 (0 verify, 1 set/change).
+		if (msgSize != static_cast<int>(sizeof(MSG_CHARPASSWORD)) || outCap < kAccountSecureWire)
+			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		const auto* in = reinterpret_cast<const MSG_CHARPASSWORD*>(msg);
+		for (int i = kPinDigits; i < 16; ++i)
+			if (in->ItemPassWord[i])
+				return OutFail(WYD_STAT_OUT_DROP_RANGE, op);
+		std::memset(out, 0, kAccountSecureWire);
+		std::memcpy(out, msg, kHeader);
+		std::memcpy(out + 12, in->ItemPassWord, kPinDigits);
+		Put32(out, 28, static_cast<std::uint32_t>(static_cast<int>(in->State)));
+		return OutDone(outSize, kAccountSecureWire);
+	}
+	case OpNewCharacter:
+		return OutPass(msgSize, 36, op);
+	case OpAction:
+	case OpActionStop:
+	case OpAction2:
+		return OutPass(msgSize, 52, op);
+	case OpCharacterLogout:
+	case OpPing:
+		return OutPass(msgSize, kHeader, op);
+	default:
+		return OutFail(WYD_STAT_OUT_DROP_UNKNOWN, op);
+	}
+}
+
+void WydDialectScrubOutbound(char* msg, int msgSize)
+{
+	if (!msg || msgSize < kHeader)
+		return;
+	volatile char* p = msg;
+	switch (U16(msg, 4))
+	{
+	case OpAccountLogin:
+		if (msgSize >= 24)
+			for (int i = 12; i < 24; ++i)
+				p[i] = 0;
+		break;
+	case OpDeleteCharacter:
+		if (msgSize >= 48)
+			for (int i = 32; i < 48; ++i)
+				p[i] = 0;
+		break;
+	case OpAccountSecure:
+		if (msgSize >= 28)
+			for (int i = 12; i < 28; ++i)
+				p[i] = 0;
+		break;
+	default:
+		break;
+	}
+}
+
+bool WydDialectIsCredential(const char* msg, int msgSize)
+{
+	if (!msg || msgSize < kHeader)
+		return false;
+	const unsigned short op = U16(msg, 4);
+	return op == OpAccountLogin || op == OpDeleteCharacter || op == OpAccountSecure;
+}
+
+void WydDialectSetClientVersion(int version) { g_clientVersion = version; }
+int WydDialectClientVersion() { return g_clientVersion; }
+
+unsigned int WydDialectStatValue(int stat)
+{
+	return (stat >= 0 && stat < WYD_STAT_COUNT) ? g_stats[stat] : 0;
+}
+
+void WydDialectResetStats()
+{
+	std::memset(g_stats, 0, sizeof(g_stats));
+	std::memset(g_drops, 0, sizeof(g_drops));
+	g_inHash = 2166136261u;
+	g_inFrames = 0;
+}
+
+unsigned int WydDialectInboundHash() { return g_inHash; }
+unsigned int WydDialectInboundFrames() { return g_inFrames; }
+
+int WydDialectDroppedCount(int outbound) { return g_drops[outbound ? 1 : 0].count; }
+
+unsigned int WydDialectDroppedOpcode(int outbound, int index)
+{
+	const DropLog& d = g_drops[outbound ? 1 : 0];
+	return (index >= 0 && index < d.count) ? d.opcode[index] : 0;
+}
+
+unsigned int WydDialectDroppedTimes(int outbound, int index)
+{
+	const DropLog& d = g_drops[outbound ? 1 : 0];
+	return (index >= 0 && index < d.count) ? d.times[index] : 0;
+}
+
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/emscripten.h>
+
+// Page-facing controls and read-only diagnostics. None of them return payload.
+extern "C"
+{
+EMSCRIPTEN_KEEPALIVE void wyd_net_set_client_version(int version) { WydDialectSetClientVersion(version); }
+EMSCRIPTEN_KEEPALIVE int wyd_net_client_version() { return WydDialectClientVersion(); }
+EMSCRIPTEN_KEEPALIVE unsigned int wyd_net_stat(int stat) { return WydDialectStatValue(stat); }
+EMSCRIPTEN_KEEPALIVE void wyd_net_reset_stats() { WydDialectResetStats(); }
+EMSCRIPTEN_KEEPALIVE int wyd_net_dropped_count(int outbound) { return WydDialectDroppedCount(outbound); }
+EMSCRIPTEN_KEEPALIVE unsigned int wyd_net_dropped_opcode(int outbound, int i) { return WydDialectDroppedOpcode(outbound, i); }
+EMSCRIPTEN_KEEPALIVE unsigned int wyd_net_dropped_times(int outbound, int i) { return WydDialectDroppedTimes(outbound, i); }
+EMSCRIPTEN_KEEPALIVE unsigned int wyd_net_inbound_hash() { return WydDialectInboundHash(); }
+EMSCRIPTEN_KEEPALIVE unsigned int wyd_net_inbound_frames() { return WydDialectInboundFrames(); }
+}
+#endif
