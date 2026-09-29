@@ -19,7 +19,7 @@ Um único serviço, `wydgateway -env`, na imagem do `Dockerfile` da raiz:
 | Rota | Conteúdo | Origem |
 |---|---|---|
 | `/healthz` | `ok` (sem autenticação, para o healthcheck) | gateway |
-| `/`, `/client.html`, `runtime.js`, `tmproject_startup.<id>.wasm` | página e runtime | imagem (`/srv/site`), compilados do upstream no SHA do lock + `patches/openwyd` |
+| `/` (= `client.html`, cliente conectado), `/local-scene.html` (cena offline de teste), `runtime.js`, `tmproject_startup.<id>.wasm` | páginas e runtime | imagem (`/srv/site`), compilados do upstream no SHA do lock + `patches/openwyd` |
 | `openwyd_assets.data/.js`, `music/*`, `manifest.json` | dados do jogo do operador | bucket privado: o gateway assina um `GET` (SigV4) por requisição e repassa em streaming, com `Range`/206/304. O navegador nunca vê o bucket nem as credenciais |
 | `/config.json` | canal, `wss://…/ws/<canal>`, `clientVersion` | gateway; o destino TCP não aparece |
 | `/ws/<canal>` | relé binário WebSocket ↔ TCP do tm-server | gateway; destino só por variável |
