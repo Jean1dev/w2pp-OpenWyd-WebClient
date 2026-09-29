@@ -88,3 +88,22 @@ O harness passa por `2138.5,2102.5`, `2152.5,2102.5`, `2166.5,2102.5` e `2184.5,
 - `0x0378` `MSG_SetShortSkill`: o runtime envia `Header + char Skill[20]` (32 bytes). `handler/skill.go` lê `[0:4]` como barra e `[4:20]` como atalhos, sem resposta. O layout é idêntico, então passa a atravessar o dialeto com tamanho exato 32; outro tamanho é descartado.
 - `0x5000` `MSG_Exp_Msg_Panel_`: painel de texto customizado do servidor (`mobkilled.go`, "+N de EXP"). Não tem handler no runtime. A experiência já chega pelo `CurrentExp` do eco de ataque. Entra em `DEFERRED_INBOUND`: descartado, contado e reportado, sem renderização.
 - Testes: `run_dialect_test.py` **435 checks, 0 failures**; `world:checks` **8 passaram**. Runtime recompilado de novo (`tmproject_startup.1790711169720373100`), certificado, 0 símbolos indefinidos; `client:stream` passou.
+
+## Memória do harness ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6))
+
+**Mudanças no harness (`tools/verify_world.mjs`):**
+
+- `ev.memory` registra amostras no fim de cada fase e em três pontos do `attack`: os dois nos Gremlins, depois do combate, e B fechado antes do relogin. Cada amostra traz a RAM livre do sistema, a soma dos working sets dos processos Chromium do Playwright (filtrados pelo caminho `ms-playwright`, sem incluir o navegador do usuário; superestima páginas compartilhadas) e, por página, o heap WASM (`HEAPU8.length`) e o heap JS (`performance.memory`). A amostragem nunca reprova o cenário.
+- Depois de observar o combate e a saída de A, B grava o resumo final do dialeto (`final_B`) e fecha. O relogin de A roda com uma única página, em vez de duas.
+- **Viewport descartado como medida:** o canvas renderiza em 800×600 fixos (`web/client.html`). Com viewport de 1024×768 o jogo já aparece no tamanho nativo; um viewport menor só reduziria a imagem por CSS, sem diminuir o custo.
+
+**Confirmado em execução** (fase `login`, uma página, Railway, PC de 8 GB):
+
+| Medida | MiB |
+|---|---|
+| RAM livre / total | 1902 / 8014 |
+| Chromium do Playwright | 865 |
+| Heap WASM da página | 150 |
+| Heap JS da página | 497 |
+
+**Hipótese:** o heap JS é dominado pelo pacote pré-carregado `openwyd_assets.data` (305 MiB), que cada página mantém inteiro em memória. Duas páginas precisam de cerca de 1,7 GB, perto da RAM livre, o que explica as interrupções. A alavanca seguinte seria carregar os assets sob demanda em vez do preload integral. É mudança no runtime e fica registrada na issue.

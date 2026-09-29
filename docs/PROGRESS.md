@@ -258,6 +258,7 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
 - **Confirmado em teste:** `protocol:dialect` 435/0, `protocol:vectors` verde, `world:checks` 8/0, `scene` e `client:stream` verdes. WASM recompilado duas vezes com o em++ 6.0.0 de `../start` (certificado, 0 indefinidos).
 - **Confirmado em execução (Railway, execução 5):** A atacou um Gremlin (HP 70→3→0) e ganhou 274 de Exp; B viu o mesmo HP e a morte. A execução reprovou na saúde de protocolo, que foi corrigida depois.
 - **Não executado:** execução limpa com relogin pós-combate. A execução 6 foi interrompida por falta de memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)). Validação do cliente Windows, skills e morte/respawn também ficam de fora.
+- **Memória (issue #6):** o harness passou a amostrar memória por fase e a fechar B antes do relogin de A. Medido: uma página usa 865 MiB no Chromium (heap JS 497 MiB, WASM 150 MiB), com 1,9 GB livres de 8 GB. Hipótese: o preload integral de `openwyd_assets.data` domina o heap JS. [Detalhes](evidence/05-gameplay/2026-09-29-basic-combat.md#memória-do-harness-issue-6).
 - **Próximo passo:** repetir o cenário `attack` num ambiente com memória suficiente (issue #6).
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

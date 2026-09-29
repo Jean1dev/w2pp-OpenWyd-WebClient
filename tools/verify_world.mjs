@@ -22,12 +22,13 @@
 // and are handed to the game UI only. Evidence holds counters, opcodes, states,
 // positions and masked names; screenshots stay in .cache (they contain assets).
 import { chromium } from 'playwright';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, execFile, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { resolve, join } from 'node:path';
-import { parseArgs } from 'node:util';
+import { freemem, totalmem } from 'node:os';
+import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, redactEvidence } from './world_checks.mjs';
 
@@ -55,6 +56,24 @@ const phases = validateOptions(opt);
 const clientVersion = Number.parseInt(opt['client-version'], 10);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const MiB = n => (n == null ? null : Math.round(n / 1048576));
+
+// Sum of the working sets of Playwright's own Chromium processes (never the
+// user's browser: matched by the ms-playwright install path). Shared pages are
+// counted once per process, so this overestimates; it is a trend, not a budget.
+async function browserWorkingSet() {
+  try {
+    if (process.platform === 'win32') {
+      const { stdout } = await promisify(execFile)('powershell', ['-NoProfile', '-Command',
+        "(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like '*ms-playwright*' } | " +
+        'Measure-Object WorkingSetSize -Sum).Sum'], { timeout: 20000 });
+      return Number(stdout.trim()) || null;
+    }
+    const { stdout } = await promisify(execFile)('ps', ['-A', '-o', 'rss=,command='], { timeout: 20000 });
+    return stdout.split('\n').filter(l => l.includes('ms-playwright'))
+      .reduce((n, l) => n + Number(l.trim().split(/\s+/)[0]) * 1024, 0) || null;
+  } catch { return null; }
+}
 const mask = s => (s ? s.slice(0, 3) + '*'.repeat(Math.max(0, s.length - 3)) : s);
 
 async function readEnvFile(path) {
@@ -127,6 +146,12 @@ class Session {
   }
 
   async close() { await this.context?.close(); this.context = null; }
+
+  // WASM linear memory (grows, never shrinks) and live JS heap of this page.
+  memory() {
+    return this.eval(() => ({ wasm: window.Module?.HEAPU8?.length ?? null,
+      js: performance.memory?.usedJSHeapSize ?? null }));
+  }
 
   eval(fn, arg) { return this.page.evaluate(fn, arg); }
 
@@ -586,6 +611,21 @@ async function main() {
     return s;
   };
   const r = ev.results;
+  // Memory trend for issue #6: system free RAM, Playwright Chromium working
+  // set and, per open page, WASM/JS heap. Sampling never fails a scenario.
+  ev.memory = [];
+  const sample = async point => {
+    const pages = {};
+    for (const s of sessions) {
+      if (!s.context) continue;
+      try { const m = await s.memory(); pages[s.label] = { wasmMiB: MiB(m.wasm), jsMiB: MiB(m.js) }; } catch {}
+    }
+    const m = { point, at: new Date().toISOString(), freeMiB: MiB(freemem()), totalMiB: MiB(totalmem()),
+      browserMiB: MiB(await browserWorkingSet()), pages };
+    ev.memory.push(m);
+    console.log(`    mem ${point}: free ${m.freeMiB}/${m.totalMiB} MiB, browser ${m.browserMiB ?? '?'} MiB, ` +
+      Object.entries(pages).map(([k, v]) => `${k} wasm ${v.wasmMiB} js ${v.jsMiB}`).join(', '));
+  };
   const step = async (name, fn) => {
     if (!phases.has(name)) return;
     const t0 = Date.now();
@@ -602,6 +642,7 @@ async function main() {
     } finally {
       r[name].ms = Date.now() - t0;
       r[name].at = new Date().toISOString();
+      await sample(`end ${name}`);
       ev.screenshots = sessions.flatMap(s => s.shots);
       ev.activePhase = null;
       await writeFile(join(OUT, 'evidence.json'), evidenceJson(ev));
@@ -894,6 +935,7 @@ async function main() {
     // the 0x0367 broadcast, experience/gold via the echo and UpdateEtc.
     await step('attack', async () => {
       const [aTrip, bTrip] = await Promise.all([a.toGremlinField(), b.toGremlinField()]);
+      await sample('attack: both at Gremlins');
       r.attack = { aTrip, bTrip, attempts: [] };
       const tried = [];
       let res;
@@ -977,6 +1019,7 @@ async function main() {
         if (died || killed || hpTrail.length > 1) res = r1;
       }
       assert(res, `no target took damage: ${JSON.stringify(tried.map(t => ({ n: t.target.name, e: t.echoes, s: t.attacksSent })))}`);
+      await sample('attack: after combat');
       try { checkCombat(res); } catch (error) { throw Object.assign(error, { combat: { result: res, tried } }); }
       // A ground click cancels auto-attack; only server-confirmed state is saved.
       await a.walk(0, 100);
@@ -987,6 +1030,13 @@ async function main() {
       await a.healthy();
       await a.close();
       await b.until('B loses A after combat', id => Module._wyd_field_human_present(id) === 0, 30000, a.id);
+      // B's part (observer, A's departure) is over: close it so the relogin
+      // runs with a single game page, the scenario's memory peak otherwise.
+      // Its final dialect summary is kept before the page goes away.
+      await b.healthy();
+      ev.final_B = dialectSummary(await b.probe());
+      await b.close();
+      await sample('attack: B closed, before relogin');
       a = await newSession('A-combat-relogin', A);
       await a.loginToSelect();
       assert.equal((await a.pin()).result, 'lock1', 'post-combat PIN rejected');
