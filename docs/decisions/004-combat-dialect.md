@@ -59,3 +59,18 @@ O runtime (`TMFieldScene::OnPacketAttack`) lê `ReqMp@16` e, quando ele próprio
 - **Hipótese:** mobs atacam com `SkillIndex = 0` (e não −1), o que faz o runtime tratar o golpe como a skill 0 para efeitos visuais. É comportamento do servidor fixado e fica registrado, sem ser corrigido no dialeto.
 - **Defeito do upstream, não corrigido:** `TMFieldScene.cpp:21481` usa `=` em vez de `==` no ramo de atacante desconhecido. O efeito é pedir `0x0369` para o atacante, que agora passa.
 - Vetores: 5 fixtures de entrada (eco de um alvo, 13 alvos com miss −3, golpe de mob, `TargetID` fora da faixa, N = 14) e 2 de saída. O overlay Go reconstrói os fixtures com `MsgAttackBody.Encode` e decodifica a saída com `Decode`. O teste C++ cobre N = 0, meia entrada, capacidades por opcode e padding 0xAB.
+
+## Retomada de 29/09/2026 — aceitação do cenário
+
+O cenário exige B como observador do mesmo alvo, broadcast recebido e dano observado. Morte do atacante não pula a validação; entidade desaparecida não equivale a morte confirmada. Após aprovação, A reconecta e compara equipamento e progressão com o estado recebido do servidor. A fase `attack` inclui essa conferência e não cria personagem ausente de B.
+
+A execução pelo portal para `2588,2096` encontrou Trolls e A morreu antes do primeiro ataque. O percurso de combate passa à saída leste de Armia, buscando `Gremlin` dos geradores 27–30 do `NPCGener.txt` fixado. `mapchange` conserva o roteiro de portal. Não há alteração no dialeto, no gateway nem no servidor. Resultados e limites na [evidência da retomada](../evidence/05-gameplay/2026-09-29-basic-combat.md).
+
+## Revisão de 29/09/2026 — tamanho, não opcode
+
+A execução 4 no Railway descartou 19 `0x039D` com 168 bytes. **Confirmado em fonte:** o corpo a corpo do runtime (`TMHuman.cpp`) envia `0x039D` com `sizeof(MSG_Attack)`, e `MsgAttackBody.Decode` ignora o opcode e deriva N do comprimento. A decisão 2 passa a ser: a struct do runtime e N vêm do tamanho recebido (168/80/72 → 13/2/1), o opcode é preservado, e qualquer outro tamanho é descartado como `outDropSize`. A entrada não muda, porque o servidor sempre responde `0x0367` com o comprimento da requisição. Detalhes em [evidência](../evidence/05-gameplay/2026-09-29-basic-combat.md).
+
+Na execução 5, o dano e a morte foram confirmados por A e B. Surgiram dois opcodes ligados ao combate:
+
+- `0x0378` `SetShortSkill` (C→S): layout idêntico (`Skill[20]`), passa com tamanho exato 32.
+- `0x5000` `Exp_Msg_Panel_` (S→C): customizado do servidor, sem handler no runtime. Fica diferido em `checkHealth`, e a experiência continua vindo do eco de ataque.

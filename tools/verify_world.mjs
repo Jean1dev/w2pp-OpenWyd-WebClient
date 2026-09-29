@@ -15,7 +15,7 @@
 //   move      A walks (mouse click on the canvas) and B sees it; then B walks and A sees it
 //   logout    A closes; B loses A. A logs in again and B sees A again
 //   mapchange A walks onto the Armia -> Armia Field portal and confirms; B loses A
-//   attack    A and B go to Armia Field; A attacks a mob with real clicks, B watches
+//   attack    A and B walk to Armia's Gremlins; A attacks, B watches, then A relogs
 //   concurrent A's account logs in a second time while A is in the Field
 //
 // Credentials come from W2PP_TEST_{ACCOUNT,PASSWORD,PIN,CHAR}[2] (env or --env-file)
@@ -29,7 +29,7 @@ import { createServer } from 'node:net';
 import { resolve, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, redactEvidence } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -359,7 +359,15 @@ class Session {
         try { await this.clickGround(dx + ox, dy + oy); clicked = true; break; }
         catch (e) { if (!String(e.message).includes('ground click overlaps entity')) throw e; }
       }
-      assert(clicked, 'no entity-free ground near target');
+      // An entity standing on the best projection is transient: pick another
+      // screen point on the next iteration (still bounded by maxClicks).
+      if (!clicked) {
+        console.log(`      ${this.label}: entity covers ${best.lx},${best.ly}; picking again`);
+        avoid.push(lastPick);
+        lastPick = null;
+        await sleep(700);
+        continue;
+      }
       // Wait until the character stops (or the stop condition holds).
       let last = me, still = 0;
       const end = Date.now() + 40000;
@@ -436,6 +444,22 @@ class Session {
     const at = await this.me();
     checkTeleport({ ...at, ...Object.fromEntries((await this.ground()).map((v, i) => [i ? 'groundY' : 'groundX', v])) });
     return { clicks: trail.length, at };
+  }
+
+  async toGremlinField() {
+    // NPCGener.txt at the locked server revision: generators 27..30 put
+    // Gremlins at x=2184, y=2086..2118. The portal to 2588,2096 instead
+    // landed our initial characters among Trolls and killed A before input.
+    const trail = [];
+    // HeightMap + baked AttributeMap put the east gate corridor at y=2102;
+    // a direct click toward 2146,2096 runs into the gatehouse fence.
+    for (const [x, y] of [[2117.5, 2095.5], [2130.5, 2091.5],
+      [2138.5, 2102.5], [2152.5, 2102.5], [2166.5, 2102.5], [2184.5, 2106.5]]) {
+      trail.push(...await this.walkTo(x, y, { near: 2 }));
+      const score = await this.combat(0);
+      assert(score.myHp > 0 && score.myDie !== 1, `${this.label}: died on the way to Gremlins`);
+    }
+    return { route: 'Armia east / generators 27..30', clicks: trail.length, at: await this.me() };
   }
 
   // Live non-player entities (server ids >= MaxUser = 1000) the runtime has on
@@ -573,7 +597,7 @@ async function main() {
       for (const s of sessions) if (s.context) await s.healthy();
     } catch (e) {
       r[name] = { ...r[name], ok: false, error: redact(e?.message ?? e), ...(e?.trail && { trail: e.trail }),
-        ...(e?.stall && { stall: e.stall }) };
+        ...(e?.stall && { stall: e.stall }), ...(e?.combat && { combat: e.combat }) };
       throw e;
     } finally {
       r[name].ms = Date.now() - t0;
@@ -759,7 +783,10 @@ async function main() {
       const pin = await b.pin();
       if (!pin.already && pin.result !== 'lock1') throw new Error(`PIN rejected (${pin.result})`);
       let slots = await b.slots();
-      if (!slots[0].name) { await b.create(B.char, cls); slots = await b.slots(); }
+      if (!slots[0].name) {
+        assert(!phases.has('attack'), 'combat requires an existing B character');
+        await b.create(B.char, cls); slots = await b.slots();
+      }
       const me = await b.enter(0);
       assert.equal(me.name, B.char, 'B entered the wrong character');
       await b.shot('field');
@@ -862,37 +889,50 @@ async function main() {
         dialect: dialectSummary(p) };
     });
 
-    // Stage 5, slice 1: A attacks a mob in Armia Field with real clicks; B, in
+    // Stage 5, slice 1: A attacks a Gremlin with real clicks; B, in
     // the same field, watches. Every number comes from the server: damage via
     // the 0x0367 broadcast, experience/gold via the echo and UpdateEtc.
     await step('attack', async () => {
-      const [aTrip, bTrip] = await Promise.all([a.toArmiaField(), b.toArmiaField()]);
+      const [aTrip, bTrip] = await Promise.all([a.toGremlinField(), b.toGremlinField()]);
+      r.attack = { aTrip, bTrip, attempts: [] };
       const tried = [];
       let res;
       for (let pick = 0; pick < 3 && !res; pick++) {
         let mob;
         for (let i = 0; i < 4 && !mob; i++) {
-          mob = (await a.mobs()).find(m => m.onScreen && m.hp > 0 && m.maxHp > 0 && !tried.some(t => t.id === m.id));
+          mob = (await a.mobs()).find(m => m.name.trim() === 'Gremlin' && m.onScreen &&
+            m.hp > 0 && m.maxHp > 0 && !tried.some(t => t.target.id === m.id));
           if (!mob) await a.walk(i % 2 ? -160 : 160, 80);
         }
-        assert(mob, `no live entity on screen in Armia Field (tried ${tried.length})`);
+        assert(mob, `no live Gremlin on screen (tried ${tried.length})`);
+        if ((await b.combat(mob.id)).present !== 1) {
+          const at = await a.me();
+          await b.walkTo(at.x, at.y, { near: 3 });
+        }
+        await b.until('B sees combat target', id => Module._wyd_field_human_present(id) === 1, 30000, mob.id);
         const c0 = await a.combat(mob.id);
+        const b0 = await b.combat(mob.id);
+        assert(c0.myHp > 0 && c0.myDie !== 1, 'attacker dead before first input');
+        assert(c0.present === 1 && c0.hp > 0 && b0.present === 1 && b0.hp > 0, 'target unavailable before attack');
         const bSees = (await b.eval(i => Module._wyd_field_human_present(i), mob.id)) === 1;
-        const bTrail = bSees ? [(await b.combat(mob.id)).hp] : [];
+        const bTrail = [b0.hp];
         const hpTrail = [c0.hp];
+        console.log(`    target ${mob.id} Gremlin: HP ${c0.hp}, observer HP ${b0.hp}`);
         let clicks = 0, lastClick = 0, killed = false, lost = false, died = false, bKill = false;
         const end = Date.now() + 150000;
         while (Date.now() < end) {
           const c = await a.combat(mob.id);
+          const v = await b.combat(mob.id);
+          if (v.present) {
+            if (v.hp !== bTrail.at(-1)) bTrail.push(v.hp);
+            if (v.die === 1 || v.hp <= 0) bKill = true;
+          }
           if (c.myDie === 1 || c.myHp <= 0) { died = true; break; }
           if (!c.present) { lost = hpTrail.at(-1) > 0; killed = !lost; break; }
           if (c.hp !== hpTrail.at(-1)) hpTrail.push(c.hp);
           if (c.die === 1 || c.hp <= 0) { killed = true; break; }
-          if (bSees) {
-            const v = await b.combat(mob.id);
-            if (!v.present || v.die === 1 || v.hp <= 0) bKill = true;
-            if (v.present && v.hp !== bTrail.at(-1)) bTrail.push(v.hp);
-          }
+          if (c.hp < c0.hp && bTrail.at(-1) < b0.hp &&
+              c.outAttack > c0.outAttack && c.inAttack > c0.inAttack && v.inAttack > b0.inAttack) break;
           // One click per intent; the runtime paces its own swings. Re-click
           // only when the target is still alive after a while (auto-attack
           // stops when the target leaves reach).
@@ -910,24 +950,53 @@ async function main() {
         const c1 = await a.combat(mob.id);
         if (bSees && !bKill) {
           const v = await b.combat(mob.id);
-          if (!v.present || v.die === 1 || v.hp <= 0) bKill = true;
+          if (v.present) {
+            if (v.hp !== bTrail.at(-1)) bTrail.push(v.hp);
+            if (v.die === 1 || v.hp <= 0) bKill = true;
+          }
         }
+        if (c1.myDie === 1 || c1.myHp <= 0) died = true;
+        if (c1.present) {
+          if (c1.hp !== hpTrail.at(-1)) hpTrail.push(c1.hp);
+          if (c1.die === 1 || c1.hp <= 0) killed = true;
+        } else if (!killed) lost = true;
         const r1 = {
           target: { id: mob.id, name: mob.name, maxHp: mob.maxHp, distance: Math.round(mob.d) },
           clicks, attacksSent: c1.outAttack - c0.outAttack, echoes: c1.inAttack - c0.inAttack,
           hpTrail, killed, lost, died, exp0: c0.exp, exp1: c1.exp, coin0: c0.coin, coin1: c1.coin,
           learnedSkill: c0.learnedSkill.toString(16), myClass: c0.myClass,
           level: [c0.myLevel, c1.myLevel], myHp: [c0.myHp, c1.myHp], myMp: [c0.myMp, c1.myMp],
-          observer: { sawTarget: bSees, hpTrail: bTrail, sawKill: bKill },
+          observer: { sawTarget: bSees, hpTrail: bTrail, sawKill: bKill,
+            echoes: (await b.combat(mob.id)).inAttack - b0.inAttack },
         };
         tried.push(r1);
+        r.attack.attempts = tried;
+        await writeFile(join(OUT, 'evidence.json'), evidenceJson(ev));
         await a.shot(`attack-${pick}`);
         if (bSees) await b.shot(`attack-${pick}`);
         if (died || killed || hpTrail.length > 1) res = r1;
       }
       assert(res, `no target took damage: ${JSON.stringify(tried.map(t => ({ n: t.target.name, e: t.echoes, s: t.attacksSent })))}`);
-      if (!res.died) checkCombat(res);
+      try { checkCombat(res); } catch (error) { throw Object.assign(error, { combat: { result: res, tried } }); }
+      // A ground click cancels auto-attack; only server-confirmed state is saved.
+      await a.walk(0, 100);
+      const last = await a.me();
+      const score = await a.combat(res.target.id);
+      assert(score.myDie !== 1 && score.myHp > 0, 'attacker died before relogin');
+      const before = { ...last, level: score.myLevel, exp: score.exp };
+      await a.healthy();
+      await a.close();
+      await b.until('B loses A after combat', id => Module._wyd_field_human_present(id) === 0, 30000, a.id);
+      a = await newSession('A-combat-relogin', A);
+      await a.loginToSelect();
+      assert.equal((await a.pin()).result, 'lock1', 'post-combat PIN rejected');
+      const again = await a.enter(0);
+      const againScore = await a.combat(0);
+      const after = { ...again, level: againScore.myLevel, exp: againScore.exp };
+      checkCombatRelogin(before, after);
+      await a.shot('post-combat-relogin');
       return { aTrip, bTrip, result: res, tried: tried.length,
+        relogin: { before, after, persisted: true },
         panelsClosed: { A: a.panelsClosed ?? [], B: b.panelsClosed ?? [] } };
     });
 

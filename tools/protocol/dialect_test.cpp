@@ -513,7 +513,13 @@ static void TestAttack()
 	a.Dam[0].Damage = -2;
 	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), sizeof(MSG_AttackOne), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
 	CHECK(size == 68 && std::memcmp(wire, k_out_attack_one, 68) == 0);
-	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), sizeof(MSG_Attack), wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	// Melee (TMHuman.cpp) sends 0x039D with the full MSG_Attack: N = 13, the
+	// opcode is kept and the prefix/Dam[0] match the one-target frame.
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), sizeof(MSG_Attack), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 164 && static_cast<unsigned char>(wire[0]) == 164 && wire[1] == 0);
+	CHECK(static_cast<unsigned char>(wire[4]) == 0x9D && wire[5] == 0x03);
+	CHECK(std::memcmp(wire + 2, k_out_attack_one + 2, 66) == 0);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), 100, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
 
 	a.Header.Size = sizeof(MSG_Attack);
 	a.Header.Type = 0x367;
@@ -527,8 +533,8 @@ static void TestAttack()
 	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), sizeof(MSG_Attack), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
 	CHECK(size == 164 && std::memcmp(wire, k_out_attack_multi, 164) == 0);
 	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), 164, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
-	CHECK(WydDialectStatValue(WYD_STAT_OUT_TRANSLATED) == 2);
-	CHECK(WydDialectStatValue(WYD_STAT_OUT_ATTACK) == 2);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_TRANSLATED) == 3);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_ATTACK) == 3);
 	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_SIZE) == 2);
 
 	// Restart (header only) and ReqMobByID (StandardParm) pass unchanged.
@@ -538,6 +544,11 @@ static void TestAttack()
 	char reqMob[16] = {16, 0, 0, 0, 0x69, 0x03};
 	CHECK(WydDialectOutbound(reqMob, 16, wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
 	CHECK(WydDialectOutbound(reqMob, 12, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	// SetShortSkill (Skill[20]) passes unchanged at its exact size only.
+	char shortSkill[32] = {32, 0, 0, 0, 0x78, 0x03};
+	shortSkill[12] = 7;
+	CHECK(WydDialectOutbound(shortSkill, 32, wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
+	CHECK(WydDialectOutbound(shortSkill, 28, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
 	char delay[16] = {16, 0, 0, 0, static_cast<char>(0xAE), 0x03};
 	CHECK(WydDialectOutbound(delay, 16, wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
 	CHECK(WydDialectOutbound(delay, 12, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);

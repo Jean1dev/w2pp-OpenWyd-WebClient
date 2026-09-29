@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, redactEvidence } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
   const value = { error: 'fixture-secret', nested: ['prefix fixture-secret suffix'], x: 123456 };
@@ -45,7 +45,8 @@ test('only listed deferred gameplay opcodes may be dropped, and only as unknown'
   assert.throws(() => checkHealth(p({ droppedIn: [{ opcode: '0x0367', times: 1 }] })));
 });
 test('combat accepts only server-confirmed damage and experience', () => {
-  const ok = { attacksSent: 3, echoes: 3, hpTrail: [100, 80, 55], killed: false, exp0: 0, exp1: 0 };
+  const observer = { sawTarget: true, hpTrail: [100, 80, 55], echoes: 3 };
+  const ok = { attacksSent: 3, echoes: 3, hpTrail: [100, 80, 55], killed: false, exp0: 0, exp1: 0, observer };
   checkCombat(ok);
   checkCombat({ ...ok, hpTrail: [100, 40], killed: true, exp0: 10, exp1: 25 });
   assert.throws(() => checkCombat({ ...ok, attacksSent: 0 }));
@@ -53,8 +54,24 @@ test('combat accepts only server-confirmed damage and experience', () => {
   assert.throws(() => checkCombat({ ...ok, hpTrail: [100, 100] }));
   assert.throws(() => checkCombat({ ...ok, hpTrail: [100, 40], killed: true, exp0: 10, exp1: 10 }));
   assert.throws(() => checkCombat({ ...ok, hpTrail: [100, 60, 90] }));
-  checkCombat({ ...ok, observer: { sawTarget: true, hpTrail: [100, 70] } });
-  assert.throws(() => checkCombat({ ...ok, observer: { sawTarget: true, hpTrail: [100, 100] } }));
+  checkCombat({ ...ok, observer: { ...observer, hpTrail: [100, 70] } });
+  assert.throws(() => checkCombat({ ...ok, observer: { ...observer, hpTrail: [100, 100] } }));
+  for (const bad of [undefined, { ...observer, sawTarget: false }, { ...observer, echoes: 0 },
+    { ...observer, hpTrail: [100], sawKill: false }])
+    assert.throws(() => checkCombat({ ...ok, observer: bad }));
+  assert.throws(() => checkCombat({ ...ok, died: true }));
+  assert.throws(() => checkCombat({ ...ok, lost: true }));
+  assert.throws(() => checkCombat({ ...ok, hpTrail: [100] }));
+});
+
+test('post-combat relogin preserves progression and equipment, allowing city spawn and regenerated HP', () => {
+  const before = { name: 'fixture', characterClass: 0, equip: [1, 1103], look: [1, 2],
+    level: 2, exp: 125, hp: 40, x: 2588.5, y: 2096.5 };
+  const after = { ...before, hp: 100, x: 2090.5, y: 2095.5 };
+  checkCombatRelogin(before, after);
+  for (const change of [{ name: 'other' }, { characterClass: 1 }, { equip: [1] },
+    { look: [2] }, { level: 1 }, { exp: 124 }, { x: 2588.5 }])
+    assert.throws(() => checkCombatRelogin(before, { ...after, ...change }));
 });
 test('persistence compares stable data and permits regenerated HP', () => {
   const before = { name: 'fixture', level: 1, maxHp: 100, maxMp: 50,

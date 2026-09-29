@@ -39,7 +39,10 @@ export function validateOptions(opt) {
 // scene). Only these, and only as "unknown" drops, may appear in a scenario;
 // they are reported in the evidence. Any other drop still fails.
 // 0x0367 (MSG_Attack) left the list when it was translated (ADR 004).
-export const DEFERRED_INBOUND = new Set();
+// 0x5000 MSG_Exp_Msg_Panel_ is a server-custom text panel ("+N de EXP",
+// mobkilled.go) with no runtime handler; the EXP itself arrives in the
+// MSG_Attack echo (CurrentExp). Deferred, not rendered (ADR 004 revision).
+export const DEFERRED_INBOUND = new Set(['0x5000']);
 
 export function checkHealth(p, errors = [], deferredIn = DEFERRED_INBOUND) {
   assert.equal(errors.length, 0, 'page errors');
@@ -79,6 +82,8 @@ export function checkTeleport(after) {
 // Combat result as observed by the clients. Damage, HP and experience are the
 // server's (0x0367 echo / broadcast); the harness only compares observations.
 export function checkCombat(c) {
+  assert(!c.died, 'attacker died before combat verification');
+  assert(!c.lost, 'target disappeared without confirmed death');
   assert(c.attacksSent > 0, 'no attack left the client');
   assert(c.echoes > 0, 'no attack echo from the server');
   assert(c.hpTrail.length >= 2, 'target HP never observed twice');
@@ -88,6 +93,15 @@ export function checkCombat(c) {
   assert(c.exp1 >= c.exp0, 'experience decreased while attacking');
   for (let i = 1; i < c.hpTrail.length; i++)
     assert(c.hpTrail[i] <= c.hpTrail[i - 1] || c.regen, 'target HP rose without regeneration');
-  if (c.observer?.sawTarget) assert(c.observer.hpTrail.at(-1) < c.observer.hpTrail[0] || c.observer.sawKill,
+  assert(c.observer?.sawTarget, 'observer never saw the target');
+  assert(c.observer.echoes > 0, 'observer received no attack broadcast');
+  assert(c.observer.hpTrail.length >= 2 || c.observer.sawKill, 'observer has no damage observation');
+  assert(c.observer.hpTrail.at(-1) < c.observer.hpTrail[0] || c.observer.sawKill,
     'observer did not see the damage');
+}
+
+export function checkCombatRelogin(before, after) {
+  for (const key of ['name', 'characterClass', 'equip', 'look', 'level', 'exp'])
+    assert.deepEqual(after[key], before[key], `post-combat persistence differs: ${key}`);
+  checkArmiaSpawn(after);
 }

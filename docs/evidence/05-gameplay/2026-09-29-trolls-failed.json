@@ -1,0 +1,403 @@
+{
+ "when": "2026-09-29T18:16:10.603Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "enter",
+  "second",
+  "attack"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 0
+    }
+   ],
+   "ms": 40999,
+   "at": "2026-09-29T18:17:16.839Z"
+  },
+  "enter": {
+   "ok": true,
+   "me": {
+    "id": 1,
+    "name": "Web*******",
+    "x": 2090.5,
+    "y": 2106.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 33,
+    "inPass": 2,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 35,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "glErrors": 0,
+   "ms": 16565,
+   "at": "2026-09-29T18:17:33.407Z"
+  },
+  "second": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "me": {
+    "id": 2,
+    "name": "Web*******",
+    "x": 2098.5,
+    "y": 2103.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 36,
+    "inPass": 3,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 39,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "ms": 135368,
+   "at": "2026-09-29T18:19:48.778Z"
+  },
+  "attack": {
+   "ok": false,
+   "error": "attacker died before combat verification",
+   "combat": {
+    "result": {
+     "target": {
+      "id": 2714,
+      "name": "Troll Mago ",
+      "maxHp": 2500,
+      "distance": 3
+     },
+     "clicks": 0,
+     "attacksSent": 0,
+     "echoes": 0,
+     "hpTrail": [
+      2500
+     ],
+     "killed": false,
+     "lost": false,
+     "died": true,
+     "exp0": 0,
+     "exp1": 0,
+     "coin0": 1000000,
+     "coin1": 1000000,
+     "learnedSkill": "0",
+     "myClass": 0,
+     "level": [
+      1,
+      1
+     ],
+     "myHp": [
+      0,
+      0
+     ],
+     "myMp": [
+      105,
+      105
+     ],
+     "observer": {
+      "sawTarget": true,
+      "hpTrail": [
+       2500
+      ],
+      "sawKill": false,
+      "echoes": 0
+     }
+    },
+    "tried": [
+     {
+      "target": {
+       "id": 2714,
+       "name": "Troll Mago ",
+       "maxHp": 2500,
+       "distance": 3
+      },
+      "clicks": 0,
+      "attacksSent": 0,
+      "echoes": 0,
+      "hpTrail": [
+       2500
+      ],
+      "killed": false,
+      "lost": false,
+      "died": true,
+      "exp0": 0,
+      "exp1": 0,
+      "coin0": 1000000,
+      "coin1": 1000000,
+      "learnedSkill": "0",
+      "myClass": 0,
+      "level": [
+       1,
+       1
+      ],
+      "myHp": [
+       0,
+       0
+      ],
+      "myMp": [
+       105,
+       105
+      ],
+      "observer": {
+       "sawTarget": true,
+       "hpTrail": [
+        2500
+       ],
+       "sawKill": false,
+       "echoes": 0
+      }
+     }
+    ]
+   },
+   "ms": 428224,
+   "at": "2026-09-29T18:26:57.006Z"
+  }
+ },
+ "ok": false,
+ "node": "v22.16.0",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "604328926be1d52bfe3d1ed16e14ac2933c152ee",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "field",
+   "file": ".cache/world/2026-09-29T18-16-10-584Z/A-field.png",
+   "sha256": "023823e4cdff864b40dcd7383e306c70061a5ca7ece6c130a6c8bb3b3d4adf9c"
+  },
+  {
+   "name": "attack-0",
+   "file": ".cache/world/2026-09-29T18-16-10-584Z/A-attack-0.png",
+   "sha256": "6edc207896be297b2b2ffe00af5056621291a14acb1c6c890012533616e4589a"
+  },
+  {
+   "name": "field",
+   "file": ".cache/world/2026-09-29T18-16-10-584Z/B-field.png",
+   "sha256": "c22b2b2a3670dc0031c69c6965366921808e82bd196ed19438ed629a9e172f0f"
+  },
+  {
+   "name": "attack-0",
+   "file": ".cache/world/2026-09-29T18-16-10-584Z/B-attack-0.png",
+   "sha256": "d639d764112bf16620d031ad96380aa2e500626750e30ef3da79aa99dc2e0cb8"
+  }
+ ],
+ "error": "attacker died before combat verification",
+ "final_A": {
+  "inTranslated": 89,
+  "inPass": 237,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 26,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 326,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "final_B": {
+  "inTranslated": 97,
+  "inPass": 912,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 17,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 1009,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "B": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-09-29T15:16:35.5124572-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-09-29T15:17:06.1810109-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-29T15:18:49.9666377-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-29T15:26:57.7632642-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 1412,
+   "bytes_down": 33748
+  },
+  {
+   "time": "2026-09-29T15:26:58.3120218-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 944,
+   "bytes_down": 70456
+  }
+ ]
+}

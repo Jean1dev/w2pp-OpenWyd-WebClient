@@ -8,9 +8,10 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 
 | Funcionalidade | Estado | Prova |
 |---|---|---|
-| Dialeto `0367/039D/039E` (entrada/saída) | confirmado em teste | C++ com 429 verificações; overlay Go com `MsgAttackBody.Encode/Decode` reais (`attack_*`) |
-| `0289` Restart, `0369` ReqMobByID, `03AE` (saída) | confirmado em teste | C++ (tamanho exato; tamanho errado é descartado) |
-| Ataque básico: A acerta um mob, B vê | **pendente de execução** | cenário `attack` escrito; execuções abaixo |
+| Dialeto `0367/039D/039E` (entrada/saída) | confirmado em teste e em execução | C++ com 435 verificações; overlay Go com `MsgAttackBody.Encode/Decode` reais (`attack_*`). Saída pelo tamanho (168/80/72 → N 13/2/1), opcode preservado: o corpo a corpo envia `0x039D` com 168 bytes |
+| `0289` Restart, `0369` ReqMobByID, `03AE`, `0378` SetShortSkill (saída) | confirmado em teste | C++ (tamanho exato; tamanho errado é descartado) |
+| `5000` Exp_Msg_Panel_ (entrada) | diferido | customizado do servidor, sem handler no runtime; Exp chega pelo eco de ataque. Em `DEFERRED_INBOUND` |
+| Ataque básico: A acerta um mob, B vê | **confirmado em execução** (saúde de protocolo e relogin pendentes) | [execução 5](2026-09-29-basic-combat.md): Gremlin HP 70→3→0, Exp 0→274, B vê o mesmo |
 | Morte e respawn (`03AE` → `0289`) | pendente | fluxo mapeado em fonte (`TMFieldScene.cpp:6218`, `16663`, `11928`) |
 | Skills das quatro classes | pendente | `LearnedSkill` passa a ser registrado pelo cenário (export 0012); a máscara inicial vem dos templates de classe do conteúdo do servidor, ausentes do checkout |
 | Inventário, drop, loja, banco, teleporte, chat, grupo, troca e persistência | pendente | fatias seguintes |
@@ -31,11 +32,24 @@ Nenhuma chegou ao combate. Todas terminaram com saúde de protocolo limpa: nenhu
 
 A mesma correção de caminhada vale para a fase `mapchange` da etapa 4, que falhou na suíte completa por esse motivo (ver `docs/evidence/04-login-mundo/`).
 
+## Retomada de 29/09/2026 (tarde): combate chega ao servidor
+
+Detalhes em [2026-09-29-basic-combat.md](2026-09-29-basic-combat.md). Critérios endurecidos: observador obrigatório, morte do atacante reprova, relogin pós-combate.
+
+| Execução | Resultado | Causa / correção |
+|---|---|---|
+| 1 (portal) | falhou | A morreu entre Trolls antes do primeiro ataque. Rota trocada para os Gremlins da saída leste (geradores 27–30) |
+| 2 | falhou | Cerca do portão leste. Rota pelo corredor y=2102, derivada de `HeightMap`/`AttributeMap` |
+| 3 | falhou | Pick coberto por entidade abortava `walkTo`; agora tenta outro ponto |
+| 4 | falhou | Rota ok; 19 `0x039D` de 168 bytes descartados (`outDropSize`). Dialeto passa a usar o tamanho |
+| 5 | **dano e morte confirmados**, reprovou na saúde | `0x0378` descartado → passa com 32 bytes; `0x5000` → diferido |
+| 6 | interrompida | Falta de memória na fase `second`, sem resultado ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)) |
+
 ## Comandos
 
 ```powershell
-npm run protocol:dialect      # 429 verificações
+npm run protocol:dialect      # 435 verificações
 npm run protocol:vectors      # inclui TestExtDialect{Inbound,Outbound}/attack_*
-npm run world:checks          # 7 testes (checkCombat, DEFERRED_INBOUND vazio)
-node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --env-file .env --phases login,enter,second,attack
+npm run world:checks          # 8 testes (checkCombat, checkCombatRelogin, DEFERRED_INBOUND = {0x5000})
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,attack
 ```
