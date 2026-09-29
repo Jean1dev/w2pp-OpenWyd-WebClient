@@ -2,9 +2,12 @@
 // Etapa 4: online slice against the operator's real tmserver, two accounts.
 //
 //   node tools/verify_world.mjs --target host:port --client-version 12000 --env-file .env
+//   node tools/verify_world_suite.mjs --target host:port --env-file .env
 //
 // Phases (all through the real gateway, the real page and its CSP):
 //   badpass   wrong password -> the server's 0x102 notice is translated and shown
+//   badpin    establish the configured PIN, reconnect, reject a different PIN, recover
+//   classes   validate --class in its own process, create only if absent, then relogin
 //   login     A logs in, PIN verified (the first verify on an account defines it)
 //   create    A creates a character when its slot 0 is empty; preview is read
 //   enter     A enters the Field with the server's CNFCharacterLogin
@@ -24,10 +27,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { resolve, join } from 'node:path';
 import { parseArgs } from 'node:util';
+import assert from 'node:assert/strict';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, redactEvidence } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
-const OUT = join(CACHE, 'world');
+const RUN_ID = new Date().toISOString().replace(/[:.]/g, '-');
+const OUT = join(CACHE, 'world', RUN_ID);
 const SITE = join(CACHE, 'local-scene');
 const GO = join(CACHE, 'toolchains/go/bin', process.platform === 'win32' ? 'go.exe' : 'go');
 const GATEWAY_BIN = join(CACHE, 'bin', process.platform === 'win32' ? 'wydgateway.exe' : 'wydgateway');
@@ -44,9 +50,8 @@ const { values: opt } = parseArgs({
     headed: { type: 'boolean', default: false },
   },
 });
-if (!opt.target) throw new Error('--target host:port is required');
+const phases = validateOptions(opt);
 const clientVersion = Number.parseInt(opt['client-version'], 10);
-const phases = new Set(opt.phases.split(',').map(s => s.trim()).filter(Boolean));
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const mask = s => (s ? s.slice(0, 3) + '*'.repeat(Math.max(0, s.length - 3)) : s);
@@ -83,17 +88,20 @@ async function startGateway(port, target) {
     channels: [{ name: 'server', target, publicWsUrl: `ws://127.0.0.1:${port}/ws/server`, clientVersion }],
     limits: { maxConns: 8, maxConnsPerIP: 8 },
   };
-  const cfgPath = join(CACHE, 'gateway-world.json');
+  const cfgPath = join(OUT, 'gateway.json');
   await writeFile(cfgPath, JSON.stringify(cfg, null, 1));
   const logs = [];
   const proc = spawn(GATEWAY_BIN, ['-config', cfgPath], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let startError;
+  proc.on('error', e => { startError = e; });
   proc.stderr.on('data', d => logs.push(...d.toString().split('\n').filter(Boolean)));
   for (let i = 0; i < 100; i++) {
+    if (startError || proc.exitCode !== null) break;
     try { const r = await fetch(`${origin}/config.json`); if (r.ok) return { proc, origin, logs }; } catch {}
     await sleep(100);
   }
   proc.kill();
-  throw new Error(`gateway did not start: ${logs.join('\n')}`);
+  throw new Error(`gateway did not start: ${startError?.message ?? logs.join('\n')}`);
 }
 
 // One browser context = one game client.
@@ -106,6 +114,11 @@ class Session {
   async open() {
     this.context = await this.browser.newContext({ viewport: { width: 1024, height: 768 } });
     this.page = await this.context.newPage();
+    this.connected = false;
+    this.page.on('websocket', ws => {
+      this.connected = true;
+      ws.on('close', () => { this.connected = false; });
+    });
     this.page.on('pageerror', e => this.pageErrors.push(e.message.slice(0, 300)));
     await this.page.goto(`${this.origin}/client.html`, { waitUntil: 'load' });
     await this.until('server selection', () => window.clientEvidence?.ready &&
@@ -133,9 +146,12 @@ class Session {
 
   async shot(name) {
     const path = join(OUT, `${this.label}-${name}.png`);
-    await this.page.locator('#canvas').screenshot({ path });
+    // page.screenshot with a clip skips the locator "stable element" wait, which
+    // flakes on a canvas redrawn every frame on a loaded machine.
+    const clip = await this.page.locator('#canvas').boundingBox();
+    await this.page.screenshot({ path, clip, timeout: 45000 });
     const sha256 = createHash('sha256').update(await readFile(path)).digest('hex');
-    this.shots.push({ name, file: `.cache/world/${this.label}-${name}.png`, sha256 });
+    this.shots.push({ name, file: `.cache/world/${RUN_ID}/${this.label}-${name}.png`, sha256 });
   }
 
   login(password = this.creds.password) {
@@ -153,11 +169,11 @@ class Session {
     await sleep(3000);
   }
 
-  async pin() {
+  async pin(value = this.creds.pin) {
     const lock = await this.eval(() => Module._wyd_selchar_account_lock());
     if (lock === 1) return { already: true };
     const sent = await this.eval(p =>
-      Module.ccall('wyd_debug_selchar_pin', 'number', ['string'], [p]), this.creds.pin);
+      Module.ccall('wyd_debug_selchar_pin', 'number', ['string'], [p]), value);
     if (sent !== 1) throw new Error(`${this.label}: PIN control refused (lock=${lock})`);
     // 0xFDE sets the lock to 1; 0xFDF returns it to 0.
     const result = await this.until('PIN reply', () => {
@@ -172,6 +188,7 @@ class Session {
       name: Module.UTF8ToString(Module._wyd_selchar_name(i)),
       level: Module._wyd_selchar_level(i),
       maxHp: Module._wyd_selchar_score(i, 0), hp: Module._wyd_selchar_score(i, 1),
+      maxMp: Module._wyd_selchar_score(i, 2), mp: Module._wyd_selchar_score(i, 3),
       str: Module._wyd_selchar_score(i, 4), int: Module._wyd_selchar_score(i, 5),
       dex: Module._wyd_selchar_score(i, 6), con: Module._wyd_selchar_score(i, 7),
       equip: Array.from({ length: 18 }, (_, k) => Module._wyd_selchar_equip(i, k)),
@@ -201,7 +218,13 @@ class Session {
     await sleep(3000);
     const me = await this.me();
     this.id = me.id;
+    checkHealth(await this.probe(), this.pageErrors);
     return me;
+  }
+
+  async healthy() {
+    checkHealth(await this.probe(), this.pageErrors);
+    assert(this.connected, `${this.label}: socket disconnected`);
   }
 
   me() {
@@ -211,6 +234,8 @@ class Session {
       x: Module._wyd_field_myhuman_x(), y: Module._wyd_field_myhuman_y(),
       hp: Module._wyd_field_myhuman_hp(), maxHp: Module._wyd_field_myhuman_max_hp(),
       cls: Module._wyd_field_myhuman_class_id(),
+      characterClass: typeof Module._wyd_field_character_class === 'function' ? Module._wyd_field_character_class() : null,
+      equip: Array.from({ length: 16 }, (_, slot) => Module._wyd_debug_my_item(0, slot)),
       look: Array.from({ length: 8 }, (_, p) => Module._wyd_field_human_look_mesh(Module._wyd_field_myhuman_id(), p)),
     }));
   }
@@ -233,10 +258,21 @@ class Session {
     const box = await this.page.locator('#canvas').boundingBox();
     const x = box.x + box.width / 2 + dx, y = box.y + box.height / 2 + dy;
     await this.page.mouse.move(x, y, { steps: 4 });
-    await sleep(1200);
+    await this.frames(2);
+    assert.equal(await this.eval(() => Module._wyd_field_hover_entity()), 0, 'ground click overlaps entity');
+    // NPCs wander: at ~1 frame/s one can step under the cursor between the
+    // check and the press (a shop request 0x027B was sent that way). Require a
+    // second clean frame right before pressing.
+    await this.frames(1);
+    assert.equal(await this.eval(() => Module._wyd_field_hover_entity()), 0, 'ground click overlaps entity');
     await this.page.mouse.down();
-    await sleep(1200);
-    await this.page.mouse.up();
+    try { await this.frames(2); } finally { await this.page.mouse.up(); }
+    await this.frames(1);
+  }
+
+  async frames(count) {
+    const before = await this.eval(() => window.clientEvidence.frames);
+    await this.until('rendered input frames', n => window.clientEvidence.frames >= n, 60000, before + count);
   }
 
   input() {
@@ -247,18 +283,32 @@ class Session {
   // Walks toward a world tile with real clicks: the runtime's own ground pick
   // (GroundGetPickPos: x = world x, z = world y) finds the screen point whose
   // ground is nearest the target; the scene then routes and sends Action.
-  async walkTo(tx, ty, { maxClicks = 25, stopWhen } = {}) {
+  async walkTo(tx, ty, { maxClicks = 25, stopWhen, maxStalls = 3, near = 1, stallOk = false } = {}) {
     const trail = [];
+    let bestDist = Infinity, stalls = 0;
     for (let i = 0; i < maxClicks; i++) {
       const me = await this.me();
       trail.push([me.x, me.y]);
+      const dist = Math.hypot(me.x - tx, me.y - ty);
+      console.log(`    ${this.label} walk ${i}: ${me.x},${me.y} d=${dist.toFixed(1)}`);
       if (stopWhen && (await stopWhen())) break;
-      if (Math.hypot(me.x - tx, me.y - ty) < 1) break;
+      if (dist < near) break;
+      // Fail fast with the trail instead of burning the scenario deadline.
+      stalls = dist < bestDist - 1 ? 0 : stalls + 1;
+      bestDist = Math.min(bestDist, dist);
+      if (stalls >= maxStalls && stallOk) break;
+      if (stalls >= maxStalls) {
+        const err = new Error(`${this.label}: no progress towards ${tx},${ty} after ${stalls} clicks (d=${dist.toFixed(1)})`);
+        err.trail = trail;
+        throw err;
+      }
       const best = await this.eval(([tx, ty]) => {
         const c = document.getElementById('canvas');
         let best = null;
-        for (let ly = 90; ly <= c.height - 110; ly += 30) {
-          for (let lx = 40; lx <= c.width - 40; lx += 30) {
+        // Keep off the screen edges: entities enter the frame there and the
+        // bottom rows sit next to the HUD.
+        for (let ly = 90; ly <= c.height - 150; ly += 30) {
+          for (let lx = 70; lx <= c.width - 70; lx += 30) {
             if (!Module._wyd_field_pick_at(lx, ly)) continue;
             const wx = Module._wyd_field_last_pick_x(), wy = Module._wyd_field_last_pick_z();
             const d = Math.hypot(wx - tx, wy - ty);
@@ -268,10 +318,17 @@ class Session {
         return best;
       }, [tx, ty]);
       if (!best) throw new Error(`${this.label}: no ground under the cursor`);
+      console.log(`      pick ${best.wx.toFixed(1)},${best.wy.toFixed(1)} at ${best.lx},${best.ly}`);
       const box = await this.page.locator('#canvas').boundingBox();
       const dx = best.lx * box.width / best.cw - box.width / 2;
       const dy = best.ly * box.height / best.ch - box.height / 2;
-      await this.clickGround(dx, dy);
+      // Try nearby screen points if an NPC covers the best ground projection.
+      let clicked = false;
+      for (const [ox, oy] of [[0, 0], [-30, 0], [30, 0], [0, -30], [0, 30]]) {
+        try { await this.clickGround(dx + ox, dy + oy); clicked = true; break; }
+        catch (e) { if (!String(e.message).includes('ground click overlaps entity')) throw e; }
+      }
+      assert(clicked, 'no entity-free ground near target');
       // Wait until the character stops (or the stop condition holds).
       let last = me, still = 0;
       const end = Date.now() + 40000;
@@ -291,7 +348,12 @@ class Session {
     const start = await this.me();
     const sentBefore = (await this.probe()).dialect.outPass;
     const inBefore = await this.input();
-    await this.clickGround(dx, dy);
+    let clicked = false;
+    for (const [cx, cy] of [[dx, dy], [-dx, dy], [dx, -dy], [-dx, -dy], [0, 160], [200, 0]]) {
+      try { await this.clickGround(cx, cy); clicked = true; break; }
+      catch (e) { if (!String(e.message).includes('ground click overlaps entity')) throw e; }
+    }
+    assert(clicked, 'no entity-free ground for movement');
     this.lastInput = { before: inBefore, after: await this.input() };
     // Wait until the own character stops at a new tile.
     let last = start, still = 0;
@@ -336,11 +398,34 @@ async function main() {
   for (const [k, c] of [['A', A], ['B', B]])
     if (!c.account || !c.password || !c.pin || !c.char) throw new Error(`credentials for ${k} incomplete in env`);
   const cls = Number.parseInt(opt.class, 10);
+  const privateValues = [A, B].flatMap(c => [c.account, c.password, c.pin, c.char]);
+  const redact = value => {
+    let text = String(value);
+    for (const secret of privateValues.filter(Boolean).sort((a, b) => b.length - a.length))
+      text = text.split(secret).join('<redacted>');
+    return text;
+  };
+  const evidenceJson = value => JSON.stringify(redactEvidence(value, privateValues), null, 1);
 
   const ev = { when: new Date().toISOString(), target: opt.target, clientVersion, phases: [...phases],
-    accounts: { A: mask(A.account), B: mask(B.account) }, results: {}, ok: false };
-  const gw = await startGateway(await freePort(), opt.target);
-  const browser = await chromium.launch({ headless: !opt.headed });
+    accounts: { A: mask(A.account), B: mask(B.account) }, results: {}, ok: false,
+    node: process.version, lock: JSON.parse(await readFile(join(ROOT, 'dependencies.lock.json'), 'utf8')),
+    revisions: Object.fromEntries(['.', 'external/server', 'external/OpenWyd'].map(dir =>
+      [dir, execFileSync('git', ['-C', join(ROOT, dir), 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()])) };
+  let gw, browser;
+  let interrupted;
+  const stop = signal => {
+    interrupted = signal;
+    // Closing the transport/page unblocks pending Playwright operations so the
+    // normal catch/finally can preserve evidence and release every resource.
+    gw?.proc.kill();
+    void browser?.close().catch(() => {});
+  };
+  const onInterrupt = () => stop('SIGINT');
+  const onTerminate = () => stop('SIGTERM');
+  process.once('SIGINT', onInterrupt);
+  process.once('SIGTERM', onTerminate);
+  const deadline = setTimeout(() => stop('scenario deadline (15 minutes)'), 15 * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
     const s = new Session(browser, gw.origin, label, creds);
@@ -353,24 +438,34 @@ async function main() {
     if (!phases.has(name)) return;
     const t0 = Date.now();
     console.log(`==> ${name}`);
+    ev.activePhase = name;
+    await writeFile(join(OUT, 'evidence.json'), evidenceJson(ev));
     try {
       r[name] = { ok: true, ...(await fn()) };
+      for (const s of sessions) if (s.context) await s.healthy();
     } catch (e) {
-      r[name] = { ok: false, error: String(e?.message ?? e) };
+      r[name] = { ...r[name], ok: false, error: redact(e?.message ?? e), ...(e?.trail && { trail: e.trail }) };
       throw e;
     } finally {
       r[name].ms = Date.now() - t0;
       r[name].at = new Date().toISOString();
+      ev.screenshots = sessions.flatMap(s => s.shots);
+      ev.activePhase = null;
+      await writeFile(join(OUT, 'evidence.json'), evidenceJson(ev));
       console.log(`    ${r[name].ok ? 'ok' : 'FAIL ' + r[name].error}`);
     }
   };
 
   let a, b;
   try {
+    gw = await startGateway(await freePort(), opt.target);
+    browser = await chromium.launch({ headless: !opt.headed });
     await step('badpass', async () => {
       const s = await newSession('A-badpass', A);
       const before = await s.probe();
-      if ((await s.login(`x${A.password}`.slice(0, 12))) !== 1) throw new Error('login control refused');
+      const wrong = (A.password[0] === 'x' ? 'y' : 'x') + A.password.slice(1);
+      privateValues.push(wrong);
+      if ((await s.login(wrong)) !== 1) throw new Error('login control refused');
       // Wait for the notice (0x102 -> MessagePanel) or a state change.
       await s.until('login reply', () => window.clientProbe().socket.lastRecvOpcode === 0x102 ||
         Module._wyd_get_game_state() !== 7, 30000);
@@ -378,6 +473,7 @@ async function main() {
         { text: Module.UTF8ToString(Module._wyd_scene_message_text()) }, 5000);
       await s.shot('badpass');
       const p = await s.probe();
+      await s.healthy();
       await s.close();
       if (p.state !== STATE.SELECT_SERVER) throw new Error(`unexpected state ${p.state}`);
       if (p.socket.lastRecvOpcode !== 0x102) throw new Error(`last opcode 0x${p.socket.lastRecvOpcode.toString(16)}`);
@@ -386,11 +482,85 @@ async function main() {
         noticeTranslated: p.dialect.inTranslated - before.dialect.inTranslated };
     });
 
+    await step('badpin', async () => {
+      // First establish the configured PIN. A wrong first PIN would set it.
+      let s = await newSession('PIN-setup', A);
+      await s.loginToSelect();
+      assert.equal((await s.pin()).result, 'lock1', 'configured PIN rejected');
+      await s.healthy();
+      await s.close();
+      s = await newSession('PIN-negative', A);
+      await s.loginToSelect();
+      const wrong = (A.pin[0] === '0' ? '1' : '0') + A.pin.slice(1);
+      privateValues.push(wrong);
+      assert.equal((await s.pin(wrong)).result, 'lock0', 'wrong PIN unlocked account');
+      assert.equal((await s.probe()).socket.lastRecvOpcode, 0xFDF, 'missing PIN rejection');
+      assert.equal(await s.eval(() => Module._wyd_debug_selchar_enter(0)), 0, 'locked UI allowed entry');
+      await s.shot('rejected');
+      assert.equal((await s.pin()).result, 'lock1', 'correct PIN did not recover');
+      await s.healthy();
+      await s.close();
+      return { rejected: true, lockedEntryRefused: true, correctPinRecovered: true };
+    });
+
+    await step('classes', async () => {
+      const results = [];
+      // One class per invocation (--class), preserving the other characters.
+      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      privateValues.push(name);
+      let s = await newSession(`class${cls}`, A);
+      await s.loginToSelect();
+      assert.equal((await s.pin()).result, 'lock1', 'class PIN rejected');
+      let slots = await s.slots();
+      let slot = slots.findIndex(x => x.name === name);
+      let created = false;
+      if (slot < 0) {
+        assert(slots.some(x => !x.name), 'no empty slot; existing characters preserved');
+        await s.create(name, cls);
+        created = true;
+        slots = await s.slots();
+        slot = slots.findIndex(x => x.name === name);
+      }
+      assert(slot >= 0, 'created character missing');
+      const preview = slots[slot];
+      assert(preview.human === 1 && preview.maxHp > 0 && preview.equip[0] > 0, 'invalid class preview');
+      const me = await s.enter(slot);
+      assert.equal(me.name, name, 'wrong class character entered');
+      assert.equal(me.characterClass, cls, 'protocol class differs from requested class (requires patch 0007)');
+      // CharacterSaveFor deliberately subtracts EquipmentAttributeHP/MP.
+      // Selection shows that flat saved score; Field includes equipment. Compare
+      // each representation with itself after relogin, not flat vs total HP.
+      assert.deepEqual(me.equip, preview.equip.slice(0, 16), 'preview/Field equipment differs');
+      await s.shot('field');
+      await s.healthy();
+      await s.close();
+      s = await newSession(`class${cls}-relogin`, A);
+      await s.loginToSelect();
+      assert.equal((await s.pin()).result, 'lock1', 'relogin PIN rejected');
+      const again = (await s.slots())[slot];
+      checkPreview(again, preview);
+      const relogin = await s.enter(slot);
+      assert.equal(relogin.name, name);
+      assert.equal(relogin.characterClass, cls);
+      assert.equal(relogin.maxHp, me.maxHp, 'Field max HP changed after relogin');
+      assert.deepEqual(relogin.equip, me.equip, 'class equipment changed after relogin');
+      assert.deepEqual(relogin.look, me.look, 'class appearance changed after relogin');
+      checkArmiaSpawn(relogin);
+      await s.shot('field');
+      await s.healthy();
+      await s.close();
+      results.push({ requestedClass: cls, slot, created, preview: { ...preview, name: mask(name) },
+        me: { ...me, name: mask(name) }, relogin: { ...relogin, name: mask(name) }, persisted: true,
+        previewResources: 'flat saved score; excludes equipment attribute HP/MP (CharacterSaveFor)' });
+      return { classes: results };
+    });
+
     await step('login', async () => {
       a = await newSession('A', A);
       await a.loginToSelect();
       const pin = await a.pin();
       if (!pin.already && pin.result !== 'lock1') throw new Error(`PIN rejected (${pin.result})`);
+      a.preview = (await a.slots())[0];
       return { pin, slots: (await a.slots()).map(x => ({ filled: !!x.name, level: x.level })) };
     });
 
@@ -405,6 +575,9 @@ async function main() {
       await a.shot('selchar');
       const s0 = slots[0];
       if (!s0.name) throw new Error('slot 0 still empty');
+      assert.equal(s0.name, A.char, 'slot 0 belongs to another character');
+      assert(s0.human === 1 && s0.maxHp > 0 && s0.equip[0] > 0, 'invalid preview');
+      a.preview = s0;
       return { created, preview: { nameMatches: s0.name === A.char, level: s0.level, maxHp: s0.maxHp, hp: s0.hp,
         str: s0.str, int: s0.int, dex: s0.dex, con: s0.con, equip: s0.equip, human: s0.human } };
     });
@@ -459,6 +632,7 @@ async function main() {
       let slots = await b.slots();
       if (!slots[0].name) { await b.create(B.char, cls); slots = await b.slots(); }
       const me = await b.enter(0);
+      assert.equal(me.name, B.char, 'B entered the wrong character');
       await b.shot('field');
       const p = await b.probe();
       return { pin, me: { ...me, name: mask(me.name) }, dialect: dialectSummary(p) };
@@ -493,21 +667,32 @@ async function main() {
       res.bSawAMove = near(bView1, aMe1) && Math.hypot(aMe1.x - aMe0.x, aMe1.y - aMe0.y) >= 1;
       res.aSawBMove = near(aView1, bMe1) && Math.hypot(bMe1.x - bWalk.from[0], bMe1.y - bWalk.from[1]) >= 1;
       if (!res.bSawAMove || !res.aSawBMove) throw Object.assign(new Error('movement not mirrored'), { res });
+      assert(res.nameAinB && res.nameBinA && res.lookMatches, 'remote identity/equipment mismatch');
+      assert.deepEqual(aView1.look, bMe1.look, 'B equipment differs in A');
       return res;
     });
 
     await step('logout', async () => {
       const lastA = await a.me();
+      const preview = a.preview;
+      await a.healthy();
       await a.close();
       const gone = await b.until('B loses A', id => Module._wyd_field_human_present(id) === 0, 30000, a.id);
       a = await newSession('A2', A);
       await a.loginToSelect();
       const pin = await a.pin();
+      assert.equal(pin.result, 'lock1', 'relogin PIN rejected');
+      checkPreview((await a.slots())[0], preview);
       const me = await a.enter(0);
+      assert.equal(me.name, lastA.name, 'relogin identity changed');
+      assert.deepEqual(me.look, lastA.look, 'relogin equipment changed');
+      assert.deepEqual(me.equip, lastA.equip, 'relogin equipment indices changed');
+      checkArmiaSpawn(me);
       const back = await b.until('B sees A again', id => Module._wyd_field_human_present(id) === 1, 30000, a.id);
       await a.shot('relogin');
       return { despawnSeenByB: gone === true, pin, lastPosition: [lastA.x, lastA.y],
-        reloginPosition: [me.x, me.y], respawnSeenByB: back === true, newId: me.id };
+        reloginPosition: [me.x, me.y], respawnSeenByB: back === true, newId: me.id,
+        persistedPreview: true, persistedLook: true, citySpawn: true };
     });
 
     // Armia -> Armia Field portal (server world/teleport.go: tile block
@@ -515,43 +700,78 @@ async function main() {
     // confirm box (message 16) on the portal; OK sends ReqTeleport.
     await step('mapchange', async () => {
       const onBox = () => a.eval(() => Module._wyd_scene_msgbox_message() === 16);
-      const trail = await a.walkTo(2141.5, 2069.5, { stopWhen: onBox });
+      // B walks next to the portal (outside its tile block) so its view covers
+      // A at the moment of the teleport; otherwise "B loses A" proves nothing.
+      const [trail, bTrail] = await Promise.all([
+        a.walkTo(2141.5, 2069.5, { stopWhen: onBox }),
+        // Position is secondary; the visibility assertion below decides.
+        b.walkTo(2136.5, 2075.5, { near: 4, stallOk: true }),
+      ]);
       const box = await a.until('portal confirm box', () => Module._wyd_scene_msgbox_message() === 16, 20000);
       const before = await a.me();
+      await b.until('B sees A at the portal', id => Module._wyd_field_human_present(id) === 1, 30000, a.id);
       const bSawBefore = await b.other(a.id);
+      assert.equal(bSawBefore.present, 1, 'B does not see A before the teleport');
       await a.shot('portal');
       if ((await a.eval(() => Module._wyd_debug_scene_msgbox_ok())) !== 1) throw new Error('OK refused');
       const after = await a.until('teleported', ([x, y]) => {
         const nx = Module._wyd_field_myhuman_x(), ny = Module._wyd_field_myhuman_y();
-        return Math.hypot(nx - x, ny - y) > 50 && { x: nx, y: ny, mapX: Module._wyd_field_map_x(), mapY: Module._wyd_field_map_y() };
+        return Math.hypot(nx - x, ny - y) > 50 && { x: nx, y: ny };
       }, 60000, [before.x, before.y]);
       await sleep(4000);
+      // Terrain block the client actually loaded (patch 0009). HomeTownX/Y
+      // (_wyd_field_map_x/y) is the character's city and survives a teleport.
+      Object.assign(after, await a.eval(() => ({
+        groundX: Module._wyd_field_ground_index_x(), groundY: Module._wyd_field_ground_index_y(),
+        homeBlockX: Module._wyd_field_map_x(), homeBlockY: Module._wyd_field_map_y() })));
       await a.shot('armia-field');
       const bLost = await b.until('B loses A', id => Module._wyd_field_human_present(id) === 0, 30000, a.id);
       const p = await a.probe();
-      return { clicks: trail.length, portalTile: [before.x, before.y], confirmBox: box === true,
+      checkTeleport(after);
+      return { clicks: trail.length, observerClicks: bTrail.length, observerAt: bTrail.at(-1), portalTile: [before.x, before.y], confirmBox: box === true,
         bSawABeforeTeleport: bSawBefore.present === 1, arrived: after,
         nearArmiaField: Math.hypot(after.x - 2588, after.y - 2096) <= 4, bLostA: bLost === true,
         dialect: dialectSummary(p) };
     });
 
     await step('concurrent', async () => {
+      // B is unnecessary here; keep only the two connections under test alive.
+      if (b?.context) { await b.healthy(); await b.close(); }
       const c = await newSession('A-concurrent', A);
-      await c.login();
-      await c.until('reply', () => Module._wyd_get_game_state() !== 7 || window.clientProbe().socket.lastRecvOpcode !== 0, 30000);
-      await sleep(3000);
+      // dbserver AccountLogin at the pinned SHA has no duplicate-session guard.
+      await c.loginToSelect();
       const second = await c.probe();
       const first = await a.probe();
+      assert.equal(second.state, STATE.SELECT_CHAR, 'duplicate login behavior differs from pinned backend');
+      assert.equal(first.state, STATE.FIELD, 'first session left Field during duplicate login');
+      await a.healthy();
+      await c.healthy();
       await c.shot('concurrent');
       await c.close();
       await sleep(2000);
       const firstAfter = await a.probe();
+      assert.equal(firstAfter.state, STATE.FIELD, 'closing duplicate removed original Field');
+      // Require a new server entity after duplicate close, not a stale Field
+      // image or an assumption that an idle server emits periodic packets.
+      const observer = await newSession('B-after-concurrent', B);
+      await observer.loginToSelect();
+      assert.equal((await observer.pin()).result, 'lock1', 'observer PIN rejected');
+      const observerMe = await observer.enter(0);
+      assert.equal(observerMe.name, B.char, 'wrong observer character');
+      await a.until('original sees observer after duplicate close', id => Module._wyd_field_human_present(id) === 1,
+        30000, observer.id);
+      assert.equal((await a.other(observer.id)).name, B.char, 'stale entity after duplicate close');
+      await a.healthy();
+      await observer.healthy();
+      await observer.close();
       return { secondState: second.state, secondLastRecv: '0x' + second.socket.lastRecvOpcode.toString(16),
-        firstStateDuring: first.state, firstStateAfter: firstAfter.state };
+        firstStateDuring: first.state, firstStateAfter: firstAfter.state,
+        duplicateAccepted: true, originalStillReceives: true,
+        backendLimitation: 'Duplicate account login accepted; shared cargo replaced/released. No inventory mutations tested.' };
     });
     ev.ok = Object.values(r).every(x => x.ok);
   } catch (e) {
-    ev.error = String(e?.message ?? e);
+    ev.error = redact(interrupted ?? e?.message ?? e);
     if (e?.res) ev.partial = e.res;
   } finally {
     for (const s of sessions) {
@@ -559,16 +779,20 @@ async function main() {
     }
     ev.pageErrors = Object.fromEntries(sessions.map(s => [s.label, s.pageErrors]));
     ev.screenshots = sessions.flatMap(s => s.shots);
-    await browser.close();
-    gw.proc.kill();
-    ev.gatewayLog = sanitizeGatewayLog(gw.logs);
+    for (const s of sessions) { try { await s.close(); } catch {} }
+    try { await browser?.close(); } catch (e) {
+      ev.ok = false;
+      ev.cleanupError = redact(e?.message ?? e);
+    } finally { gw?.proc.kill(); }
+    clearTimeout(deadline);
+    process.removeListener('SIGINT', onInterrupt);
+    process.removeListener('SIGTERM', onTerminate);
+    ev.gatewayLog = sanitizeGatewayLog(gw?.logs ?? []);
   }
   // Never let a credential reach the evidence file.
-  let text = JSON.stringify(ev, null, 1);
-  for (const c of [A, B]) for (const v of [c.account, c.password, c.pin, c.char])
-    if (v && text.includes(v)) text = text.split(v).join('<redacted>');
+  const text = evidenceJson(ev);
   // One file per run: a later run must not overwrite an earlier result.
-  const path = join(OUT, `evidence-${ev.when.replace(/[:.]/g, '-')}.json`);
+  const path = join(OUT, 'evidence.json');
   await writeFile(path, text);
   console.log(JSON.stringify({ ok: ev.ok, error: ev.error, evidence: path }, null, 1));
   process.exit(ev.ok ? 0 : 1);

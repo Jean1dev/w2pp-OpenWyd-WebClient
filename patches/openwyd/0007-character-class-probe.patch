@@ -1,0 +1,17 @@
+Read the protocol character class separately from the renderer's mesh class.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -674,6 +674,11 @@ extern "C" WYD_EXPORT int wyd_debug_my_item(int place, int slot) {
+   return -1;
+ }
+ 
++extern "C" WYD_EXPORT int wyd_field_character_class() {
++  if (!g_pObjectManager) return -1;
++  return static_cast<int>(g_pObjectManager->m_stMobData.Class);
++}
++
+ // Other entities in the field, by server id (read-only).
+ static TMHuman* WydFieldHuman(unsigned int id) {
+   if (!g_pObjectManager || !g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)

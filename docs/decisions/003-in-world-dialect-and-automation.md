@@ -44,3 +44,9 @@ Duas outras lacunas:
 - `WydDialectInbound` produz no máximo 260 bytes, abaixo de `WYD_DIALECT_MAX_FRAME`.
 - `tools/protocol/gen_fixtures.py` ganhou 15 fixtures. O overlay Go exige igualdade byte a byte com os encoders reais, e o teste C++ confere campo a campo (364 verificações).
 - As funções `wyd_debug_*` ficam no build de depuração. Antes de uma entrega pública (etapa 8), elas devem ficar atrás de uma flag de build.
+
+## Revisão — 29/09/2026
+
+- **Descartes adiados nas verificações da etapa 4.** A política desta ADR não muda: pacotes não mapeados continuam descartados e contados. Mesmo assim, `checkHealth` (`tools/world_checks.mjs`) passou a tolerar os opcodes de `DEFERRED_INBOUND`, hoje só `0x0367` (combate, etapa 5). A tolerância vale apenas como `inDropUnknown` e até a contagem desses opcodes. Qualquer outro descarte de entrada, qualquer descarte de saída e descartes por tamanho/faixa continuam reprovando. Motivo: o Armia Field transmite combate de mobs, o que tornaria a troca de mapa impossível de aprovar sem mapear gameplay antes da hora. Ao traduzir `0x0367` na etapa 5, o opcode sai da lista.
+- **Novos exports só de leitura:** classe do protocolo (0007), entidade sob o cursor (0008) e bloco de terreno carregado (0009). `_wyd_field_map_x/y` lê `HomeTownX/Y` e **não** indica o mapa atual.
+- **Defeito corrigido (patch 0011):** `wyd_debug_selchar_open_create` acionava o controle 5673, que na seleção abre a confirmação de "Voltar". Agora aciona o 4613 ("Criar", `VisibleSelectCreate(0)`). A criação automatizada nunca dependeu dele, porque aperta 1545 direto. **Confirmado em execução:** a vista de criação abre pelo export, com a câmera nas quatro amostras.

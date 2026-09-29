@@ -1,0 +1,242 @@
+{
+ "when": "2026-09-29T12:37:18.481Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "enter",
+  "concurrent"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 0
+    }
+   ],
+   "ms": 31203,
+   "at": "2026-09-29T12:37:50.819Z"
+  },
+  "enter": {
+   "ok": true,
+   "me": {
+    "id": 1,
+    "name": "Web*******",
+    "x": 2090.5,
+    "y": 2098.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 36,
+    "inPass": 3,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 39,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "glErrors": 0,
+   "ms": 22617,
+   "at": "2026-09-29T12:38:13.438Z"
+  },
+  "concurrent": {
+   "ok": true,
+   "secondState": 5,
+   "secondLastRecv": "0x10a",
+   "firstStateDuring": 0,
+   "firstStateAfter": 0,
+   "duplicateAccepted": true,
+   "originalStillReceives": true,
+   "backendLimitation": "Duplicate account login accepted; shared cargo replaced/released. No inventory mutations tested.",
+   "ms": 252603,
+   "at": "2026-09-29T12:42:26.045Z"
+  }
+ },
+ "ok": true,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "ddb1b7483af1ae01151398664e1211f4199e4d5b",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "field",
+   "file": ".cache/world/2026-09-29T12-37-18-473Z/A-field.png",
+   "sha256": "c1e45f6baf0d89d6a31a154048e1d6adf6af0c1018d0cb6eb283e15639fbd8d2"
+  },
+  {
+   "name": "concurrent",
+   "file": ".cache/world/2026-09-29T12-37-18-473Z/A-concurrent-concurrent.png",
+   "sha256": "2f8a09c30d652a6dd25adec4e34c5f45d59e6dd0bbce0104f4d0dc055241f0b9"
+  }
+ ],
+ "final_A": {
+  "inTranslated": 37,
+  "inPass": 5,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 3,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 42,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "A-concurrent": [],
+  "B-after-concurrent": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-09-29T09:37:19.3754889-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-09-29T09:37:42.4296936-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-29T09:39:37.6965199-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-29T09:40:13.5192055-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 132,
+   "bytes_down": 2008
+  },
+  {
+   "time": "2026-09-29T09:41:35.6744825-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-29T09:42:25.3433529-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 200,
+   "bytes_down": 11460
+  },
+  {
+   "time": "2026-09-29T09:42:26.8326643-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 212,
+   "bytes_down": 11876
+  }
+ ]
+}

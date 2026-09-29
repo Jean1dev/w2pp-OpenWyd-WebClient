@@ -38,15 +38,16 @@ Resultado online no Railway: adaga, elmo, armadura, calça, luvas e botas de cou
 
 A conversão de `ItemList.bin` (140→164 bytes) e `SkillData.bin` (96→104) já era feita por `tools/import_local_assets.py`. O diagnóstico em execução confirmou os campos: 1115 `Armadura_de_Couro(A)`, `nPos` 4, grau 3, ícone 756.
 
-### Armadura “escurecida”: medido, sem correção
+### Armadura escurecida: causa real e correção (29/09/2026)
 
-- **Textura:** o personagem usa `mesh\ch010302.wys` e as demais partes `ch010[2-6]02.wys`, legend 3 e multi 0. A textura é couro vermelho gasto, com média de 126/69/64 na parte vermelha e uma faixa de cota de malha escura. O ícone é uma ilustração mais viva e não serve de referência de cor.
-- **Brilho no Field:** a armadura renderizada tem cerca de 50% do brilho da textura (≈ 64/42/36).
-- **Fórmula do shader original:** para essa malha, o shader de skin usa `c7 = ambiente×0,25 + emissiva 0,3` e `c8 = difusa 1,0`, com luz fixa (−1, 1, 1), estágio `MODULATE` e cor do vértice limitada a 1. Isso é compatível com a medida, então a diferença não foi classificada como defeito.
-- **Hipóteses descartadas:**
-  - o modo linear `uLinearColor` da camada compat foi testado ligado e desligado, sem diferença na cena;
-  - a rampa de gama do cliente clássico (`SetGammaRamp`, fator brilho×0,02) é ignorada pela camada web, mas o `Config.bin` do operador tem brilho 49 (fator 0,98).
-- **Pendente:** captura de referência do cliente Windows no mesmo ponto para decidir.
+**Confirmado em execução:** capturas do operador na vista de criação de personagem mostraram, no `WYD.exe` 7662, armaduras douradas e, no cliente web, as mesmas armaduras quase pretas com filetes dourados. A medição anterior (≈50% de brilho, compatível com o shader) estava incompleta. Ela olhou só a cor do vértice e não o estágio 1 de textura.
+
+- **Medição por probe de pixel** (`wyd_d3d9_trace_*`), na mesma cena, com as quatro amostras (`legend=3`, `multi=9`, skin com 2–4 influências): estágio 0 `MODULATE2X` (textura × difusa), estágio 1 `D3DTOP_MODULATEALPHA_ADDCOLOR` (op 18) com `effect/multi009.wys`. A textura da armadura tem alfa 0 em grande parte (ex.: `t0=227,163,24,0`), e a difusa também tem alfa 0.
+- **Defeito:** a camada compat implementava op 18 como `Arg1.RGB × Arg1.A + Arg2.RGB` e op 19 como `Arg1.RGB + Arg1.A × Arg2.RGB`, ou seja, as fórmulas trocadas. Pelo D3D9, op 18 é `Arg1.RGB + Arg1.A × Arg2.RGB` e op 19 (`MODULATECOLOR_ADDALPHA`) é `Arg1.RGB × Arg2.RGB + Arg1.A`. Com alfa 0, a cor base era zerada e sobrava só o `multi009`, quase preto.
+- **Correção:** `patches/openwyd/0010-texture-op-modulatealpha-addcolor.patch`, nas três cópias de `applyColorOp` (FFP, ator nativo, cor nativa). As ops 20 e 21 foram conferidas e já estavam corretas.
+- **Depois:** a mesma cena mostra armaduras douradas e saia vermelha, como na captura do `.exe`. O Field offline mostra o couro vermelho na cor da textura. Capturas em `.cache/world/2026-09-29T13-05-22-837Z` (antes) e `…T13-09-52-079Z` (depois); ficam fora do Git por conterem assets.
+- **Ainda não comparado:** pose e ângulo das armas das amostras diferem entre as capturas. É provável que seja fase de animação, mas isso é **hipótese**. Brilho exato não foi medido pixel a pixel contra o `.exe`, porque as capturas têm resolução e janela diferentes.
+- **Achado lateral:** o export `wyd_debug_selchar_open_create` (patch 0004) aciona o controle 5673, que na seleção abre a confirmação de "Voltar". O botão "Criar" é o 4613. A criação automatizada não é afetada, porque aperta o 1545 direto. A abertura da vista para o probe usou clique real no botão. Corrigido depois pelo patch 0011; o export abre a vista (execução `.cache/world/2026-09-29T13-20-39-561Z`).
 
 ## Lacuna de conteúdo
 

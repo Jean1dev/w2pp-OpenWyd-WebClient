@@ -1,0 +1,45 @@
+D3DTOP_MODULATEALPHA_ADDCOLOR (18) and MODULATECOLOR_ADDALPHA (19) had swapped formulas: legend armour
+(stage 1 op 18 over texture alpha 0) rendered almost black instead of the base colour plus glow.
+
+diff --git a/webclient/client-wasm/compat/src/win32_emscripten_stubs.cpp b/webclient/client-wasm/compat/src/win32_emscripten_stubs.cpp
+--- a/webclient/client-wasm/compat/src/win32_emscripten_stubs.cpp
++++ b/webclient/client-wasm/compat/src/win32_emscripten_stubs.cpp
+@@ -9552,8 +9552,10 @@
+   if (op == 14) return a1 * uTextureFactor.a + a2 * (1.0 - uTextureFactor.a);
+   if (op == 15) return min(a1 + a2 * (1.0 - texel.a), vec4(1.0));
+   if (op == 16) return a1 * currentColor.a + a2 * (1.0 - currentColor.a);
+-  if (op == 18) return vec4(min(a1.rgb * a1.a + a2.rgb, vec3(1.0)), currentColor.a);
+-  if (op == 19) return vec4(min(a1.rgb + a2.rgb * a1.a, vec3(1.0)), currentColor.a);
++  // D3DTOP_MODULATEALPHA_ADDCOLOR: Arg1.RGB + Arg1.A * Arg2.RGB.
++  if (op == 18) return vec4(min(a1.rgb + a2.rgb * a1.a, vec3(1.0)), currentColor.a);
++  // D3DTOP_MODULATECOLOR_ADDALPHA: Arg1.RGB * Arg2.RGB + Arg1.A.
++  if (op == 19) return vec4(min(a1.rgb * a2.rgb + a1.aaa, vec3(1.0)), currentColor.a);
+   if (op == 20) return vec4(min((vec3(1.0) - a1.aaa) * a2.rgb + a1.rgb, vec3(1.0)), currentColor.a);
+   if (op == 21) return vec4(min((vec3(1.0) - a1.rgb) * a2.rgb + a1.aaa, vec3(1.0)), currentColor.a);
+   if (op == 24) {
+@@ -12423,8 +12425,10 @@
+   if (op == 14) return a1 * uTextureFactor.a + a2 * (1.0 - uTextureFactor.a);
+   if (op == 15) return min(a1 + a2 * (1.0 - texel.a), vec4(1.0));
+   if (op == 16) return a1 * currentColor.a + a2 * (1.0 - currentColor.a);
+-  if (op == 18) return vec4(min(a1.rgb * a1.a + a2.rgb, vec3(1.0)), currentColor.a);
+-  if (op == 19) return vec4(min(a1.rgb + a2.rgb * a1.a, vec3(1.0)), currentColor.a);
++  // D3DTOP_MODULATEALPHA_ADDCOLOR: Arg1.RGB + Arg1.A * Arg2.RGB.
++  if (op == 18) return vec4(min(a1.rgb + a2.rgb * a1.a, vec3(1.0)), currentColor.a);
++  // D3DTOP_MODULATECOLOR_ADDALPHA: Arg1.RGB * Arg2.RGB + Arg1.A.
++  if (op == 19) return vec4(min(a1.rgb * a2.rgb + a1.aaa, vec3(1.0)), currentColor.a);
+   if (op == 20) return vec4(min((vec3(1.0) - a1.aaa) * a2.rgb + a1.rgb, vec3(1.0)), currentColor.a);
+   if (op == 21) return vec4(min((vec3(1.0) - a1.rgb) * a2.rgb + a1.aaa, vec3(1.0)), currentColor.a);
+   if (op == 24) {
+@@ -13772,8 +13776,10 @@
+   if (op == 14) return a1 * uTextureFactor.a + a2 * (1.0 - uTextureFactor.a);
+   if (op == 15) return min(a1 + a2 * (1.0 - texel.a), vec4(1.0));
+   if (op == 16) return a1 * currentColor.a + a2 * (1.0 - currentColor.a);
+-  if (op == 18) return vec4(min(a1.rgb * a1.a + a2.rgb, vec3(1.0)), currentColor.a);
+-  if (op == 19) return vec4(min(a1.rgb + a2.rgb * a1.a, vec3(1.0)), currentColor.a);
++  // D3DTOP_MODULATEALPHA_ADDCOLOR: Arg1.RGB + Arg1.A * Arg2.RGB.
++  if (op == 18) return vec4(min(a1.rgb + a2.rgb * a1.a, vec3(1.0)), currentColor.a);
++  // D3DTOP_MODULATECOLOR_ADDALPHA: Arg1.RGB * Arg2.RGB + Arg1.A.
++  if (op == 19) return vec4(min(a1.rgb * a2.rgb + a1.aaa, vec3(1.0)), currentColor.a);
+   if (op == 20) return vec4(min((vec3(1.0) - a1.aaa) * a2.rgb + a1.rgb, vec3(1.0)), currentColor.a);
+   if (op == 21) return vec4(min((vec3(1.0) - a1.rgb) * a2.rgb + a1.aaa, vec3(1.0)), currentColor.a);
+   if (op == 24) {

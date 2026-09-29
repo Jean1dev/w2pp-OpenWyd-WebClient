@@ -1,0 +1,58 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, redactEvidence } from './world_checks.mjs';
+
+test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
+  const value = { error: 'fixture-secret', nested: ['prefix fixture-secret suffix'], x: 123456 };
+  const clean = redactEvidence(value, ['fixture-secret', '123456']);
+  assert.deepEqual(JSON.parse(JSON.stringify(clean)), {
+    error: '<redacted>', nested: ['prefix <redacted> suffix'], x: 123456,
+  });
+});
+
+const options = phases => ({ target: 'localhost:8281', 'client-version': '12000', class: '0', phases });
+test('rejects incomplete, unknown and duplicate scenarios before connecting', () => {
+  for (const phases of ['', 'logout', 'login,enter,mapchange', 'login,enter,typo', 'login,login'])
+    assert.throws(() => validateOptions(options(phases)));
+  assert.doesNotThrow(() => validateOptions(options('login,enter,second,logout')));
+  assert.doesNotThrow(() => validateOptions(options('badpin,classes')));
+  assert.throws(() => validateOptions({ ...options('login'), class: '4' }));
+  assert.throws(() => validateOptions({ ...options('login'), 'client-version': '12000junk' }));
+});
+test('health fails on rejected packets, graphics errors and offline scenes', () => {
+  const p = { glErrorTotal: 0, placeholder: 0, state: 0, field: { fixture: 0 }, dialect: {
+    inDropUnknown: 0, inDropSize: 0, inDropRange: 0, outDropUnknown: 0,
+    outDropSize: 0, outDropRange: 0, outDropNoVersion: 0 } };
+  checkHealth(p);
+  for (const k of Object.keys(p.dialect))
+    assert.throws(() => checkHealth({ ...p, dialect: { ...p.dialect, [k]: 1 } }));
+  assert.throws(() => checkHealth({ ...p, glErrorTotal: 1 }));
+  assert.throws(() => checkHealth({ ...p, field: { fixture: 1 } }));
+  assert.throws(() => checkHealth(p, ['runtime error']));
+});
+test('only listed deferred gameplay opcodes may be dropped, and only as unknown', () => {
+  const dialect = { inDropUnknown: 1, inDropSize: 0, inDropRange: 0, outDropUnknown: 0,
+    outDropSize: 0, outDropRange: 0, outDropNoVersion: 0 };
+  const p = d => ({ glErrorTotal: 0, placeholder: 0, state: 0, field: { fixture: 0 }, dialect: { ...dialect, ...d } });
+  checkHealth(p({ droppedIn: [{ opcode: '0x0367', times: 1 }] }));
+  assert.throws(() => checkHealth(p({ droppedIn: [{ opcode: '0x0333', times: 1 }] })));
+  assert.throws(() => checkHealth(p({ droppedIn: [] })));
+  assert.throws(() => checkHealth(p({ inDropUnknown: 2, droppedIn: [{ opcode: '0x0367', times: 1 }] })));
+  assert.throws(() => checkHealth(p({ inDropSize: 1, droppedIn: [{ opcode: '0x0367', times: 2 }] })));
+  assert.throws(() => checkHealth(p({ outDropUnknown: 1, droppedIn: [{ opcode: '0x0367', times: 1 }] })));
+});
+test('persistence compares stable data and permits regenerated HP', () => {
+  const before = { name: 'fixture', level: 1, maxHp: 100, maxMp: 50,
+    str: 12, int: 12, dex: 12, con: 12, hp: 30, equip: [1, 1103] };
+  checkPreview({ ...before, hp: 100 }, before);
+  assert.throws(() => checkPreview({ ...before, equip: [1, 0] }, before));
+  assert.throws(() => checkPreview({ ...before, str: 0 }, before));
+});
+test('spawn and teleport use server bounds, not proximity to an arbitrary previous point', () => {
+  checkArmiaSpawn({ x: 2086.5, y: 2107.5 });
+  checkArmiaSpawn({ x: 2083.5, y: 2090.5 });
+  assert.throws(() => checkArmiaSpawn({ x: 2104.5, y: 2100.5 }));
+  checkTeleport({ x: 2590.5, y: 2098.5, groundX: 20, groundY: 16 });
+  assert.throws(() => checkTeleport({ x: 2600, y: 2096, groundX: 20, groundY: 16 }));
+  assert.throws(() => checkTeleport({ x: 2588.5, y: 2096.5, groundX: 16, groundY: 16 }));
+});

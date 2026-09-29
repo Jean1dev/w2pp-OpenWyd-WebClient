@@ -1,6 +1,6 @@
 # Progresso
 
-Atualização: 28/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN, criação de personagem e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento uma da outra pelo servidor. Relogin observado pela segunda sessão, troca de mapa, login concorrente, cliente Windows e gameplay ainda não foram provados.
+Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. Cliente Windows e gameplay ainda não foram provados.
 
 | Etapa | Estado | Evidência |
 |---|---|---|
@@ -15,9 +15,13 @@ Atualização: 28/09/2026. O cliente web, via gateway próprio, faz no tm-server
 
 ## Próxima ação
 
-1. Etapa 4: rodar `node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --env-file .env` com memória livre, para cobrir as fases `logout`, `mapchange` e `concurrent`. A última execução completa foi encerrada pelo Claude Code por falta de memória na máquina. Depois, testar PIN errado e as outras classes, e seguir o roteiro com o cliente Windows ([evidências](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente)).
-2. Etapa 5 (`prompts/05-gameplay.md`): mapear chat (`0333/0334`), combate (`0367/039D/039E`), itens, loja, banco, troca e grupo. Continuam descartados e contados.
+1. Etapa 4 — fechar:
+   - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente)); é o único critério de aceite ainda sem evidência;
+   - rodar a suíte completa `npm run world` uma vez, de ponta a ponta (hoje só há cenários independentes, todos confirmados em [29/09](evidence/04-login-mundo/2026-09-29.md));
+   - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
+2. Etapa 5 (`prompts/05-gameplay.md`): mapear chat (`0333/0334`), combate (`0367/039D/039E`), itens, loja, banco, troca e grupo. Continuam descartados e contados; ao traduzir `0367`, removê-lo de `DEFERRED_INBOUND`.
 3. Fechar a etapa 3 (CNFNew/Delete e AccountSecure já têm prova ponta a ponta; falta DeleteCharacter) e a etapa 1 (consumidores ainda assinalados na [matriz](compatibility.md)).
+4. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
 
@@ -134,5 +138,30 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
 - **Ícones de item (mesma data):** o conjunto 526 usava células fixas de 100 px (atlas de 1000 px da base 769), mas os atlas 7662 têm 350 px. O patch `0006-item-icon-atlas.patch` calcula a célula pela largura do atlas; ícones e sobreposição de grau estão corretos online. `tools/apply_openwyd_patches.py` passou a verificar a pilha de patches inteira, porque o 0006 altera contexto que o 0004 adiciona.
 - **Armadura escurecida:** a medida é compatível com a fórmula do shader original (≈50% da textura). Os modos linear e gama foram descartados. Sem captura de referência do cliente Windows, não houve alteração ([evidências](evidence/02-build/README.md#armadura-escurecida-medido-sem-correção)).
 - **Limitações:** não há teste unitário isolado do leitor, nem arquivo real de 528 bytes para exercitar esse ramo. A detecção foi validada só com os dados 7662. Firefox e comparação lado a lado com o cliente Windows continuam pendentes.
+
+### 29/09/2026 — etapa 4: relogin, mapa, concorrência, PIN e classes
+
+- **Ambiente:** Railway `tm-server`, deploy `9016864a…`, commit do servidor `98286fdf…`, `ClientVersion=12000`. Contas A/B de `.env`. Cenários rodados um por vez, em processos separados, com 8 GB de RAM.
+- **Arquivos:**
+  - alterados: `tools/verify_world.mjs`, `package.json`, `tools/capture_world_logs.py` (timeout de leitura 60→180 s), README da etapa 4;
+  - novos: `tools/world_checks.mjs` e `.test.mjs`, `tools/verify_world_suite.mjs`, `tools/capture_world_logs.py`, `tools/tcp_relay.mjs`, patches 0007–0009 (probes de leitura) e evidências de 29/09.
+- **Resultados confirmados em execução:** senha incorreta e PIN errado são recusados e o correto recupera o acesso; classes 0–3 com persistência; movimento e relogin observados por B; troca de mapa Armia → Armia Field (`0x0290`, terreno 20,16, B vê A no portal e depois o perde); login concorrente aceito pelo backend, com a sessão original preservada. Logs do servidor sanitizados correlacionados. Regressões: `world:checks` com 6 testes, `scene`, `client:stream` e `protocol:dialect` com 364 verificações, todos verdes. Codec não mudou, então vetores e fragmentação não foram reexecutados.
+- **Decisões:**
+  - `checkHealth` tolera apenas o descarte, já previsto na ADR 003, de `0x0367` (combate, etapa 5), registrado na evidência;
+  - o probe `_wyd_field_map_x/y` lê `HomeTownX/Y` e não prova mudança de mapa, por isso passa a valer o bloco de terreno (patch 0009).
+- **Limitações:**
+  - suíte completa não rodada de ponta a ponta, só cenários independentes;
+  - cliente Windows não executado (exige GUI do operador), mas relé e `serverlist.bin` foram verificados;
+  - login duplicado sem proteção no backend (entrega separada no servidor, não feita);
+  - só Chromium headless.
+- **Próximo passo:** roteiro Windows × web pelo operador; depois a etapa 5.
+
+### 29/09/2026 — cores das armaduras (comparação com o `.exe`)
+
+- **Pedido do usuário:** capturas do `WYD.exe` (correto) e do cliente web na vista de criação de personagem; armaduras escuras no web.
+- **Causa confirmada em execução:** `D3DTOP_MODULATEALPHA_ADDCOLOR`/`MODULATECOLOR_ADDALPHA` com fórmulas trocadas na camada compat. Corrigido no patch 0010 ([evidências](evidence/02-build/README.md#armadura-escurecida-causa-real-e-correção-29092026)). Isso encerra a pendência "armadura escurecida" de 28/09.
+- **Verificação:** probe de pixel antes/depois na cena real (Railway, conta B, sem criar personagem). `scene`, `client:stream`, `protocol:dialect` (364) e `world:checks` (6) verdes após religar o WASM.
+- **Pendências:** pose das armas das amostras (hipótese: fase de animação).
+- **`open_create` (mesma data):** patch 0011 troca o controle 5673 ("Voltar") pelo 4613 ("Criar"). O export abre a vista de criação no Railway. `scene`, `client:stream`, `protocol:dialect` e `world:checks` verdes após religar.
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

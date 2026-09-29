@@ -1,0 +1,21 @@
+wyd_debug_selchar_open_create pressed control 5673 ("Voltar" confirmation in the selection view); the "Criar" button is 4613.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -524,11 +524,13 @@
+   return scene->OnControlEvent(66433, 0);
+ }
+ 
+-// Opens the creation view (control 5673), as the "create" button does.
++// Opens the creation view as the "Criar" button does: control 4613 runs
++// VisibleSelectCreate(0) (CreCamAction). 5673 is "Voltar": in the selection
++// view it asks to return to server selection.
+ extern "C" WYD_EXPORT int wyd_debug_selchar_open_create() {
+   TMSelectCharScene* scene = WydSelectCharScene();
+   if (!scene || g_AccountLock != 1) return 0;
+-  return scene->OnControlEvent(5673, 0);
++  return scene->OnControlEvent(4613, 0);
+ }
+ 
+ // Picks the class sample, types the name into edit 4626 and presses create

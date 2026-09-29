@@ -58,7 +58,15 @@ A tabela está em [compatibility.md](../../compatibility.md#tradução-acrescent
 
 ## 3. Roteiro manual para o cliente Windows 7662 (pendente)
 
-Pré-requisitos: cliente 7662 do operador apontado para o mesmo tm-server, com a porta TCP do Railway, e as contas A e B de `.env`.
+Pré-requisitos: cliente 7662 do operador apontado para o mesmo tm-server e as contas A e B de `.env`.
+
+O `serverlist.bin` da cópia do operador (`Client-aws`, SHA-256 `ee979675…`) aponta todos os canais para `127.0.0.1:8281`; o `serverlist.txt` da mesma pasta (192.168.0.103) está desatualizado. **Confirmado em execução (29/09):** decodificado com a chave legada do `Basedef.cpp`. O tmserver responde ao `GET /serv00.htm` na porta de jogo (`world/edge.go`), então basta um relé TCP de loopback, sem regra de jogo, até o destino do operador:
+
+```
+node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950   # escuta só em 127.0.0.1:8281
+```
+
+Pelo relé, `curl http://127.0.0.1:8281/serv00.htm` devolveu `200` do Railway. O relé registra apenas abertura/fechamento e contagem de bytes.
 
 1. **Windows contra web:** A no navegador (`npm run dev`), B no cliente Windows.
 2. **Login e entrada:** logar B, digitar o PIN e entrar no Field.
@@ -74,7 +82,7 @@ Resultado esperado: os mesmos opcodes do log acima, sem `version mismatch` para 
 
 ```
 npm run protocol:vectors          # tabela, vetores, overlay Go (transporte + dialeto)
-npm run protocol:dialect          # patches 0001..0004 + teste C++ wasm32 (364 verificações)
+npm run protocol:dialect          # patches 0001..0011 + teste C++ wasm32 (364 verificações)
 npm run gateway:test
 # runtime: build_tmproject_wasm_objects.py + link_tmproject_wasm_startup.py (docs/setup.md)
 npm run scene                     # regressão da etapa 2
@@ -86,10 +94,9 @@ npx -y @railway/cli@5.63.1 logs -p <projeto> -e production -s tm-server --since 
 
 ## Limites
 
-- **Fases não executadas até o fim:** logout/relogin com a segunda sessão observando, troca de mapa e login concorrente. Rodar de novo quando houver memória livre; cada fase pode rodar sozinha com `--phases`, mas `logout`, `mapchange` e `concurrent` precisam de `login,enter,second` antes. Duas instâncias Chromium com WebGL em software consomem muita memória.
+- **Fases executadas em 29/09** (relogin, troca de mapa, concorrência, PIN errado e as quatro classes): ver [continuidade](2026-09-29.md). Cada fase roda sozinha com `--phases`; `logout`, `mapchange` e `concurrent` precisam de `login,enter,second` (ou `login,enter` para `concurrent`).
 - **Só Chromium headless**, cerca de 1 quadro/s. Firefox e cliente Windows não foram testados.
 - **Automação por export:** PIN, criação e entrada usam exports que chamam os controles originais. O clique 3D na amostra de classe e no slot é substituído por atribuição do alvo. O movimento usa cliques reais.
-- **PIN errado** (`0xFDF`) e as outras três classes não foram exercitados.
 - **Hipóteses mantidas:** `Tab`→`Nick` no `CreateMobTrade` e `Hold`→`FakeExp` no `UpdateEtc`.
 - **Classe no runtime:** `m_nClass` do runtime vale 1 para um personagem criado com classe 0. É a classe de malha do `TMHuman`, não a classe do personagem; o servidor registrou `class=0`.
 - **Terreno:** as capturas das execuções desta etapa são anteriores ao patch 0005 (catálogos de textura); depois dele o Field online aparece texturizado. Ver [etapa 2](../02-build/README.md).

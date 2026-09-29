@@ -127,4 +127,4 @@ Decisões no [ADR 003](decisions/003-in-world-dialect-and-automation.md). As fix
 | S→C | `0181` 28, `0182` 24, `0337` 48, `0166` 16, `018B` 16 | repassa se o tamanho for exato (`static_assert` dos offsets) | unitário |
 | C→S | `0290` ReqTeleport 16, `0291` ChangeCity 16 | repassa se o tamanho for exato; o servidor lê só o header | unitário; teleporte no Railway (ver evidências) |
 
-Continuam descartados e contados: chat `0333/0334`, combate `0367/039D/039E`, itens/loja/banco/troca/grupo e os demais opcodes da matriz acima. Isso é trabalho da etapa 5.
+Continuam descartados e contados: chat `0333/0334`, combate `0367/039D/039E`, itens/loja/banco/troca/grupo e os demais opcodes da matriz acima. Isso é trabalho da etapa 5. As verificações da etapa 4 toleram apenas o descarte de `0367` recebido no Field ([ADR 003, revisão 29/09](decisions/003-in-world-dialect-and-automation.md#revisão--29092026)).
