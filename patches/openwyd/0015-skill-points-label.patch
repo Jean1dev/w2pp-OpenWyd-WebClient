@@ -1,0 +1,21 @@
+Skill window: show SkillBonus in the "Pontos" label.
+
+TMFieldScene formats ScoreBonus and SpecialBonus into szStr and then writes
+szStr to both m_pSpBonus and m_pSkBonus, so the skill window showed the
+special points (6 for a level-4 Foema) instead of the free skill points the
+server sent in MSG_UpdateEtc (12). Display only; no packet or rule changes.
+
+diff --git a/Projects/TMProject/TMFieldScene.cpp b/Projects/TMProject/TMFieldScene.cpp
+--- a/Projects/TMProject/TMFieldScene.cpp
++++ b/Projects/TMProject/TMFieldScene.cpp
+@@ -13447,6 +13447,10 @@ void TMFieldScene::UpdateScoreUI(unsigned int unFlag)
+ 		sprintf(szStr, "%d", pMobData->SpecialBonus);
+ 		if (m_pSpBonus)
+ 			m_pSpBonus->SetText(szStr, 0);
++
++		// The skill window's "Pontos" showed SpecialBonus: format SkillBonus
++		// (MSG_UpdateEtc, the server's derived free skill points) for it.
++		sprintf(szStr, "%d", pMobData->SkillBonus);
+ 		if (m_pSkBonus)
+ 			m_pSkBonus->SetText(szStr, 0);
+ 

@@ -1,0 +1,69 @@
+Read-only probes for the stage 5 skill scenario: skill master window
+visibility, the skills the server listed, where each is drawn (so the harness
+clicks it with the real mouse), the recorded master NPC and the free skill
+points from MSG_UpdateEtc. Nothing here sends a packet or selects an item.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -19,6 +19,7 @@
+ #include "TMSelectCharScene.h"
+ #include "TMSelectServerScene.h"
+ #include "TMFieldScene.h"
++#include "SGrid.h"
+ #include "TMSkinMesh.h"
+ 
+ #include <cstring>
+@@ -847,6 +848,52 @@ extern "C" WYD_EXPORT double wyd_field_my_exp() {
+   return g_pObjectManager ? static_cast<double>(g_pObjectManager->m_stMobData.Exp) : -1.0;
+ }
+ 
++// Skill master window (stage 5 skills, read-only). A click on a class-master
++// NPC sends 0x027B and records the NPC in m_dwMerchantID; the server's ShopType
++// 3 list fills m_pGridSkillMaster. The harness reads which skills are offered
++// and where each is drawn, then clicks it with the real mouse (SGrid.cpp
++// GRID_SKILLM -> box 4 -> ApplyBonus). Nothing here sends or selects.
++static SGridControl* WydSkillMasterGrid() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return nullptr;
++  return static_cast<TMFieldScene*>(g_pCurrentScene)->m_pGridSkillMaster;
++}
++
++extern "C" WYD_EXPORT int wyd_field_skillmaster_visible() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return 0;
++  auto* f = static_cast<TMFieldScene*>(g_pCurrentScene);
++  return f->m_pSkillMPanel && f->m_pSkillMPanel->IsVisible() ? 1 : 0;
++}
++
++extern "C" WYD_EXPORT unsigned int wyd_field_skillmaster_merchant() {
++  SGridControl* g = WydSkillMasterGrid();
++  return g ? g->m_dwMerchantID : 0;
++}
++
++// Item slot k (0..127) of the grid: its item index (5000+skill), 0 if empty.
++extern "C" WYD_EXPORT int wyd_field_skillmaster_item(int k) {
++  SGridControl* g = WydSkillMasterGrid();
++  if (!g || k < 0 || k >= 128 || !g->m_pItemList[k] || !g->m_pItemList[k]->m_pItem) return 0;
++  return g->m_pItemList[k]->m_pItem->sIndex;
++}
++
++// Center of slot k's icon as last drawn (SGridControl::FrameMove2 lays the
++// skill icon out in m_GCObj; m_GCEnable is only the cooldown mask), in canvas
++// pixels (which = 0 x, 1 y); -1 if the slot is empty or not laid out yet.
++extern "C" WYD_EXPORT int wyd_field_skillmaster_item_screen(int k, int which) {
++  SGridControl* g = WydSkillMasterGrid();
++  if (!g || k < 0 || k >= 128 || !g->m_pItemList[k]) return -1;
++  const GeomControl& gc = g->m_pItemList[k]->m_GCObj;
++  if (gc.nWidth <= 0 || gc.nHeight <= 0) return -1;
++  return static_cast<int>(which == 0 ? gc.nPosX + gc.nWidth / 2 : gc.nPosY + gc.nHeight / 2);
++}
++
++// Free skill points as the server last sent them (MSG_UpdateEtc SkillBonus).
++extern "C" WYD_EXPORT int wyd_field_my_skill_bonus() {
++  return g_pObjectManager ? g_pObjectManager->m_stMobData.SkillBonus : -1;
++}
++
+ extern "C" int wyd_start_client() {
+   wchar_t empty_cmdline[] = L"";
+   return wWinMain(reinterpret_cast<HINSTANCE>(1), nullptr, empty_cmdline, 1);

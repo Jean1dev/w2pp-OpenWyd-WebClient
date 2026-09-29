@@ -14,7 +14,7 @@ export function redactEvidence(value, secrets) {
 }
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
-  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'concurrent'];
+  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -28,13 +28,23 @@ export function validateOptions(opt) {
   assert(new Set(names).size === names.length, 'duplicate phase');
   const phases = new Set(names);
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
-    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], concurrent: ['enter'] };
+    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
     assert(phases.has(dep), `${name} requires ${dep}`);
   // death takes A through the portal and needs B waiting at the Armia spawn;
   // mapchange/attack move B away (attack also closes it).
   for (const other of ['mapchange', 'attack'])
     assert(!(phases.has('death') && phases.has(other)), `death cannot run with ${other}`);
+  // grind enters the --class character itself, alone (one game page).
+  for (const own of ['grind', 'learn']) {
+    if (!phases.has(own)) continue;
+    for (const other of phases)
+      assert(['login', 'grind', 'learn'].includes(other), `${own} runs only with login/grind/learn (got ${other})`);
+  }
+  if (phases.has('grind')) {
+    assert(/^\d+$/.test(opt['grind-level'] ?? '') && Number(opt['grind-level']) >= 2 &&
+      Number(opt['grind-level']) <= 20, '--grind-level must be 2..20');
+  }
   return phases;
 }
 
@@ -130,4 +140,37 @@ export function checkRespawn(d) {
   if (d.before.level < 35) assert.equal(d.after.exp, d.before.exp, 'EXP lost below the level-35 gate');
   else assert(d.after.exp <= d.before.exp, 'EXP rose on death');
   assert(d.observer?.sawRespawn, 'B did not see A back in the city');
+}
+
+// Leveling by real combat: every kill is a target the server took to 0 HP and
+// paid EXP for; level only rises through the server's level-up (mobkilled.go).
+export function checkGrind(g) {
+  assert(g.kills.length > 0, 'no kill');
+  for (const k of g.kills) {
+    assert(k.hpTrail.at(-1) <= 0 || k.gone, `kill ${k.id} without HP 0`);
+    assert(k.hpTrail.length >= 2 && k.hpTrail[0] > k.hpTrail.at(-1), `kill ${k.id} without damage`);
+    assert(k.exp1 > k.exp0, `kill ${k.id} paid no EXP`);
+  }
+  assert(g.end.exp > g.start.exp, 'EXP did not rise');
+  assert(g.end.level >= g.start.level, 'level fell');
+  assert(!g.died, 'grinding character died');
+}
+
+// Learning a skill from the class master (skill.go learnSkill). The client
+// only asks: NPC click (0x027B) -> server ShopType 3 list -> box 4 -> ApplyBonus
+// BonusType 2 (Detail = 5000+idx, TargetID = master). The learned bit and the
+// spent points are the server's (MSG_UpdateEtc), and must survive a relogin.
+export function checkLearn(l) {
+  const bit = (l.skill - 5000) % 24;
+  const cls = Math.floor((l.skill - 5000) / 24);
+  assert(l.offered.includes(l.skill), 'skill not offered by the master');
+  assert(l.offered.every(i => i >= 5000 + cls * 24 && i < 5024 + cls * 24), 'master offered another class');
+  assert.equal(l.merchant, l.npc, 'runtime recorded another merchant');
+  assert.equal(l.box, 4, 'learn box did not open');
+  assert.equal((l.before.learned >>> bit) & 1, 0, 'skill already learned before');
+  assert.equal((l.after.learned >>> bit) & 1, 1, 'server did not set the learned bit');
+  assert.equal(l.after.learned & ~(1 << bit), l.before.learned & ~(1 << bit), 'other learned bits changed');
+  assert.equal(l.before.bonus - l.after.bonus, l.cost, 'skill points not charged by the cost');
+  assert.equal((l.relogin.learned >>> bit) & 1, 1, 'learned bit lost on relogin');
+  assert.equal(l.relogin.bonus, l.after.bonus, 'skill points differ after relogin');
 }

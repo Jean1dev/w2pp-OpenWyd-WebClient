@@ -1,0 +1,393 @@
+{
+ "when": "2026-09-29T21:17:26.776Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "grind"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 0
+    }
+   ],
+   "ms": 31381,
+   "at": "2026-09-29T21:17:58.910Z"
+  },
+  "grind": {
+   "ok": false,
+   "class": 1,
+   "slot": 1,
+   "want": 4,
+   "start": {
+    "level": 1,
+    "exp": 0
+   },
+   "kills": [
+    {
+     "id": 1037,
+     "hpTrail": [
+      36,
+      0
+     ],
+     "exp0": 0,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 274,
+     "level": 1
+    },
+    {
+     "id": 1031,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 274,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 548,
+     "level": 1
+    },
+    {
+     "id": 1036,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 548,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 822,
+     "level": 1
+    },
+    {
+     "id": 1030,
+     "hpTrail": [
+      70,
+      32,
+      0
+     ],
+     "exp0": 822,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 1096,
+     "level": 1
+    },
+    {
+     "id": 1031,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 1096,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 1370,
+     "level": 2
+    },
+    {
+     "id": 1030,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 1370,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 1597,
+     "level": 2
+    },
+    {
+     "id": 1030,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 1597,
+     "clicks": 2,
+     "gone": false,
+     "exp1": 1824,
+     "level": 2
+    },
+    {
+     "id": 1036,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 1824,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 2051,
+     "level": 3
+    },
+    {
+     "id": 1037,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 2051,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 2222,
+     "level": 3
+    },
+    {
+     "id": 1030,
+     "hpTrail": [
+      70,
+      30,
+      0
+     ],
+     "exp0": 2222,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 2393,
+     "level": 3
+    },
+    {
+     "id": 1038,
+     "hpTrail": [
+      70,
+      31,
+      0
+     ],
+     "exp0": 2393,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 2564,
+     "level": 3
+    },
+    {
+     "id": 1032,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 2564,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 2735,
+     "level": 4
+    }
+   ],
+   "rests": 0,
+   "died": false,
+   "trip": {
+    "route": "Armia east / generators 27..30",
+    "clicks": 28,
+    "at": {
+     "id": 1,
+     "name": "<redacted>",
+     "x": 2184.5,
+     "y": 2106.5,
+     "hp": 105,
+     "maxHp": 105,
+     "cls": 2,
+     "characterClass": 1,
+     "equip": [
+      11,
+      1251,
+      1265,
+      1277,
+      1289,
+      1301,
+      816,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "look": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      815
+     ]
+    }
+   },
+   "end": {
+    "level": 4,
+    "exp": 2735,
+    "hp": 108,
+    "maxHp": 108
+   },
+   "reached": true,
+   "skillPoints": 12,
+   "error": "protocol rejection: inbound opcode outside the deferred list\n+ actual - expected\n\n+ [\n+   {\n+     opcode: '0x036a',\n+     times: 3\n+   }\n+ ]\n- []\n",
+   "ms": 677893,
+   "at": "2026-09-29T21:29:25.240Z"
+  }
+ },
+ "ok": false,
+ "node": "v22.16.0",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "1d7310c7bb3ee5aa74b995fd93723ee2b0fdcc05",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-09-29T21:17:59.395Z",
+   "freeMiB": 1505,
+   "totalMiB": 8014,
+   "browserMiB": 877,
+   "pages": {
+    "A": {
+     "wasmMiB": 150,
+     "jsMiB": 468
+    }
+   }
+  },
+  {
+   "point": "end grind",
+   "at": "2026-09-29T21:29:25.826Z",
+   "freeMiB": 1308,
+   "totalMiB": 8014,
+   "browserMiB": 981,
+   "pages": {
+    "A": {
+     "wasmMiB": 259,
+     "jsMiB": 468
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "grind-end",
+   "file": ".cache/world/2026-09-29T21-17-26-768Z/A-grind-end.png",
+   "sha256": "92dfa92d199706a344adf13262329c8226f62236329a77338383bec8bf49cb50"
+  }
+ ],
+ "error": "protocol rejection: inbound opcode outside the deferred list\n+ actual - expected\n\n+ [\n+   {\n+     opcode: '0x036a',\n+     times: 3\n+   }\n+ ]\n- []\n",
+ "final_A": {
+  "inTranslated": 335,
+  "inPass": 950,
+  "inDropUnknown": 15,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 26,
+  "outPass": 56,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 1300,
+  "droppedIn": [
+   {
+    "opcode": "0x5000",
+    "times": 12
+   },
+   {
+    "opcode": "0x036a",
+    "times": 3
+   }
+  ],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-09-29T18:17:27.3772582-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-09-29T18:17:48.2515429-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-29T18:29:33.5015346-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 5724,
+   "bytes_down": 104232
+  }
+ ]
+}

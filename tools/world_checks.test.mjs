@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, redactEvidence } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
   const value = { error: 'fixture-secret', nested: ['prefix fixture-secret suffix'], x: 123456 };
@@ -105,4 +105,35 @@ test('death and respawn require server death, recall packets, city spawn and an 
   // Above the gate the server may subtract EXP, never add it.
   checkRespawn({ ...ok, before: { level: 40, exp: 1000 }, after: { ...ok.after, level: 40, exp: 900 } });
   assert.throws(() => checkRespawn({ ...ok, before: { level: 40, exp: 1000 }, after: { ...ok.after, level: 40, exp: 1001 } }));
+});
+
+test('grinding needs server-paid kills and runs alone with login', () => {
+  const g = { kills: [{ id: 1040, hpTrail: [70, 3, 0], exp0: 0, exp1: 274 }],
+    start: { level: 1, exp: 0 }, end: { level: 1, exp: 274 }, died: false };
+  checkGrind(g);
+  for (const bad of [{ kills: [] }, { died: true }, { end: { level: 1, exp: 0 } }, { end: { level: 0, exp: 274 } }])
+    assert.throws(() => checkGrind({ ...g, ...bad }));
+  for (const k of [{ hpTrail: [70, 70] }, { hpTrail: [70, 20] }, { exp1: 0 }])
+    assert.throws(() => checkGrind({ ...g, kills: [{ ...g.kills[0], ...k }] }));
+  const opts = p => ({ ...options(p), class: '1', 'grind-level': '4' });
+  assert.doesNotThrow(() => validateOptions(opts('login,grind')));
+  for (const p of ['grind', 'login,enter,grind', 'login,enter,second,grind'])
+    assert.throws(() => validateOptions(opts(p)));
+  for (const lvl of ['1', '21', 'x', undefined])
+    assert.throws(() => validateOptions({ ...opts('login,grind'), 'grind-level': lvl }));
+});
+
+test('learning needs the master list, box 4, the server bit and charged points that persist', () => {
+  const l = { skill: 5024, cost: 12, npc: 1100, merchant: 1100, box: 4,
+    offered: [5024, 5025, 5026, 5047],
+    before: { learned: 0, bonus: 12 }, after: { learned: 1, bonus: 0 }, relogin: { learned: 1, bonus: 0 } };
+  checkLearn(l);
+  for (const bad of [{ offered: [5025] }, { offered: [5024, 5000] }, { merchant: 1101 }, { box: 11 },
+    { before: { learned: 1, bonus: 12 } }, { after: { learned: 0, bonus: 0 } }, { after: { learned: 3, bonus: 0 } },
+    { after: { learned: 1, bonus: 6 } }, { relogin: { learned: 0, bonus: 0 } }, { relogin: { learned: 1, bonus: 12 } }])
+    assert.throws(() => checkLearn({ ...l, ...bad }));
+  const opts = p => ({ ...options(p), class: '1', 'grind-level': '4' });
+  assert.doesNotThrow(() => validateOptions(opts('login,learn')));
+  assert.doesNotThrow(() => validateOptions(opts('login,grind,learn')));
+  assert.throws(() => validateOptions(opts('login,enter,learn')));
 });

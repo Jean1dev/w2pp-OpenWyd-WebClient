@@ -8,14 +8,14 @@ Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (combate básico e morte/respawn aprovados) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (combate básico, morte/respawn e aprender skill aprovados) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Pendente | — |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
 
 ## Próxima ação
 
-1. Etapa 5 — próximas fatias de gameplay: máscara `LearnedSkill` das classes para decidir as skills, depois chat `0333/0334`, itens, loja, banco, grupo, troca e persistência. Combate básico com relogin e morte/respawn já aprovados. Rodar os cenários online como processo separado (`Start-Process`), por causa da memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
+1. Etapa 5 — próximas fatias de gameplay: usar a Flecha Mágica aprendida em combate (barra de atalhos, `MSG_Attack` com `SkillIndex 24`); depois chat `0333/0334`, itens, loja, banco, grupo, troca e persistência. Combate básico com relogin e morte/respawn já aprovados. Rodar os cenários online como processo separado (`Start-Process`), por causa da memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar:
    - repetir `npm run world` completo com o trajeto novo até o portal (a execução de 29/09 falhou só na caminhada da `mapchange`);
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
@@ -273,5 +273,26 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
   - execução 2 aprovada: HP 105→0, `0x03AE`/`0x0289` nos logs do servidor, HP 2 no spawn de Armia, EXP intacta, B vê A voltar, protocolo limpo.
 - **Limites:** B não observa a morte em si; o OK da caixa usa o export de automação; perda de EXP acima do nível 35 e PvP não foram exercitados.
 - **Próximo passo:** skills (máscara `LearnedSkill` das classes).
+
+### 29/09/2026 — etapa 5: skills (subir de nível e aprender)
+
+- **Pedido do usuário:** seguir para skills. Decisão do usuário: upar a Foema da conta A por combate real.
+- **Arquivos:**
+  - `client/dialect/WydDialect.cpp` e `tools/protocol/dialect_test.cpp`: `0x027B`, `0x0277`, `0x017C` e `0x036A`;
+  - patches `0013-skill-master-probes`, `0014-skill-master-merchant-id` e `0015-skill-points-label`;
+  - `tools/verify_world.mjs`: fases `grind` e `learn`, opção `--grind-level`;
+  - `tools/world_checks{,.test}.mjs`: `checkGrind`, `checkLearn` e regras de fases;
+  - `tools/capture_world_logs.py`: `shop opened` e `skill learned` no filtro;
+  - evidências `docs/evidence/05-gameplay/2026-09-29-{skills,grind-*,learn-*}`.
+- **Confirmado em teste:** `protocol:dialect` 447/0, `world:checks` 11/0, `client:stream` verde, WASM certificado com 0 indefinidos.
+- **Confirmado em execução (Railway):**
+  - grind: 12 abates, nível 1→4, EXP 0→2735;
+  - learn: NPC 12474 (Merchant 19), Flecha Mágica aprendida, pontos 12→0, preservada no relogin; logs `shop opened` e `skill learned`.
+- **Falhas registradas:** saúde (`0x036A`), rota bloqueada, NPC errado (a loja comum funcionou) e geometria da célula. Todas foram corrigidas.
+- **Limites:**
+  - a skill ainda não foi usada em combate;
+  - as outras classes exigem nível 6–8;
+  - a Foema da conta A agora tem nível 4 e a skill 24.
+- **Próximo passo:** usar a skill em combate.
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

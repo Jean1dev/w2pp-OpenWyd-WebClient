@@ -483,6 +483,35 @@ static void TestAttack()
 	CHECK(WydDialectStatValue(WYD_STAT_IN_DROP_SIZE) == 6);
 	CHECK(WydDialectStatValue(WYD_STAT_IN_DROP_UNKNOWN) == 0);
 
+	// Motion as protocol/motion.go EncodeMotion writes it (level up: 14/3?).
+	{
+		unsigned char mo[20] = {20, 0, 0, 0, 0x6A, 0x03};
+		mo[12] = 14; mo[14] = 3; // Motion, Parm; NotUsed @16 zero
+		char in[WYD_DIALECT_MAX_FRAME];
+		int inSize = 0;
+		CHECK(WydDialectInbound(reinterpret_cast<char*>(mo), 20, in, sizeof(in), &inSize) == WYD_DIALECT_PASS);
+		MSG_Motion m;
+		std::memcpy(&m, mo, sizeof(m));
+		CHECK(m.Motion == 14 && m.Parm == 3 && m.Direction == 0.0f);
+		CHECK(WydDialectInbound(reinterpret_cast<char*>(mo), 16, in, sizeof(in), &inSize) == WYD_DIALECT_DROP);
+	}
+	// ShopList built at the server's offsets passes and reads back in the runtime struct.
+	{
+		unsigned char shop[236] = {};
+		shop[0] = 236 & 0xFF; shop[1] = 236 >> 8; shop[4] = 0x7C; shop[5] = 0x01;
+		shop[12] = 3;                                   // ShopType 3 (skill master)
+		shop[16] = 5024 & 0xFF; shop[17] = 5024 >> 8;   // List[0].sIndex
+		shop[16 + 26 * 8] = 5047 & 0xFF; shop[17 + 26 * 8] = 5047 >> 8; // List[26]
+		shop[232] = 7;                                  // Tax
+		char in[WYD_DIALECT_MAX_FRAME];
+		int inSize = 0;
+		CHECK(WydDialectInbound(reinterpret_cast<char*>(shop), 236, in, sizeof(in), &inSize) == WYD_DIALECT_PASS);
+		MSG_ShopList sl;
+		std::memcpy(&sl, shop, sizeof(sl));
+		CHECK(sl.ShopType == 3 && sl.List[0].sIndex == 5024 && sl.List[26].sIndex == 5047 && sl.Tax == 7);
+		CHECK(WydDialectInbound(reinterpret_cast<char*>(shop), 232, in, sizeof(in), &inSize) == WYD_DIALECT_DROP);
+	}
+
 	// Outbound: runtime structs over non-zero padding.
 	char wire[WYD_DIALECT_MAX_FRAME];
 	MSG_Attack a;
@@ -544,6 +573,30 @@ static void TestAttack()
 	char reqMob[16] = {16, 0, 0, 0, 0x69, 0x03};
 	CHECK(WydDialectOutbound(reqMob, 16, wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
 	CHECK(WydDialectOutbound(reqMob, 12, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	// NPC shop and skill learning pass unchanged at their exact runtime sizes.
+	MSG_REQShopList reqShop{};
+	reqShop.Header.Size = sizeof(reqShop);
+	reqShop.Header.Type = 0x27B;
+	reqShop.TargetID = 1234;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&reqShop), sizeof(reqShop), wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&reqShop), 14, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	MSG_ApplyBonus bonus{};
+	bonus.Header.Size = sizeof(bonus);
+	bonus.Header.Type = 0x277;
+	bonus.BonusType = 2;
+	bonus.Detail = 5024;
+	bonus.TargetID = 1234;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&bonus), sizeof(bonus), wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&bonus), 18, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	// Offsets as the server encodes them (protocol/shop.go, messages.go),
+	// read back through the runtime structs.
+	{
+		const unsigned char* rb = reinterpret_cast<const unsigned char*>(&bonus);
+		CHECK(rb[12] == 2 && rb[13] == 0 && rb[14] == (5024 & 0xFF) && rb[15] == (5024 >> 8) &&
+			rb[16] == (1234 & 0xFF) && rb[17] == (1234 >> 8));
+		const unsigned char* rs = reinterpret_cast<const unsigned char*>(&reqShop);
+		CHECK(rs[12] == (1234 & 0xFF) && rs[13] == (1234 >> 8));
+	}
 	// SetShortSkill (Skill[20]) passes unchanged at its exact size only.
 	char shortSkill[32] = {32, 0, 0, 0, 0x78, 0x03};
 	shortSkill[12] = 7;

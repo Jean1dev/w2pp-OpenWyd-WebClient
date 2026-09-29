@@ -10,10 +10,12 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 |---|---|---|
 | Dialeto `0367/039D/039E` (entrada/saída) | confirmado em teste e em execução | C++ com 435 verificações; overlay Go com `MsgAttackBody.Encode/Decode` reais (`attack_*`). Saída pelo tamanho (168/80/72 → N 13/2/1), opcode preservado: o corpo a corpo envia `0x039D` com 168 bytes |
 | `0289` Restart, `0369` ReqMobByID, `03AE`, `0378` SetShortSkill (saída) | confirmado em teste | C++ (tamanho exato; tamanho errado é descartado) |
+| `027B`/`0277` (saída), `017C` ShopList e `036A` Motion (entrada) | confirmado em teste e em execução | layouts idênticos, tamanho exato; [skills](2026-09-29-skills.md) |
 | `5000` Exp_Msg_Panel_ (entrada) | diferido | customizado do servidor, sem handler no runtime; Exp chega pelo eco de ataque. Em `DEFERRED_INBOUND` |
 | Ataque básico: A acerta um mob, B vê, relogin | **confirmado em execução** | [execução 7](2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados): Gremlin HP 70→0, Exp 274→548, B vê o mesmo, relogin preserva equipamento/nível/Exp, protocolo limpo |
 | Morte e respawn (`03AE` → `0289`) | **confirmado em execução** | [morte e respawn](2026-09-29-death-respawn.md): A morre para os Trolls (HP 105→0), caixa 11, `0x03AE`/`0x0289`, revive com HP 2 no spawn de Armia, EXP intacta, B vê A voltar |
-| Skills das quatro classes | pendente | `LearnedSkill` passa a ser registrado pelo cenário (export 0012); a máscara inicial vem dos templates de classe do conteúdo do servidor, ausentes do checkout |
+| Skills: subir de nível e aprender | **confirmado em execução** (Foema) | [skills](2026-09-29-skills.md): 12 Gremlins até o nível 4; Flecha Mágica aprendida no mestre com cliques reais, pontos 12→0, preservada no relogin |
+| Skills: usar em combate; outras classes | pendente | barra de atalhos e `MSG_Attack` com `SkillIndex`; Huntress, Transknight e BeastMaster exigem níveis 6–8 |
 | Inventário, drop, loja, banco, teleporte, chat, grupo, troca e persistência | pendente | fatias seguintes |
 
 ## Execuções de 29/09/2026 (cenário `login,enter,second,attack`)
@@ -49,9 +51,11 @@ Detalhes em [2026-09-29-basic-combat.md](2026-09-29-basic-combat.md). Critérios
 ## Comandos
 
 ```powershell
-npm run protocol:dialect      # 435 verificações
+npm run protocol:dialect      # 447 verificações
 npm run protocol:vectors      # inclui TestExtDialect{Inbound,Outbound}/attack_*
-npm run world:checks          # 9 testes (checkCombat, checkCombatRelogin, checkRespawn, DEFERRED_INBOUND = {0x5000})
+npm run world:checks          # 11 testes (checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, DEFERRED_INBOUND = {0x5000})
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,attack
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,death
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,grind --class 1 --grind-level 4
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,learn --class 1
 ```

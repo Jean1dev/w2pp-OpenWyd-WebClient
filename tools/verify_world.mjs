@@ -16,6 +16,8 @@
 //   logout    A closes; B loses A. A logs in again and B sees A again
 //   mapchange A walks onto the Armia -> Armia Field portal and confirms; B loses A
 //   attack    A and B walk to Armia's Gremlins; A attacks, B watches, then A relogs
+//   grind     the --class character of A kills Gremlins until --grind-level (server EXP)
+//   learn     the --class character learns its cheapest skill from the class master
 //   death     A dies to the Armia Field Trolls, returns to town (box 11, 0x03AE/0x0289); B at the spawn sees it
 //   concurrent A's account logs in a second time while A is in the Field
 //
@@ -31,7 +33,7 @@ import { resolve, join } from 'node:path';
 import { freemem, totalmem } from 'node:os';
 import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, redactEvidence } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -50,6 +52,7 @@ const { values: opt } = parseArgs({
     'env-file': { type: 'string' },
     phases: { type: 'string', default: 'badpass,login,create,enter,second,move,logout,mapchange,concurrent' },
     'class': { type: 'string', default: '0' },
+    'grind-level': { type: 'string', default: '4' },
     headed: { type: 'boolean', default: false },
   },
 });
@@ -602,7 +605,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = phases.has('attack') || phases.has('death') ? 25 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn'].some(x => phases.has(x)) ? 25 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -929,6 +932,162 @@ async function main() {
         bSawABeforeTeleport: bSawBefore.present === 1, arrived: after,
         nearArmiaField: Math.hypot(after.x - 2588, after.y - 2096) <= 4, bLostA: bLost === true,
         dialect: dialectSummary(p) };
+    });
+
+    // Stage 5, skills: level the --class character of account A by real combat
+    // until it has the points its cheapest skill costs (skill.go
+    // deriveSkillBonus: level*3). Level-ups are the server's (mobkilled.go);
+    // progress persists, so a phase cut by the deadline resumes on the next run.
+    await step('grind', async () => {
+      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      privateValues.push(name);
+      const slot = (await a.slots()).findIndex(x => x.name === name);
+      assert(slot >= 0, `class ${cls} character missing`);
+      await a.enter(slot);
+      const want = Number(opt['grind-level']);
+      const s0 = await a.combat(0);
+      const res = { class: cls, slot, want, start: { level: s0.myLevel, exp: s0.exp }, kills: [], rests: 0, died: false };
+      r.grind = res;
+      console.log(`    class ${cls} level ${s0.myLevel} exp ${s0.exp} -> want level ${want}`);
+      if (s0.myLevel < want) res.trip = await a.toGremlinField();
+      // Leave time for the evidence and a clean logout inside the deadline.
+      const end = Date.now() + 19 * 60000;
+      const tried = new Set();
+      while (Date.now() < end) {
+        const s = await a.combat(0);
+        if (s.myLevel >= want) break;
+        if (s.myDie === 1 || s.myHp <= 0) { res.died = true; break; }
+        // Regenerate between fights instead of dying to the next Gremlin.
+        if (s.myHp < s.myMaxHp * 0.5) { res.rests++; await sleep(6000); continue; }
+        const mob = (await a.mobs()).find(m => m.name.trim() === 'Gremlin' && m.onScreen && m.hp > 0 && !tried.has(m.id));
+        if (!mob) { await a.walk(res.kills.length % 2 ? -160 : 160, 80); tried.clear(); continue; }
+        tried.add(mob.id);
+        const c0 = await a.combat(mob.id);
+        const k = { id: mob.id, hpTrail: [c0.hp], exp0: c0.exp, clicks: 0, gone: false };
+        let lastClick = 0;
+        const fightEnd = Date.now() + 60000;
+        while (Date.now() < fightEnd) {
+          const c = await a.combat(mob.id);
+          if (c.myDie === 1 || c.myHp <= 0) { res.died = true; break; }
+          if (!c.present) { k.gone = true; break; }
+          if (c.hp !== k.hpTrail.at(-1)) k.hpTrail.push(c.hp);
+          if (c.die === 1 || c.hp <= 0) break;
+          if (Date.now() - lastClick > 6000) { if (await a.clickHuman(mob.id)) k.clicks++; lastClick = Date.now(); }
+          await sleep(1000);
+        }
+        await sleep(2000);
+        const c1 = await a.combat(mob.id);
+        k.exp1 = c1.exp;
+        k.level = c1.myLevel;
+        if (res.died) break;
+        // Only server-paid kills count; a Gremlin that walked away is skipped.
+        if (k.exp1 > k.exp0) {
+          res.kills.push(k);
+          console.log(`    kill ${res.kills.length}: Gremlin ${k.id} HP ${k.hpTrail.join(',')} exp ${k.exp0}->${k.exp1} level ${k.level}`);
+          await writeFile(join(OUT, 'evidence.json'), evidenceJson(ev));
+        }
+      }
+      const s1 = await a.combat(0);
+      res.end = { level: s1.myLevel, exp: s1.exp, hp: s1.myHp, maxHp: s1.myMaxHp };
+      res.reached = s1.myLevel >= want;
+      res.skillPoints = s1.myLevel * 3; // server-derived rule; spent points not visible here
+      await a.shot('grind-end');
+      if (res.start.level < want) checkGrind(res);
+      assert(res.reached, `level ${s1.myLevel} of ${want} after ${res.kills.length} kills (run again to continue)`);
+      return res;
+    });
+
+    // Stage 5, skills: the --class character learns its cheapest skill from the
+    // class master with real clicks (the NPC, then the skill in the master's
+    // grid). The server decides and charges (skill.go learnSkill); the client
+    // only sends 0x027B and ApplyBonus. Masters from NPCGener.txt at the locked
+    // revision; the list the NPC actually sends is what the check trusts.
+    await step('learn', async () => {
+      // route: HeightMap + AttributeMap of the locked revision (same search as
+      // the east gate); the straight line north of the spawn is blocked.
+      const PLANS = { 1: { skill: 5024, name: 'Flecha_Magica', cost: 12, master: [2094, 2126], npcName: /foema|ancia/i,
+        route: [[2088.5, 2111.5], [2088.5, 2116.5], [2090.5, 2122.5]] } };
+      const plan = PLANS[cls];
+      assert(plan, `no learn plan for class ${cls}`);
+      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      privateValues.push(name);
+      const enterOwn = async s => {
+        const slot = (await s.slots()).findIndex(x => x.name === name);
+        assert(slot >= 0, `class ${cls} character missing`);
+        return s.enter(slot);
+      };
+      if ((await a.eval(() => Module._wyd_get_game_state())) !== 0) await enterOwn(a);
+      const read = s => s.eval(() => ({ learned: Module._wyd_field_my_score(6) >>> 0,
+        bonus: Module._wyd_field_my_skill_bonus(), level: Module._wyd_field_my_score(4) }));
+      const before = await read(a);
+      console.log(`    level ${before.level}, ${before.bonus} skill points, learned 0x${before.learned.toString(16)}`);
+      assert(before.bonus >= plan.cost, `${before.bonus} skill points at level ${before.level}; ${plan.name} costs ${plan.cost}`);
+      const walk = [];
+      for (const [x, y] of plan.route) walk.push(...await a.walkTo(x, y, { near: 2, stallOk: true }));
+      const at = await a.me();
+      // By name: a plain merchant stands next to the master (first run clicked
+      // it and got ShopType 1). The generator name is Foema_Ancian.
+      const near = (await a.mobs()).filter(m => Math.hypot(m.x - at.x, m.y - at.y) <= 15);
+      const npc = near.find(m => plan.npcName.test(m.name));
+      assert(npc, `class master not in view from ${at.x},${at.y}: ${near.map(m => `${m.id} ${m.name.trim()} ${m.x},${m.y}`).join('; ')}`);
+      let visible = false;
+      const clicks = [];
+      for (let i = 0; i < 3 && !visible; i++) {
+        const hit = await a.clickHuman(npc.id);
+        clicks.push({ hit, lastSent: await a.eval(() => window.clientProbe().socket.lastSentOpcode) });
+        if (!hit) continue;
+        try { visible = await a.until('skill master window', () => Module._wyd_field_skillmaster_visible() === 1, 15000); }
+        catch { visible = false; }
+      }
+      await a.shot('master-click');
+      assert(visible, `skill master window did not open (at ${at.x},${at.y}, npc ${npc.id} at ${npc.x},${npc.y}, clicks ${JSON.stringify(clicks)})`);
+      await a.frames(3);
+      const offered = await a.eval(() => {
+        const o = [];
+        for (let k = 0; k < 128; k++) { const i = Module._wyd_field_skillmaster_item(k); if (i) o.push(i); }
+        return o;
+      });
+      const merchant = await a.eval(() => Module._wyd_field_skillmaster_merchant());
+      await a.shot('skill-master');
+      const k = offered.length ? await a.eval(sk => {
+        for (let k = 0; k < 128; k++) if (Module._wyd_field_skillmaster_item(k) === sk) return k;
+        return -1;
+      }, plan.skill) : -1;
+      assert(k >= 0, `master did not offer ${plan.skill} (offered ${offered.join(',')})`);
+      const [sx, sy, cw, ch] = await a.eval(k => {
+        const c = document.getElementById('canvas');
+        return [Module._wyd_field_skillmaster_item_screen(k, 0), Module._wyd_field_skillmaster_item_screen(k, 1), c.width, c.height];
+      }, k);
+      assert(sx >= 0 && sy >= 0, 'skill cell not laid out');
+      // Real left click on the drawn cell (SGridControl GRID_SKILLM -> box 4).
+      const cb = await a.page.locator('#canvas').boundingBox();
+      await a.page.mouse.move(cb.x + sx * cb.width / cw, cb.y + sy * cb.height / ch, { steps: 3 });
+      await a.frames(2);
+      await a.page.mouse.down();
+      try { await a.frames(2); } finally { await a.page.mouse.up(); }
+      await a.frames(2);
+      const box = await a.eval(() => Module._wyd_scene_msgbox_message());
+      await a.shot('learn-box');
+      assert.equal(box, 4, `learn box did not open (box ${box}, cursor cell ${sx},${sy})`);
+      assert.equal(await a.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'OK refused');
+      const bit = (plan.skill - 5000) % 24;
+      await a.until('learned bit from the server', b => ((Module._wyd_field_my_score(6) >>> b) & 1) === 1, 20000, bit);
+      await sleep(2000);
+      const after = await read(a);
+      console.log(`    learned 0x${after.learned.toString(16)}, ${after.bonus} skill points left`);
+      await a.page.keyboard.press('Escape');
+      await a.healthy();
+      await a.close();
+      a = await newSession('A-learn-relogin', A);
+      await a.loginToSelect();
+      assert.equal((await a.pin()).result, 'lock1', 'relogin PIN rejected');
+      await enterOwn(a);
+      const relogin = await read(a);
+      const res = { skill: plan.skill, name: plan.name, cost: plan.cost, npc: npc.id, npcAt: [npc.x, npc.y],
+        walkClicks: walk.length, merchant, offered, box, before, after, relogin };
+      r.learn = res;
+      checkLearn(res);
+      return res;
     });
 
     // Stage 5, slice 2: A dies to the Armia Field Trolls (the portal route that
