@@ -8,14 +8,14 @@ Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (combate básico, morte/respawn e aprender skill aprovados) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (combate básico, morte/respawn, aprender e usar skill aprovados) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Pendente | — |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
 
 ## Próxima ação
 
-1. Etapa 5 — próximas fatias de gameplay: usar a Flecha Mágica aprendida em combate (barra de atalhos, `MSG_Attack` com `SkillIndex 24`); depois chat `0333/0334`, itens, loja, banco, grupo, troca e persistência. Combate básico com relogin e morte/respawn já aprovados. Rodar os cenários online como processo separado (`Start-Process`), por causa da memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
+1. Etapa 5 — próximas fatias de gameplay: skills das outras classes (nível 6–8) e de área, buff e cura; depois chat `0333/0334`, itens, loja, banco, grupo, troca e persistência. Combate básico com relogin e morte/respawn já aprovados. Rodar os cenários online como processo separado (`Start-Process`), por causa da memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar:
    - repetir `npm run world` completo com o trajeto novo até o portal (a execução de 29/09 falhou só na caminhada da `mapchange`);
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
@@ -294,5 +294,17 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
   - as outras classes exigem nível 6–8;
   - a Foema da conta A agora tem nível 4 e a skill 24.
 - **Próximo passo:** usar a skill em combate.
+
+### 29/09/2026 — etapa 5: usar a skill em combate
+
+- **Arquivos:** patch `0016-skill-belt-probes`; `tools/verify_world.mjs` (fase `cast`, `clickHuman` com botão direito); `tools/world_checks{,.test}.mjs` (`checkCast`); evidências `2026-09-29-cast-passed*`.
+- **Confirmado em teste:** `world:checks` 12/0; WASM certificado com 0 indefinidos; `client:stream` verde.
+- **Confirmado em execução (Railway):**
+  - Flecha Mágica atribuída pelo gesto original (`S`, mouse, Shift+1) com `0x0378` enviado;
+  - slot 0 selecionado com a tecla `1`; clique direito no Gremlin;
+  - MP 110→105 (servidor), HP 70→16;
+  - logs: `recv 0x0378` e `recv 0x039d len=56`.
+- **Limites:** outras classes; skills de área, buff e cura; comparação visual da barra com o cliente Windows.
+- **Próximo passo:** skills das outras classes, ou as fatias seguintes (chat, itens, loja, banco, grupo, troca).
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

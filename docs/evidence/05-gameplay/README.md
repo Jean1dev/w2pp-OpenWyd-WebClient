@@ -15,7 +15,8 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 | Ataque básico: A acerta um mob, B vê, relogin | **confirmado em execução** | [execução 7](2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados): Gremlin HP 70→0, Exp 274→548, B vê o mesmo, relogin preserva equipamento/nível/Exp, protocolo limpo |
 | Morte e respawn (`03AE` → `0289`) | **confirmado em execução** | [morte e respawn](2026-09-29-death-respawn.md): A morre para os Trolls (HP 105→0), caixa 11, `0x03AE`/`0x0289`, revive com HP 2 no spawn de Armia, EXP intacta, B vê A voltar |
 | Skills: subir de nível e aprender | **confirmado em execução** (Foema) | [skills](2026-09-29-skills.md): 12 Gremlins até o nível 4; Flecha Mágica aprendida no mestre com cliques reais, pontos 12→0, preservada no relogin |
-| Skills: usar em combate; outras classes | pendente | barra de atalhos e `MSG_Attack` com `SkillIndex`; Huntress, Transknight e BeastMaster exigem níveis 6–8 |
+| Skills: usar em combate | **confirmado em execução** (Foema) | [skills](2026-09-29-skills.md#uso-da-skill-em-combate): Flecha Mágica na barra (Shift+1, `0x0378`), clique direito no Gremlin, MP 110→105 cobrado pelo servidor, HP 70→16 |
+| Skills das outras classes, área, buff e cura | pendente | Huntress, Transknight e BeastMaster exigem nível 6–8 |
 | Inventário, drop, loja, banco, teleporte, chat, grupo, troca e persistência | pendente | fatias seguintes |
 
 ## Execuções de 29/09/2026 (cenário `login,enter,second,attack`)
@@ -53,9 +54,10 @@ Detalhes em [2026-09-29-basic-combat.md](2026-09-29-basic-combat.md). Critérios
 ```powershell
 npm run protocol:dialect      # 447 verificações
 npm run protocol:vectors      # inclui TestExtDialect{Inbound,Outbound}/attack_*
-npm run world:checks          # 11 testes (checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, DEFERRED_INBOUND = {0x5000})
+npm run world:checks          # 12 testes (checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, DEFERRED_INBOUND = {0x5000})
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,attack
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,death
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,grind --class 1 --grind-level 4
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,learn --class 1
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,cast --class 1
 ```

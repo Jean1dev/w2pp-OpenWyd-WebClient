@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
   const value = { error: 'fixture-secret', nested: ['prefix fixture-secret suffix'], x: 123456 };
@@ -136,4 +136,17 @@ test('learning needs the master list, box 4, the server bit and charged points t
   assert.doesNotThrow(() => validateOptions(opts('login,learn')));
   assert.doesNotThrow(() => validateOptions(opts('login,grind,learn')));
   assert.throws(() => validateOptions(opts('login,enter,learn')));
+});
+
+test('casting needs the belt, the selected slot, server-charged MP and damage', () => {
+  const c = { cls: 1, pos: 0, skill: 24, cell: 5024, belt: 24, slot: 0, selected: 0,
+    attacksSent: 2, echoes: 3, mpTrail: [110, 104, 106], hpTrail: [70, 40], died: false };
+  checkCast(c);
+  for (const bad of [{ cell: 5025 }, { belt: 255 }, { selected: 1 }, { attacksSent: 0 }, { echoes: 0 },
+    { mpTrail: [110, 110] }, { mpTrail: [110] }, { hpTrail: [70, 70] }, { died: true }])
+    assert.throws(() => checkCast({ ...c, ...bad }));
+  const opts = p => ({ ...options(p), class: '1', 'grind-level': '4' });
+  assert.doesNotThrow(() => validateOptions(opts('login,cast')));
+  assert.doesNotThrow(() => validateOptions(opts('login,learn,cast')));
+  assert.throws(() => validateOptions(opts('login,enter,cast')));
 });

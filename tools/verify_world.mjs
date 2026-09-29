@@ -18,6 +18,7 @@
 //   attack    A and B walk to Armia's Gremlins; A attacks, B watches, then A relogs
 //   grind     the --class character of A kills Gremlins until --grind-level (server EXP)
 //   learn     the --class character learns its cheapest skill from the class master
+//   cast      the --class character assigns its learned skill (hover + Shift+1) and casts it on a Gremlin
 //   death     A dies to the Armia Field Trolls, returns to town (box 11, 0x03AE/0x0289); B at the spawn sees it
 //   concurrent A's account logs in a second time while A is in the Field
 //
@@ -33,7 +34,7 @@ import { resolve, join } from 'node:path';
 import { freemem, totalmem } from 'node:os';
 import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -514,7 +515,7 @@ class Session {
 
   // A real click on an entity: hover until the runtime's own pick reports it
   // under the cursor, then press. The scene builds and sends the attack.
-  async clickHuman(id) {
+  async clickHuman(id, button = 'left') {
     await this.closePanels();
     const box = await this.page.locator('#canvas').boundingBox();
     for (let attempt = 0; attempt < 4; attempt++) {
@@ -528,8 +529,8 @@ class Session {
         await this.page.mouse.move(box.x + sx * box.width / cw, box.y + (sy + oy) * box.height / ch, { steps: 3 });
         await this.frames(2);
         if ((await this.eval(() => Module._wyd_field_hover_human_id())) !== id) continue;
-        await this.page.mouse.down();
-        try { await this.frames(2); } finally { await this.page.mouse.up(); }
+        await this.page.mouse.down({ button });
+        try { await this.frames(2); } finally { await this.page.mouse.up({ button }); }
         await this.frames(1);
         return true;
       }
@@ -605,7 +606,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn'].some(x => phases.has(x)) ? 25 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast'].some(x => phases.has(x)) ? 25 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -1087,6 +1088,91 @@ async function main() {
         walkClicks: walk.length, merchant, offered, box, before, after, relogin };
       r.learn = res;
       checkLearn(res);
+      return res;
+    });
+
+    // Stage 5, skills: use the learned skill. Assignment is the original
+    // gesture (skill window "S", hover the skill, Shift+1 -> 0x0378), the slot
+    // is selected with the real "1" key and the cast is a real right click on a
+    // Gremlin (TMFieldScene SkillUse). MP and damage are the server's.
+    await step('cast', async () => {
+      const PLANS = { 1: { skill: 24, pos: 0, name: 'Flecha_Magica' } };
+      const plan = PLANS[cls];
+      assert(plan, `no cast plan for class ${cls}`);
+      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      privateValues.push(name);
+      if ((await a.eval(() => Module._wyd_get_game_state())) !== 0) {
+        const slot = (await a.slots()).findIndex(x => x.name === name);
+        assert(slot >= 0, `class ${cls} character missing`);
+        await a.enter(slot);
+      }
+      const learned = await a.eval(() => Module._wyd_field_my_score(6) >>> 0);
+      assert(((learned >>> plan.pos) & 1) === 1, `skill ${plan.skill} not learned (run learn first)`);
+      const trip = await a.toGremlinField();
+      const res = { cls, pos: plan.pos, skill: plan.skill, name: plan.name, slot: 0, trip, attempts: 0 };
+      r.cast = res;
+      // Assign: open the skill window with the real "s" key, hover the cell.
+      await a.closePanels();
+      await a.page.focus('#canvas');
+      await a.page.keyboard.press('s');
+      await a.until('skill window', () => Module._wyd_field_skill_panel_visible() === 1, 10000);
+      await a.frames(3);
+      const [cx, cy, cw, ch, cell] = await a.eval(i => {
+        const c = document.getElementById('canvas');
+        return [Module._wyd_field_skill_cell_screen(i, 0), Module._wyd_field_skill_cell_screen(i, 1), c.width, c.height,
+          Module._wyd_field_skill_cell_item(i)];
+      }, plan.pos);
+      res.cell = cell;
+      assert(cx >= 0 && cy >= 0, 'skill cell not laid out');
+      const cb = await a.page.locator('#canvas').boundingBox();
+      await a.page.mouse.move(cb.x + cx * cb.width / cw, cb.y + cy * cb.height / ch, { steps: 3 });
+      await a.frames(2);
+      await a.page.keyboard.press('Shift+Digit1');
+      await a.frames(3);
+      res.belt = await a.eval(() => Module._wyd_field_short_skill(0));
+      res.lastSentAfterAssign = await a.eval(() => window.clientProbe().socket.lastSentOpcode);
+      await a.shot('skill-assigned');
+      await a.page.keyboard.press('s');
+      await a.frames(2);
+      await a.page.keyboard.press('Digit1');
+      await a.frames(2);
+      res.selected = await a.eval(() => Module._wyd_field_selected_short_skill());
+      console.log(`    cell ${cell}, belt[0] ${res.belt}, selected ${res.selected}, last sent 0x${res.lastSentAfterAssign.toString(16)}`);
+      // Cast on the nearest live Gremlin with real right clicks.
+      let mob;
+      for (let i = 0; i < 4 && !mob; i++) {
+        mob = (await a.mobs()).find(m => m.name.trim() === 'Gremlin' && m.onScreen && m.hp > 0);
+        if (!mob) await a.walk(i % 2 ? -160 : 160, 80);
+      }
+      assert(mob, 'no live Gremlin on screen');
+      const c0 = await a.combat(mob.id);
+      res.target = { id: mob.id, distance: Math.round(mob.d) };
+      res.mpTrail = [c0.myMp];
+      res.hpTrail = [c0.hp];
+      res.died = false;
+      const end = Date.now() + 60000;
+      let lastCast = 0;
+      while (Date.now() < end) {
+        const c = await a.combat(mob.id);
+        if (c.myMp !== res.mpTrail.at(-1)) res.mpTrail.push(c.myMp);
+        if (c.present && c.hp !== res.hpTrail.at(-1)) res.hpTrail.push(c.hp);
+        if (c.myDie === 1 || c.myHp <= 0) { res.died = true; break; }
+        if (!c.present || c.die === 1 || c.hp <= 0) break;
+        if (Math.min(...res.mpTrail) < res.mpTrail[0] && res.hpTrail.at(-1) < res.hpTrail[0]) break;
+        if (Date.now() - lastCast > 4000 && res.attempts < 6) {
+          if (await a.clickHuman(mob.id, 'right')) res.attempts++;
+          lastCast = Date.now();
+        }
+        await sleep(500);
+      }
+      await sleep(2000);
+      const c1 = await a.combat(mob.id);
+      if (c1.myMp !== res.mpTrail.at(-1)) res.mpTrail.push(c1.myMp);
+      res.attacksSent = c1.outAttack - c0.outAttack;
+      res.echoes = c1.inAttack - c0.inAttack;
+      await a.shot('cast');
+      console.log(`    cast x${res.attempts}: MP ${res.mpTrail.join(',')} target HP ${res.hpTrail.join(',')} sent ${res.attacksSent} echoes ${res.echoes}`);
+      checkCast(res);
       return res;
     });
 

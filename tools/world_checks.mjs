@@ -14,7 +14,7 @@ export function redactEvidence(value, secrets) {
 }
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
-  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'concurrent'];
+  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -28,7 +28,7 @@ export function validateOptions(opt) {
   assert(new Set(names).size === names.length, 'duplicate phase');
   const phases = new Set(names);
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
-    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], concurrent: ['enter'] };
+    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
     assert(phases.has(dep), `${name} requires ${dep}`);
   // death takes A through the portal and needs B waiting at the Armia spawn;
@@ -36,10 +36,11 @@ export function validateOptions(opt) {
   for (const other of ['mapchange', 'attack'])
     assert(!(phases.has('death') && phases.has(other)), `death cannot run with ${other}`);
   // grind enters the --class character itself, alone (one game page).
-  for (const own of ['grind', 'learn']) {
-    if (!phases.has(own)) continue;
+  const own = ['login', 'grind', 'learn', 'cast'];
+  for (const p of own.slice(1)) {
+    if (!phases.has(p)) continue;
     for (const other of phases)
-      assert(['login', 'grind', 'learn'].includes(other), `${own} runs only with login/grind/learn (got ${other})`);
+      assert(own.includes(other), `${p} runs only with ${own.join('/')} (got ${other})`);
   }
   if (phases.has('grind')) {
     assert(/^\d+$/.test(opt['grind-level'] ?? '') && Number(opt['grind-level']) >= 2 &&
@@ -173,4 +174,19 @@ export function checkLearn(l) {
   assert.equal(l.before.bonus - l.after.bonus, l.cost, 'skill points not charged by the cost');
   assert.equal((l.relogin.learned >>> bit) & 1, 1, 'learned bit lost on relogin');
   assert.equal(l.relogin.bonus, l.after.bonus, 'skill points differ after relogin');
+}
+
+// Using a learned skill (skill.go / combat.go). The client assigns it to the
+// belt (0x0378), selects the slot and right-clicks the target; the server
+// validates the learned bit and class, charges MP and decides the damage.
+// MP spent is the signature of a skill: plain melee costs none.
+export function checkCast(c) {
+  assert.equal(c.cell, 5000 + c.cls * 24 + c.pos, 'skill window shows another skill');
+  assert.equal(c.belt, c.skill, 'belt slot does not hold the skill');
+  assert.equal(c.selected, c.slot, 'slot not selected');
+  assert(c.attacksSent > 0, 'no skill attack left the client');
+  assert(c.echoes > 0, 'no attack echo from the server');
+  assert(c.mpTrail.length >= 2 && Math.min(...c.mpTrail) < c.mpTrail[0], 'server charged no MP');
+  assert(c.hpTrail.length >= 2 && c.hpTrail.at(-1) < c.hpTrail[0], 'target took no damage');
+  assert(!c.died, 'caster died');
 }
