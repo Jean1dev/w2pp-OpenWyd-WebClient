@@ -1,13 +1,13 @@
 # Progresso
 
-Atualização: 28/09/2026. Auditoria em andamento. O runtime do Alan roda no navegador, conectado por gateway próprio ao tm-server do operador no Railway: o login real chega à seleção de personagem. Seleção de personagem, entrada no Field com servidor, duas sessões e gameplay ainda não foram provados.
+Atualização: 28/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN, criação de personagem e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento uma da outra pelo servidor. Relogin observado pela segunda sessão, troca de mapa, login concorrente, cliente Windows e gameplay ainda não foram provados.
 
 | Etapa | Estado | Evidência |
 |---|---|---|
 | 1 Auditoria | Em andamento | [Fontes, layouts, build e assets](evidence/01-auditoria/README.md) |
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
-| 4 Login e mundo | Pendente | — |
+| 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
 | 5 Gameplay | Pendente | — |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Pendente | — |
@@ -15,11 +15,11 @@ Atualização: 28/09/2026. Auditoria em andamento. O runtime do Alan roda no nav
 
 ## Próxima ação
 
-1. Etapa 4 (`prompts/04-login-mundo.md`): criar personagem, passar pelo PIN (atenção: numa conta sem PIN, a primeira verificação **define** o PIN), entrar no Field com o `CNFCharacterLogin` real e mapear os pacotes que hoje são descartados ao entrar no mundo (`UpdateScore`, `UpdateEtc`, `SendItem`, `PKInfo`…), guiado pela lista de opcodes do probe. Depois, duas sessões e relogin.
-2. Fechar a etapa 3: prova ponta a ponta dos pacotes já traduzidos só em teste unitário (CNFCharacterLogin, CreateMob, CNFNew/Delete, AccountSecure); exibir o aviso `0x102`; apagar a senha do controle de edição da cena.
-3. Fechar a etapa 1: consumidores ainda assinalados na [matriz](compatibility.md).
+1. Etapa 4: rodar `node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --env-file .env` com memória livre, para cobrir as fases `logout`, `mapchange` e `concurrent`. A última execução completa foi encerrada pelo Claude Code por falta de memória na máquina. Depois, testar PIN errado e as outras classes, e seguir o roteiro com o cliente Windows ([evidências](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente)).
+2. Etapa 5 (`prompts/05-gameplay.md`): mapear chat (`0333/0334`), combate (`0367/039D/039E`), itens, loja, banco, troca e grupo. Continuam descartados e contados.
+3. Fechar a etapa 3 (CNFNew/Delete e AccountSecure já têm prova ponta a ponta; falta DeleteCharacter) e a etapa 1 (consumidores ainda assinalados na [matriz](compatibility.md)).
 
-A lacuna de conteúdo de terreno ([known-asset-gaps.json](evidence/02-build/known-asset-gaps.json)) é dependência externa do operador, não trabalho de código: o cliente 7662 fornecido não contém os níveis de textura que o runtime 769 abre. Decidir entre obter os arquivos, fixar o runtime em um nível disponível ou aceitar a degradação — nenhuma substituição local reproduz o asset.
+As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
 
 ## Registro por sessão
 
@@ -89,5 +89,50 @@ A lacuna de conteúdo de terreno ([known-asset-gaps.json](evidence/02-build/know
 
   A etapa 3 fica **Em andamento**, e não Validada, até a prova ponta a ponta dos pacotes restantes do fluxo de entrada.
 - **Próximo passo:** etapa 4.
+
+### 28/09/2026 — etapa 4: entrada no mundo e duas sessões
+
+- **Solicitação do usuário:** executar o orquestrador. Backend: tm-server do Railway. Criar a segunda conta, personagens e PIN, guardando-os só em `.env`.
+- **Entregas próprias:**
+  - dialeto no mundo: `UpdateScore`, `SendAffect`, `UpdateEquip`, `CreateMobTrade` e `SetHpDam` traduzidos; `SetHpMp`, `SendItem`, `UpdateEtc`, `PKInfo` e `UpdateWeather` repassados; `0x102` vira `MessagePanel` legível; saída `0x290`/`0x291`;
+  - 15 fixtures, overlay Go e teste C++ (364 verificações);
+  - `patches/openwyd/0004`: senha apagada logo após o envio e exports de automação pelos controles originais;
+  - `tools/verify_world.mjs` e `tools/create_test_account.mjs`;
+  - ADR 003, evidências, matriz e setup.
+
+  Servidor e upstream versionado não foram alterados.
+- **Confirmado em execução no Railway:**
+  - senha errada aparece como "Senha incorreta.";
+  - o primeiro PIN define o PIN da conta, e os logins seguintes o verificam;
+  - criação com preview do servidor;
+  - entrada no Field sem nenhum pacote descartado;
+  - A e B se veem com nome e equipamento corretos;
+  - o movimento de cada um chega ao outro pelo servidor (logs `0x036C`/`0x0366`), com posição final idêntica;
+  - o spawn a cada login é gerado pelo servidor perto da cidade.
+- **Operador:** conta B criada via `POST /api/signup` (201), com contrato conferido no bundle do portal. Railway só lida: logs via `npx @railway/cli@5.63.1 logs`.
+- **Limitações:**
+  - a execução completa (`logout`, `mapchange`, `concurrent`) foi encerrada pelo Claude Code por falta de memória e não foi reiniciada automaticamente;
+  - só Chromium headless;
+  - cliente Windows pendente, com roteiro manual nas evidências;
+  - PIN errado e as outras três classes não testados;
+  - hipóteses `Tab`→`Nick` e `Hold`→`FakeExp`.
+
+  A etapa 4 fica **Em andamento**.
+- **Próximo passo:** repetir a execução completa com memória livre e depois seguir para a etapa 5.
+
+### 28/09/2026 — cores/texturas erradas
+
+- **Solicitação do usuário:** investigar por que as cores do jogo estavam “completamente bugadas”.
+- **Causa (confirmada em execução):** os quatro catálogos `*TextureList*.bin` do cliente 7662 têm registros de 264 bytes e eram lidos com a struct de 528. O índice N apontava para o registro 2N, e a metade superior ficava vazia. A conclusão da etapa 2 de que “faltam níveis de textura no cliente 7662” estava errada, porque aqueles nomes eram produto da leitura deslocada.
+- **Entrega:** `patches/openwyd/0005-texture-catalog-layout.patch`, leitor único que detecta o layout pelo conteúdo. A etapa 2 foi corrigida em `known-asset-gaps.json` (lacunas retratadas listadas).
+- **Resultados:**
+  - Field offline passou de 11 para 3 lacunas, com terreno, UI e armadura corretos;
+  - Select Server passou de 3 lacunas para 0;
+  - Field online no Railway aparece texturizado;
+  - `npm run scene` e `npm run client:stream` verdes;
+  - link com 0 símbolos indefinidos.
+- **Ícones de item (mesma data):** o conjunto 526 usava células fixas de 100 px (atlas de 1000 px da base 769), mas os atlas 7662 têm 350 px. O patch `0006-item-icon-atlas.patch` calcula a célula pela largura do atlas; ícones e sobreposição de grau estão corretos online. `tools/apply_openwyd_patches.py` passou a verificar a pilha de patches inteira, porque o 0006 altera contexto que o 0004 adiciona.
+- **Armadura escurecida:** a medida é compatível com a fórmula do shader original (≈50% da textura). Os modos linear e gama foram descartados. Sem captura de referência do cliente Windows, não houve alteração ([evidências](evidence/02-build/README.md#armadura-escurecida-medido-sem-correção)).
+- **Limitações:** não há teste unitário isolado do leitor, nem arquivo real de 528 bytes para exercitar esse ramo. A detecção foi validada só com os dados 7662. Firefox e comparação lado a lado com o cliente Windows continuam pendentes.
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

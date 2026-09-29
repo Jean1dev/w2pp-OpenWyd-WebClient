@@ -1,0 +1,144 @@
+Item icons (UI texture set 526): derive the 10x10 cell size from the atlas
+width instead of a fixed 100 px (1000 px atlases in the runtime's base, 350 px
+in 7662 data). Adds read-only diagnostics (UI texture size, item fields, own
+items, own mesh textures) used by tools/verify_world.mjs.
+
+diff --git a/Projects/TMProject/TextureManager.cpp b/Projects/TMProject/TextureManager.cpp
+index e837650..ccb5701 100644
+--- a/Projects/TMProject/TextureManager.cpp
++++ b/Projects/TMProject/TextureManager.cpp
+@@ -556,6 +556,25 @@ IDirect3DTexture9* TextureManager::GetUITexture(int nIndex, DWORD showTime)
+ 	return nullptr;
+ }
+ 
++// Width in pixels of a UI texture file, read from its header (0 if unknown).
++// .wyt = 4-byte tag + TGA header (width @12); .wys = 1-byte tag + DDS (width @16).
++static int WydUITextureFileWidth(const char* path)
++{
++	// Same open path as the texture loaders (_open), which the web build maps
++	// for backslashes and case.
++	const int handle = _open(path, _O_BINARY);
++	if (handle == -1)
++		return 0;
++	unsigned char head[24]{};
++	const int read = _read(handle, head, sizeof(head));
++	_close(handle);
++	const size_t got = read > 0 ? static_cast<size_t>(read) : 0u;
++	const char* dot = strrchr(path, '.');
++	if (dot && !strcmp(dot, TextureList_FileFormat))
++		return got >= 21 ? head[17] | head[18] << 8 | head[19] << 16 | head[20] << 24 : 0;
++	return got >= 18 ? head[16] | head[17] << 8 : 0;
++}
++
+ int TextureManager::InitUITextureSetList()
+ {
+ 	FILE* fp = fopen(TextureSetList_Path, "rt");
+@@ -592,13 +611,26 @@ int TextureManager::InitUITextureSetList()
+ 
+ 			if (nSetIndex == 526)
+ 			{
++				// Item icons: every atlas is a 10x10 grid. The cell size comes
++				// from the atlas itself (1000 px -> 100 in this runtime's base,
++				// 350 px -> 35 in 7662 data); a fixed 100 read 3x3 icons from
++				// a 350 px atlas and shrank the grade overlay to a third.
++				static int s_nIconCell = -1;
++				if (s_nIconCell < 0)
++				{
++					const int nTex = m_UITextureSetList[nSetIndex].pTextureCoord[nCount].nTextureIndex;
++					const int nAtlas = nTex >= 0 && nTex < MAX_UI_TEXTURE
++						? WydUITextureFileWidth(m_stUITextureList[nTex].szFileName) : 0;
++					s_nIconCell = nAtlas >= 10 ? nAtlas / 10 : 100;
++					LOG_WRITELOG("item icon atlas %d px, cell %d px\n", nAtlas, s_nIconCell);
++				}
+ 				if (CurIcon > (100 - 1))
+ 					CurIcon = 0;
+ 
+-				m_UITextureSetList[nSetIndex].pTextureCoord[nCount].nStartX = 100 * (CurIcon % 100 % 10);
+-				m_UITextureSetList[nSetIndex].pTextureCoord[nCount].nStartY = 100 * (CurIcon % 100 / 10);
+-				m_UITextureSetList[nSetIndex].pTextureCoord[nCount].nWidth = 100;
+-				m_UITextureSetList[nSetIndex].pTextureCoord[nCount].nHeight = 100;
++				m_UITextureSetList[nSetIndex].pTextureCoord[nCount].nStartX = s_nIconCell * (CurIcon % 100 % 10);
++				m_UITextureSetList[nSetIndex].pTextureCoord[nCount].nStartY = s_nIconCell * (CurIcon % 100 / 10);
++				m_UITextureSetList[nSetIndex].pTextureCoord[nCount].nWidth = s_nIconCell;
++				m_UITextureSetList[nSetIndex].pTextureCoord[nCount].nHeight = s_nIconCell;
+ 				CurIcon++;
+ 			}
+ 		}
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+index d0b0125..1fec234 100644
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -3,6 +3,7 @@
+ #include "d3d9.h"
+ #include "d3dx9.h"
+ #include "CFrame.h"
++#include "CMesh.h"
+ #include "DirShow.h"
+ #include "MeshManager.h"
+ #include "NewApp.h"
+@@ -611,6 +612,65 @@ extern "C" WYD_EXPORT int wyd_debug_scene_msgbox_ok() {
+   return scene->OnControlEvent(scene->m_pMessageBox->GetControlID(), 0);
+ }
+ 
++// Texture diagnostics (read-only): the size the renderer sees for a UI
++// texture (which = 0 width, 1 height), and item table fields used by icons.
++extern "C" WYD_EXPORT int wyd_debug_ui_texture_size(int index, int which) {
++  if (!g_pTextureManager) return -1;
++  IDirect3DTexture9* tex = g_pTextureManager->GetUITexture(index, 2000);
++  if (!tex) return -2;
++  D3DSURFACE_DESC desc{};
++  if (FAILED(tex->GetLevelDesc(0, &desc))) return -3;
++  return which == 0 ? static_cast<int>(desc.Width) : static_cast<int>(desc.Height);
++}
++
++extern "C" WYD_EXPORT int wyd_debug_item_field(int item, int field) {
++  if (item < 0 || item >= MAX_ITEMLIST) return -99999;
++  const STRUCT_ITEMLIST& it = g_pItemList[item];
++  switch (field) {
++    case 0: return g_itemicon[item];
++    case 1: return it.nGrade;
++    case 2: return it.nIndexMesh;
++    case 3: return it.nIndexTexture;
++    case 4: return it.nPos;
++    case 5: return it.nPrice;
++    default: return -99999;
++  }
++}
++
++// Texture file, multi (sanc) and legend type of the n-th mesh of the own
++// character's skin (read-only; "" past the last mesh).
++static CMesh* WydNthMesh(CFrame* frame, int* n) {
++  for (CFrame* node = frame; node; node = node->m_pSibling) {
++    if (node->m_pMesh && (*n)-- == 0) return node->m_pMesh;
++    if (node->m_pFirstChild) {
++      if (CMesh* m = WydNthMesh(node->m_pFirstChild, n)) return m;
++    }
++  }
++  return nullptr;
++}
++
++extern "C" WYD_EXPORT const char* wyd_debug_myhuman_mesh_texture(int index) {
++  static char out[300];
++  out[0] = 0;
++  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
++  TMHuman* human = scene ? scene->m_pMyHuman : nullptr;
++  if (!human || !human->m_pSkinMesh || !g_pTextureManager) return out;
++  int n = index;
++  CMesh* mesh = WydNthMesh(human->m_pSkinMesh->m_pRoot, &n);
++  if (!mesh) return out;
++  const int tex = mesh->m_nTextureIndex;
++  const char* name = tex >= 0 && tex < MAX_MODEL_TEXTURE ? g_pTextureManager->m_stModelTextureList[tex].szFileName : "?";
++  std::snprintf(out, sizeof(out), "%d|%s|multi=%d|legend=%d", tex, name, mesh->m_sMultiType, mesh->m_sLegendType);
++  return out;
++}
++
++extern "C" WYD_EXPORT int wyd_debug_my_item(int place, int slot) {
++  if (!g_pObjectManager) return -1;
++  if (place == 0 && slot >= 0 && slot < 18) return g_pObjectManager->m_stMobData.Equip[slot].sIndex;
++  if (place == 1 && slot >= 0 && slot < 64) return g_pObjectManager->m_stMobData.Carry[slot].sIndex;
++  return -1;
++}
++
+ // Other entities in the field, by server id (read-only).
+ static TMHuman* WydFieldHuman(unsigned int id) {
+   if (!g_pObjectManager || !g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)

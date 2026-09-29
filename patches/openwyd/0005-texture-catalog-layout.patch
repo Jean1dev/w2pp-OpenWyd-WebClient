@@ -1,0 +1,160 @@
+Read the *TextureList*.bin catalogs in either record layout: 528 bytes (this
+runtime's base) or 264 bytes (7662 client data). The 7662 files read as 528-byte
+records mapped texture index N to record 2N and left the upper half empty.
+
+diff --git a/Projects/TMProject/TextureManager.cpp b/Projects/TMProject/TextureManager.cpp
+index 5c35840..e837650 100644
+--- a/Projects/TMProject/TextureManager.cpp
++++ b/Projects/TMProject/TextureManager.cpp
+@@ -3,6 +3,9 @@
+ #include "TMGlobal.h"
+ #include "TMLog.h"
+ 
++#include <cstring>
++#include <vector>
++
+ int TextureManager::DYNAMIC_TEXTURE_WIDTH = 256;
+ int TextureManager::DYNAMIC_TEXTURE_HEIGHT = 256;
+ 
+@@ -246,21 +249,84 @@ int TextureManager::RestoreRenderTargetTexture()
+ 	return 0;
+ }
+ 
++// Texture catalogs (*TextureList*.bin) exist in two record layouts:
++//   528 bytes: szFileName[255], szFilePart[255], cAlpha@510, 4 DWORDs (this runtime's base);
++//   264 bytes: szFileName[255], cAlpha@255, 2 DWORDs (7662 client data).
++// Reading a 264-byte file with the 528-byte struct maps index N to record 2N
++// and leaves every index past the half empty, so every texture is wrong or
++// missing. The layout is chosen from the content: a record counts only if its
++// name is a plausible path and its alpha byte is one of the loader's codes.
++static int WydReadTextureCatalog(const char* path, stTextureListInfo* out, int maxRecords)
++{
++	FILE* fp = fopen(path, "rb");
++	if (!fp)
++		return 0;
++	fseek(fp, 0, SEEK_END);
++	const long size = ftell(fp);
++	fseek(fp, 0, SEEK_SET);
++	std::vector<char> buf(size > 0 ? static_cast<size_t>(size) : 0u);
++	const size_t got = buf.empty() ? 0 : fread(buf.data(), 1, buf.size(), fp);
++	fclose(fp);
++	if (got != buf.size())
++		return 0;
++
++	auto valid = [&](long off, int alphaOff) {
++		if (off + alphaOff >= size)
++			return false;
++		const char* p = &buf[static_cast<size_t>(off)];
++		if (!p[0] || static_cast<unsigned char>(p[0]) == 0xCD)
++			return false;
++		const char* end = static_cast<const char*>(memchr(p, 0, 255));
++		if (!end || !memchr(p, '.', static_cast<size_t>(end - p)))
++			return false;
++		const char a = p[alphaOff];
++		return a == 'N' || a == 'A' || a == 'a' || a == 'C';
++	};
++	int n264 = 0, n528 = 0;
++	for (int i = 0; i < maxRecords; ++i)
++	{
++		n264 += valid(static_cast<long>(i) * 264, 255) ? 1 : 0;
++		n528 += valid(static_cast<long>(i) * 528, 510) ? 1 : 0;
++	}
++	const int stride = n264 > n528 ? 264 : 528;
++	const int alphaOff = stride == 264 ? 255 : 510;
++
++	memset(out, 0, sizeof(stTextureListInfo) * static_cast<size_t>(maxRecords));
++	for (int i = 0; i < maxRecords; ++i)
++	{
++		const long off = static_cast<long>(i) * stride;
++		if (off + alphaOff >= size)
++			break;
++		const char* p = &buf[static_cast<size_t>(off)];
++		const char* end = static_cast<const char*>(memchr(p, 0, 255));
++		const size_t len = end ? static_cast<size_t>(end - p) : 254u;
++		if (len && static_cast<unsigned char>(p[0]) != 0xCD)
++			memcpy(out[i].szFileName, p, len);
++		if (stride == 528)
++		{
++			const char* part = p + 255;
++			const char* partEnd = static_cast<const char*>(memchr(part, 0, 255));
++			const size_t partLen = partEnd ? static_cast<size_t>(partEnd - part) : 254u;
++			if (partLen && static_cast<unsigned char>(part[0]) != 0xCD)
++				memcpy(out[i].szFilePart, part, partLen);
++		}
++		out[i].cAlpha = p[alphaOff];
++	}
++	LOG_WRITELOG("texture catalog %s: record %d bytes (%d/%d plausible)\n", path, stride, n264, n528);
++	return stride;
++}
++
+ int TextureManager::InitUITextureList()
+ {
+ 	char szBin[128];
+ 	sprintf(szBin, "%s", TextureListNList_Path);
+ 
+-	FILE* fpBin = fopen(szBin, "rb");
+-	if (!fpBin)
++	if (!WydReadTextureCatalog(szBin, m_stUITextureList, MAX_UI_TEXTURE))
+ 	{
+ 		LOG_WRITELOG("Cannot init UI Texture List\n");
+ 		return 0;
+ 	}
+ 
+-	fread(m_stUITextureList, sizeof(m_stUITextureList), 1, fpBin);
+-	fclose(fpBin);
+-
+ #if defined(__EMSCRIPTEN__)
+ 	struct WydLegacyUITextureInfo
+ 	{
+@@ -632,16 +698,12 @@ int TextureManager::InitEffectTextureList()
+ 	char szBin[128];
+ 	sprintf(szBin, "%s", EffectTextureList_Path);
+ 
+-	FILE* fpBin = fopen(szBin, "rb");
+-	if (!fpBin)
++	if (!WydReadTextureCatalog(szBin, m_stEffectTextureList, MAX_EFFECT_TEXTURE))
+ 	{
+ 		LOG_WRITELOG("Cannot init Effect Textur List\n");
+ 		return 0;
+ 	}
+ 
+-	fread(m_stEffectTextureList, sizeof(m_stEffectTextureList), 1, fpBin);
+-	fclose(fpBin);
+-
+ 	return 1;
+ }
+ 
+@@ -850,15 +912,11 @@ int TextureManager::InitModelTextureList()
+ 	char szBin[128];
+ 	sprintf(szBin, "%s", MeshTextureList_Path);
+ 
+-	FILE* fpBin = fopen(szBin, "rb");
+-	if (!fpBin)
++	if (!WydReadTextureCatalog(szBin, m_stModelTextureList, MAX_MODEL_TEXTURE))
+ 	{
+ 		LOG_WRITELOG("Cannot init model texture list \n");
+ 		return 0;
+ 	}
+-
+-	fread(m_stModelTextureList, sizeof(m_stModelTextureList), 1, fpBin);
+-	fclose(fpBin);
+ 	return 1;
+ }
+ 
+@@ -1123,15 +1181,11 @@ int TextureManager::InitEnvTextureList()
+ 	char szBin[128];
+ 	sprintf(szBin, "%s", EnvTextureList_Path);
+ 
+-	FILE* fpBin = fopen(szBin, "rb");
+-	if (!fpBin)
++	if (!WydReadTextureCatalog(szBin, m_stEnvTextureList, MAX_ENV_TEXTURE))
+ 	{
+ 		LOG_WRITELOG("Cannot init env texture list \n");
+ 		return 0;
+ 	}
+-
+-	fread(m_stEnvTextureList, sizeof(m_stEnvTextureList), 1, fpBin);
+-	fclose(fpBin);
+ 	return 1;
+ }
+ 

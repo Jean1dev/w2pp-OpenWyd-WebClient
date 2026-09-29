@@ -8,7 +8,45 @@
 
 **Confirmado em execução:** o relógio falso era a causa da cena distorcida registrada antes desta sessão. Com `?tickMs=16`, o harness upstream reproduz exatamente a mesma imagem — modelos gigantes e horizonte torto — porque a câmera fica no início da animação de abertura. Não era defeito de renderização nem de asset. A página agora acompanha o relógio do navegador, como o jogo ao vivo.
 
-**Confirmado em execução:** o terreno sem textura vem de arquivos que o cliente 7662 do operador não fornece. Substituindo em memória, apenas para diagnóstico, os sete `env/tile*2.wys` da cena Field pelo nível 1 correspondente, as falhas de abertura caíram de 18.897 para 746 e os quadrados brancos sumiram — mas o terreno não ficou correto, e sim escuro. O nível 2 é um asset distinto, não uma cópia; nenhuma substituição o reproduz.
+**Corrigido em 28/09/2026 (ver “Catálogos de textura” abaixo): a conclusão deste parágrafo estava errada.** O texto original dizia: o terreno sem textura vem de arquivos que o cliente 7662 do operador não fornece. Substituindo em memória, apenas para diagnóstico, os sete `env/tile*2.wys` da cena Field pelo nível 1 correspondente, as falhas de abertura caíram de 18.897 para 746 e os quadrados brancos sumiram — mas o terreno não ficou correto, e sim escuro. O nível 2 é um asset distinto, não uma cópia; nenhuma substituição o reproduz.
+
+## Catálogos de textura: causa real das cores erradas (28/09/2026)
+
+**Confirmado em execução.** Os catálogos `UI/UITextureListN.bin`, `Effect/EffectTextureList.bin`, `Mesh/MeshTextureList.bin` e `Env/EnvTextureList3.bin` do cliente 7662 usam registros de **264 bytes**: `szFileName[255]`, `cAlpha@255` e 2 DWORDs. Os tamanhos são 512, 512, 2048 e 512 registros, e o espaçamento entre nomes medido nos quatro arquivos é 264.
+
+O runtime lia esses arquivos com `fread` na struct de **528 bytes** (`szFileName[255]`, `szFilePart[255]`, `cAlpha@510` e 4 DWORDs). Com isso, o índice N recebia o nome do registro 2N, e a metade superior ficava vazia. Por exemplo, o índice de ambiente 6 abria `Env\Tile00002.wys`, que é a entrada 12 do catálogo e cujo arquivo não existe. Já os índices 256+ (`MTile*`, a segunda camada do terreno) saíam vazios.
+
+O efeito era terreno branco ou trocado, anéis de efeito no chão, UI sem moldura e modelos com textura errada.
+
+O patch `patches/openwyd/0005-texture-catalog-layout.patch` lê os dois layouts. Ele escolhe o espaçamento pelo conteúdo: conta os registros com nome plausível e código de alpha válido (`N`, `A`, `a` ou `C`) em cada layout.
+
+| Cena | Antes (sha256 da captura) | Depois | Lacunas antes → depois |
+|---|---|---|---|
+| Field offline | `b44abd0a…59b2`: chão branco/preto, anéis, UI sem moldura | `bb3fcea1…322d`: calçamento de Armia, fonte, UI completa, armadura | 11 → 3 (`mesh//abox01.msa`, `mesh//abox02.msa`, `ui/questsubjects4.txt`) |
+| Select Server | `cbe48893…c9db` | `8ce6557b…b58d`: painéis com moldura, céu, água | 3 → 0 nessa execução; a cena sorteia modelos e em outra execução pediu `mesh//abox02.msa` e `mesh/hs010301.msh`, ausentes de fato |
+| Field online (Railway, etapa 4) | capturas de `.cache/world` antes da correção | `eeaa36fd…9e47`: cidade texturizada, NPCs e jogadores | — |
+
+Os `env/*tile*.wys` “ausentes” eram artefato da leitura errada (`mesh/bird0101.wys` e `mesh/hs010301.msh` não: são ausências reais); o catálogo correto não os pede na cena medida. O experimento de substituição do parágrafo acima deu “terreno escuro” porque o índice continuava errado. Capturas em `.cache/texfix/before/` e `.cache/`, fora do Git porque contêm assets.
+
+### Ícones de item (28/09/2026)
+
+**Confirmado em execução.** O inventário mostrava, em cada célula, um mosaico de uns 3×3 ícones, e os itens equipados apareciam como quadrados brancos. `InitUITextureSetList` sobrescreve o conjunto 526 (ícones de item) com células fixas de 100 px numa grade 10×10, o atlas de 1000 px da base do runtime. Os atlas do 7662 (`UI\itemicon01..10.wyt`) têm 350×350 px, com células de 35 px, conferidas no cabeçalho TGA e em `UITextureSetList.txt`.
+
+Com a célula fixa em 100 px, cada ícone lia um quadrado de 100 px, e a escala 35/100 reduzia a sobreposição de grau (textura 338) a um terço, produzindo o quadrado branco. O patch `0006-item-icon-atlas.patch` mantém a regra da grade 10×10, mas calcula a célula pela largura real do atlas.
+
+Resultado online no Railway: adaga, elmo, armadura, calça, luvas e botas de couro (A), poções de HP/MP ×120, gold e baú aparecem corretos.
+
+A conversão de `ItemList.bin` (140→164 bytes) e `SkillData.bin` (96→104) já era feita por `tools/import_local_assets.py`. O diagnóstico em execução confirmou os campos: 1115 `Armadura_de_Couro(A)`, `nPos` 4, grau 3, ícone 756.
+
+### Armadura “escurecida”: medido, sem correção
+
+- **Textura:** o personagem usa `mesh\ch010302.wys` e as demais partes `ch010[2-6]02.wys`, legend 3 e multi 0. A textura é couro vermelho gasto, com média de 126/69/64 na parte vermelha e uma faixa de cota de malha escura. O ícone é uma ilustração mais viva e não serve de referência de cor.
+- **Brilho no Field:** a armadura renderizada tem cerca de 50% do brilho da textura (≈ 64/42/36).
+- **Fórmula do shader original:** para essa malha, o shader de skin usa `c7 = ambiente×0,25 + emissiva 0,3` e `c8 = difusa 1,0`, com luz fixa (−1, 1, 1), estágio `MODULATE` e cor do vértice limitada a 1. Isso é compatível com a medida, então a diferença não foi classificada como defeito.
+- **Hipóteses descartadas:**
+  - o modo linear `uLinearColor` da camada compat foi testado ligado e desligado, sem diferença na cena;
+  - a rampa de gama do cliente clássico (`SetGammaRamp`, fator brilho×0,02) é ignorada pela camada web, mas o `Config.bin` do operador tem brilho 49 (fator 0,98).
+- **Pendente:** captura de referência do cliente Windows no mesmo ponto para decidir.
 
 ## Lacuna de conteúdo
 
@@ -61,4 +99,4 @@ Artefatos: `.cache/local-scene-evidence.json`, `.cache/local-scene-field.png`, `
 - Só Chromium foi executado. Firefox e Safari continuam sem teste.
 - Nenhum login, conexão, gateway ou segunda sessão. O servidor Go não participou desta etapa.
 - A cena Field vem da fixture offline do runtime; mapa real depende das etapas 3 e 4.
-- Terreno segue sem textura correta enquanto a lacuna de conteúdo acima existir.
+- Terreno texturizado depois do patch 0005. Continuam ausentes `mesh//abox01.msa`, `mesh//abox02.msa` e `ui/questsubjects4.txt`.
