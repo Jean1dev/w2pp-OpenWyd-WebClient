@@ -107,6 +107,19 @@ npm run scene                                  # regressão da cena offline
 npm run client:stream                          # navegador + gateway + servidor roteirizado
 ```
 
+### Etapa 4: mundo online com duas contas
+
+As contas de teste ficam em `.env`: `W2PP_TEST_{ACCOUNT,PASSWORD,PIN,CHAR}` para A e o sufixo `2` para B. A conta B e os PINs/nomes são gerados sem impressão:
+
+```powershell
+node tools/create_test_account.mjs --extras                                          # PIN/nome para a conta A existente
+node tools/create_test_account.mjs --portal https://wyd-ten.vercel.app --suffix 2    # cria a conta B (uma vez)
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --env-file .env     # todas as fases
+node tools/verify_world.mjs ... --phases login,enter,second,move                     # subconjunto
+```
+
+O primeiro PIN verificado numa conta sem PIN **define** o PIN; por isso o harness usa sempre o valor do `.env`. Duas instâncias do Chromium com WebGL em software exigem bastante memória. Cada execução grava `.cache/world/evidence-<data>.json`, com contas mascaradas, e capturas locais.
+
 `go test -overlay` injeta testes no pacote de protocolo do servidor sem alterar `external/server`. Para desfazer os patches no checkout: `git -C external/OpenWyd reset --hard` e remover `Projects/TMProject/WydDialect.*`.
 
 ### Gateway e página conectada

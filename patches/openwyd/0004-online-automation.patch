@@ -1,0 +1,219 @@
+Etapa 4: clear the login password right after sending it; debug exports that
+drive the original controls (PIN keypad, create, enter, message-box OK) and
+read-only accessors (message panel/box, field entities by id) for the online harness.
+
+diff --git a/Projects/TMProject/TMSelectServerScene.cpp b/Projects/TMProject/TMSelectServerScene.cpp
+index 41349c4..4df6ca9 100644
+--- a/Projects/TMProject/TMSelectServerScene.cpp
++++ b/Projects/TMProject/TMSelectServerScene.cpp
+@@ -1472,6 +1472,10 @@ int TMSelectServerScene::OnControlEvent(unsigned int idwControlID, unsigned int
+ 				g_pObjectManager->m_szAccountPass[i] += i;
+ 
+ 				g_pSocketManager->SendOneMessage(reinterpret_cast<char*>(&stAccountLogin), sizeof(MSG_AccountLogin));
++			// The password must not outlive the send: clear the edit control
++			// now instead of when the scene is destroyed. A rejected login
++			// asks for it again.
++			pEditPassword->SetText((char*)"");
+ 			LastSendMsgTime = g_pTimerManager->GetServerTime();
+ 		}
+ 		break;
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+index c635053..d0b0125 100644
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -455,7 +455,10 @@ extern "C" int wyd_debug_selectserver_login(const char* account, const char* pas
+   select_server->LastSendMsgTime = live_time > 1500 ? live_time - 1501 : 0;
+   select_server->m_dwLastClickLoginBtnTime = 0;
+ 
+-  return select_server->OnControlEvent(B_LOGIN_OK, 0);
++  const int result = select_server->OnControlEvent(B_LOGIN_OK, 0);
++  volatile char* scrub = password_buf;
++  for (size_t i = 0; i < sizeof(password_buf); ++i) scrub[i] = 0;
++  return result;
+ }
+ 
+ extern "C" int wyd_public_demo_unlock_select_character() {
+@@ -477,6 +480,183 @@ extern "C" int wyd_public_demo_unlock_select_character() {
+   return 1;
+ }
+ 
++// ---- Online automation (etapa 4) ----
++// Each helper drives the original scene controls through OnControlEvent, the
++// same path a click takes, so the scene builds and sends its own packets. None
++// of them fabricate a packet or read one back. Selecting a class sample and a
++// character slot replaces the 3D mouse pick; the rest is the original UI flow.
++#if defined(__EMSCRIPTEN__)
++#include <emscripten/emscripten.h>
++#define WYD_EXPORT EMSCRIPTEN_KEEPALIVE
++#else
++#define WYD_EXPORT
++#endif
++
++static TMSelectCharScene* WydSelectCharScene() {
++  if (!g_pObjectManager) return nullptr;
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELCHAR) return nullptr;
++  return static_cast<TMSelectCharScene*>(scene);
++}
++
++// 0 locked, 1 unlocked, 2 verify sent, 3..5 PIN change steps.
++extern "C" WYD_EXPORT int wyd_selchar_account_lock() { return g_AccountLock; }
++
++// Types the PIN on the shuffled keypad (buttons 66437..66446 show keybuf[])
++// and presses the verify button (66433). The digits are not kept.
++extern "C" WYD_EXPORT int wyd_debug_selchar_pin(const char* pin) {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || !pin || g_AccountLock != 0) return 0;
++  const size_t len = std::strlen(pin);
++  if (len < 4 || len > 6) return 0;
++  std::memset(scene->keypass, 0, sizeof(scene->keypass));
++  for (size_t i = 0; i < len; ++i) {
++    if (pin[i] < '0' || pin[i] > '9') return 0;
++    int button = -1;
++    for (int b = 0; b < 10; ++b) {
++      if (scene->keybuf[b] == pin[i] - '0') button = b;
++    }
++    if (button < 0) return 0;
++    scene->OnControlEvent(66437 + button, 0);
++  }
++  return scene->OnControlEvent(66433, 0);
++}
++
++// Opens the creation view (control 5673), as the "create" button does.
++extern "C" WYD_EXPORT int wyd_debug_selchar_open_create() {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || g_AccountLock != 1) return 0;
++  return scene->OnControlEvent(5673, 0);
++}
++
++// Picks the class sample, types the name into edit 4626 and presses create
++// (1545). The server's CNFNewCharacter/NewCharacterFail decides the outcome.
++extern "C" WYD_EXPORT int wyd_debug_selchar_create(const char* name, int class_index) {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || !name || class_index < 0 || class_index >= 4 || g_AccountLock != 1) return 0;
++  if (!scene->m_pSampleHuman[class_index]) return 0;
++  auto* edit = static_cast<SEditableText*>(scene->m_pControlContainer->FindControl(4626));
++  if (!edit) return 0;
++  char buf[16] = {0};
++  std::snprintf(buf, sizeof(buf), "%s", name);
++  g_pObjectManager->m_pTargetObject = scene->m_pSampleHuman[class_index];
++  edit->SetText(buf);
++  if (scene->m_pBtnCreate) scene->m_pBtnCreate->SetEnable(1);
++  return scene->OnControlEvent(1545, 0);
++}
++
++// Selects the slot and presses "enter" (4612): the scene sends CharacterLogin.
++extern "C" WYD_EXPORT int wyd_debug_selchar_enter(int slot) {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || slot < 0 || slot >= 4 || g_AccountLock != 1) return 0;
++  if (!scene->m_pHuman[slot] || !g_pObjectManager->m_stSelCharData.MobName[slot][0]) return 0;
++  g_pObjectManager->m_cCharacterSlot = static_cast<char>(slot);
++  scene->m_dwLastClickLoginBtnTime = 0;
++  return scene->OnControlEvent(4612, 0);
++}
++
++// Preview of a selection slot, as the scene shows it (read-only).
++extern "C" WYD_EXPORT int wyd_selchar_level(int slot) {
++  if (!g_pObjectManager || slot < 0 || slot >= 4) return -1;
++  return g_pObjectManager->m_stSelCharData.Score[slot].Level;
++}
++
++extern "C" WYD_EXPORT int wyd_selchar_score(int slot, int field) {
++  if (!g_pObjectManager || slot < 0 || slot >= 4) return 0;
++  const STRUCT_SCORE& s = g_pObjectManager->m_stSelCharData.Score[slot];
++  switch (field) {
++    case 0: return s.MaxHp;
++    case 1: return s.Hp;
++    case 2: return s.MaxMp;
++    case 3: return s.Mp;
++    case 4: return s.Str;
++    case 5: return s.Int;
++    case 6: return s.Dex;
++    case 7: return s.Con;
++    default: return 0;
++  }
++}
++
++extern "C" WYD_EXPORT int wyd_selchar_equip(int slot, int index) {
++  if (!g_pObjectManager || slot < 0 || slot >= 4 || index < 0 || index >= 18) return -1;
++  return g_pObjectManager->m_stSelCharData.Equip[slot][index].sIndex;
++}
++
++// The current scene's message panel (notices, login errors), read-only.
++extern "C" WYD_EXPORT int wyd_scene_message_visible() {
++  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
++  return scene && scene->m_pMessagePanel ? static_cast<int>(scene->m_pMessagePanel->m_bVisible) : 0;
++}
++
++extern "C" WYD_EXPORT const char* wyd_scene_message_text() {
++  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
++  if (!scene || !scene->m_pMessagePanel || !scene->m_pMessagePanel->m_pText) return "";
++  return scene->m_pMessagePanel->m_pText->GetText();
++}
++
++// Id of the scene's visible message box (0 when hidden), and its OK button:
++// the box forwards to the scene exactly as a click on OK does.
++extern "C" WYD_EXPORT unsigned int wyd_scene_msgbox_message() {
++  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
++  if (!scene || !scene->m_pMessageBox || !scene->m_pMessageBox->IsVisible()) return 0;
++  return scene->m_pMessageBox->m_dwMessage;
++}
++
++extern "C" WYD_EXPORT int wyd_debug_scene_msgbox_ok() {
++  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
++  if (!scene || !scene->m_pMessageBox || !scene->m_pMessageBox->IsVisible()) return 0;
++  // SMessageBox::OnControlEvent on OK: hide, then notify the scene with the
++  // box's own control id and event 0.
++  scene->m_pMessageBox->SetVisible(0);
++  return scene->OnControlEvent(scene->m_pMessageBox->GetControlID(), 0);
++}
++
++// Other entities in the field, by server id (read-only).
++static TMHuman* WydFieldHuman(unsigned int id) {
++  if (!g_pObjectManager || !g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return nullptr;
++  return g_pObjectManager->GetHumanByID(id);
++}
++
++extern "C" WYD_EXPORT int wyd_field_human_present(unsigned int id) { return WydFieldHuman(id) ? 1 : 0; }
++
++extern "C" WYD_EXPORT float wyd_field_human_x(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_vecPosition.x : 0.0f;
++}
++
++extern "C" WYD_EXPORT float wyd_field_human_y(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_vecPosition.y : 0.0f;
++}
++
++extern "C" WYD_EXPORT int wyd_field_human_target_x(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_vecTargetPos.x : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_human_target_y(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_vecTargetPos.y : -1;
++}
++
++extern "C" WYD_EXPORT float wyd_field_human_angle(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_fAngle : 0.0f;
++}
++
++extern "C" WYD_EXPORT const char* wyd_field_human_name(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_szName : "";
++}
++
++// HUMAN_LOOKINFO as {mesh, skin} shorts; part 0..7.
++extern "C" WYD_EXPORT int wyd_field_human_look_mesh(unsigned int id, int part) {
++  TMHuman* h = WydFieldHuman(id);
++  if (!h || part < 0 || part >= 8) return -1;
++  return reinterpret_cast<const short*>(&h->m_stLookInfo)[part * 2];
++}
++
+ extern "C" int wyd_start_client() {
+   wchar_t empty_cmdline[] = L"";
+   return wWinMain(reinterpret_cast<HINSTANCE>(1), nullptr, empty_cmdline, 1);

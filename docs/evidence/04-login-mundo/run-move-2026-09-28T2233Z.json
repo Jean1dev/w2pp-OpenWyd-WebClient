@@ -1,0 +1,319 @@
+{
+ "when": "2026-09-28T22:32:07.764Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "enter",
+  "second",
+  "move"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 29776,
+   "at": "2026-09-28T22:32:39.687Z"
+  },
+  "enter": {
+   "ok": true,
+   "me": {
+    "id": 1,
+    "name": "Web*******",
+    "x": 2090.5,
+    "y": 2106.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 33,
+    "inPass": 2,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 35,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "glErrors": 0,
+   "ms": 20114,
+   "at": "2026-09-28T22:32:59.801Z"
+  },
+  "second": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "me": {
+    "id": 2,
+    "name": "Web*******",
+    "x": 2092.5,
+    "y": 2103.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 37,
+    "inPass": 3,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 40,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "ms": 85575,
+   "at": "2026-09-28T22:34:25.376Z"
+  },
+  "move": {
+   "ok": true,
+   "aSeesB": true,
+   "bSeesA": true,
+   "aWalk": {
+    "from": [
+     2090.5,
+     2106.5
+    ],
+    "to": [
+     2090.5,
+     2101.5
+    ],
+    "actionsSent": 2,
+    "input": {
+     "before": {
+      "mouse": 0,
+      "moveTo": [
+       2090.5,
+       2106.5
+      ]
+     },
+     "after": {
+      "mouse": 6,
+      "moveTo": [
+       2090.5,
+       2101.5
+      ]
+     }
+    }
+   },
+   "bWalk": {
+    "from": [
+     2092.5,
+     2103.5
+    ],
+    "to": [
+     2091.5,
+     2104.5
+    ],
+    "actionsSent": 2,
+    "input": {
+     "before": {
+      "mouse": 0,
+      "moveTo": [
+       2092.5,
+       2103.5
+      ]
+     },
+     "after": {
+      "mouse": 5,
+      "moveTo": [
+       2091.5,
+       2104.5
+      ]
+     }
+    }
+   },
+   "bSawAFrom": [
+    2090.5,
+    2106.5
+   ],
+   "bSawATo": [
+    2090.5,
+    2101.5
+   ],
+   "aActual": [
+    2090.5,
+    2101.5
+   ],
+   "aSawBTo": [
+    2091.5,
+    2104.5
+   ],
+   "bActual": [
+    2091.5,
+    2104.5
+   ],
+   "nameAinB": true,
+   "nameBinA": true,
+   "angleAinB": -1.5707964897155762,
+   "lookAinB": [
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    863
+   ],
+   "lookAself": [
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    863
+   ],
+   "lookMatches": true,
+   "bSawAMove": true,
+   "aSawBMove": true,
+   "ms": 118142,
+   "at": "2026-09-28T22:36:23.518Z"
+  }
+ },
+ "ok": true,
+ "final_A": {
+  "inTranslated": 38,
+  "inPass": 6,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 4,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 44,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "final_B": {
+  "inTranslated": 42,
+  "inPass": 9,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 4,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 51,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "B": []
+ },
+ "screenshots": [
+  {
+   "name": "field",
+   "file": ".cache/world/A-field.png",
+   "sha256": "a0244cc4f593f236dfd40444f845fe7d448a5fac47f818f94aa79422019a579b"
+  },
+  {
+   "name": "after-move",
+   "file": ".cache/world/A-after-move.png",
+   "sha256": "a74528428fdca8b4d002a22446ac1690c007a555d4da54bbcd54951998d8bf2e"
+  },
+  {
+   "name": "field",
+   "file": ".cache/world/B-field.png",
+   "sha256": "f2c9053172678438ad963c0e605549a766d93006e8c6620ebb5a739e8d32635a"
+  },
+  {
+   "name": "after-move",
+   "file": ".cache/world/B-after-move.png",
+   "sha256": "03a0675b5e7af8fd1d1ed172b8c8a1a2628f6e2147258b3baf5d81b66454f3c6"
+  }
+ ],
+ "gatewayLog": [
+  {
+   "time": "2026-09-28T19:32:09.6655682-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-09-28T19:32:33.1136406-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-28T19:33:37.5099411-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-28T19:36:24.6732643-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 304,
+   "bytes_down": 13252
+  },
+  {
+   "time": "2026-09-28T19:36:24.6879111-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 304,
+   "bytes_down": 12276
+  }
+ ]
+}

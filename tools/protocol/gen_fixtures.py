@@ -198,6 +198,95 @@ def create_mob(d: dict) -> bytearray:
     return b
 
 
+# ---------------- in-world frames (etapa 4) ----------------
+
+SCORE_SELF = {"level": 398, "ac": 120, "damage": 300, "attackRun": 0x34, "maxHp": 5000, "maxMp": 800,
+              "hp": 4999, "mp": 799, "str": 200, "int": 50, "dex": 100, "con": 150, "special": [1, 2, 3, -4],
+              "critical": 9, "saveMana": 10, "affect": {"0": 0x0102, "31": 0xABCD}, "guild": 77,
+              "guildLevel": 513, "resist": [-1, 2, 3, 127], "magic": 300, "id": 5}
+AFFECTS = {"0": {"type": 8, "value": 0x1F, "level": 3, "time": 1234},
+           "31": {"type": 255, "value": 255, "level": 200, "time": 0x7FFFFFFF}}
+EQUIP_UPDATE = {"id": 5, "equip": {"0": 1, "15": 3500}, "anct": {"0": 0x80, "15": 0x7F}}
+TRADE = {"mob": MOB_PLAYER, "tab": "LojaTab", "desc": "Vendo pocoes baratas 123"}
+HP_DAM = {"id": 1234, "hp": 100, "dam": -250}
+HP_MP = {"id": 5, "hp": 4000, "mp": 700, "reqHp": 4999, "reqMp": 799}
+SEND_ITEM = {"id": 5, "invType": 1, "slot": 63, "item": {"index": 401, "eff": [[7, 8], [0, 0], [255, 1]]}}
+ETC = {"id": 5, "hold": 77, "exp": (1 << 40) + 9, "learn": 0x4000000140000001, "scoreBonus": 5,
+       "specialBonus": 6, "skillBonus": 7, "magic": 20, "coin": 2000000001}
+
+
+def update_score(s: dict) -> bytearray:
+    b = header(152, 0x0336, s["id"])
+    score(b, 12, s, 0, s["special"])
+    b[60] = s["critical"]
+    b[61] = s["saveMana"]
+    for k, v in s["affect"].items():
+        struct.pack_into("<H", b, 62 + 2 * int(k), v)
+    struct.pack_into("<HH", b, 126, s["guild"], s["guildLevel"])
+    struct.pack_into("<4b", b, 130, *s["resist"])
+    struct.pack_into("<iii", b, 136, s["hp"], s["mp"], s["magic"])
+    b[148:152] = b"\xcc" * 4
+    return b
+
+
+def send_affect(affects: dict) -> bytearray:
+    b = header(268, 0x03B9, 5)
+    for k, a in affects.items():
+        struct.pack_into("<BBHI", b, 12 + 8 * int(k), a["type"], a["value"], a["level"], a["time"])
+    return b
+
+
+def update_equip(d: dict) -> bytearray:
+    b = header(60, 0x036B, d["id"])
+    for k, v in d["equip"].items():
+        struct.pack_into("<H", b, 12 + 2 * int(k), v)
+    for k, v in d["anct"].items():
+        b[44 + int(k)] = v
+    return b
+
+
+def create_mob_trade(d: dict) -> bytearray:
+    b = header(252, 0x0363, 30000)
+    b[: 232] = create_mob(d["mob"])
+    struct.pack_into("<HH", b, 0, 252, 0)
+    struct.pack_into("<H", b, 4, 0x0363)
+    put_name(b, 202, d["tab"], 26)
+    put_name(b, 228, d["desc"], 24)
+    return b
+
+
+def set_hp_dam(d: dict) -> bytearray:
+    b = header(20, 0x018A, d["id"])
+    struct.pack_into("<ii", b, 12, d["hp"], d["dam"])
+    return b
+
+
+def set_hp_mp(d: dict) -> bytearray:
+    b = header(28, 0x0181, d["id"])
+    struct.pack_into("<iiii", b, 12, d["hp"], d["mp"], d["reqHp"], d["reqMp"])
+    return b
+
+
+def send_item(d: dict) -> bytearray:
+    b = header(24, 0x0182, d["id"])
+    struct.pack_into("<HH", b, 12, d["invType"], d["slot"])
+    put_item(b, 16, d["item"])
+    return b
+
+
+def update_etc(d: dict) -> bytearray:
+    b = header(48, 0x0337, d["id"])
+    struct.pack_into("<IqQHHHHi", b, 12, d["hold"], d["exp"], d["learn"], d["scoreBonus"],
+                     d["specialBonus"], d["skillBonus"], d["magic"], d["coin"])
+    return b
+
+
+def standard_parm(opcode: int, ident: int, parm: int) -> bytearray:
+    b = header(16, opcode, ident)
+    struct.pack_into("<i", b, 12, parm)
+    return b
+
+
 # Outbound expectations: what the translator must emit for runtime structs
 # built by dialect_test.cpp with these values.
 OUT_ACCOUNT = {"pass": "segredo1", "account": "fixture01", "force": 1, "mac": [1, 2, 3, 0xDEADBEEF]}
@@ -240,6 +329,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.parse_args()
     over = [dict(SELCHARS[0], level=40000)]
+    score_magic = dict(SCORE_SELF, magic=70000)
+    score_level = dict(SCORE_SELF, level=40000)
+    dam_over = dict(HP_DAM, dam=100000)
     inbound = {
         "cnf_account_login": (cnf_account_login(SELCHARS, CARGO, 123456789, "fixture01"),
                               {"chars": SELCHARS, "cargo": CARGO, "coin": 123456789, "account": "fixture01"}),
@@ -249,6 +341,22 @@ def main() -> int:
         "cnf_character_login": (cnf_character_login(CHAR_LOGIN), CHAR_LOGIN),
         "create_mob_player": (create_mob(MOB_PLAYER), MOB_PLAYER),
         "create_mob_npc": (create_mob(MOB_NPC), MOB_NPC),
+        "update_score": (update_score(SCORE_SELF), SCORE_SELF),
+        "update_score_magic_overflow": (update_score(score_magic), score_magic),
+        "update_score_level_overflow": (update_score(score_level), score_level),
+        "send_affect": (send_affect(AFFECTS), {"affects": AFFECTS}),
+        "update_equip": (update_equip(EQUIP_UPDATE), EQUIP_UPDATE),
+        "create_mob_trade": (create_mob_trade(TRADE), TRADE),
+        "set_hp_dam": (set_hp_dam(HP_DAM), HP_DAM),
+        "set_hp_dam_overflow": (set_hp_dam(dam_over), dam_over),
+        "set_hp_mp": (set_hp_mp(HP_MP), HP_MP),
+        "send_item": (send_item(SEND_ITEM), SEND_ITEM),
+        "update_etc": (update_etc(ETC), ETC),
+        "pk_info": (standard_parm(0x0166, 5, 75), {"id": 5, "parm": 75}),
+        "update_weather": (standard_parm(0x018B, 30000, 2), {"id": 30000, "parm": 2}),
+        # handler/notice.go: MsgMessageBoxOk with the local notice code, ID = conn.
+        "notice_bad_pass": (standard_parm(0x0102, 7, 3), {"id": 7, "parm": 3}),
+        "notice_unknown": (standard_parm(0x0102, 7, 999), {"id": 7, "parm": 999}),
     }
     outbound = {
         "account_login": (out_account_login(), dict(OUT_ACCOUNT, clientVersion=CLIENT_VERSION)),

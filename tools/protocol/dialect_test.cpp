@@ -208,16 +208,131 @@ static void TestInboundPassAndDrop()
 	CHECK(In(action, &size) == WYD_DIALECT_PASS);
 	unsigned char fail[12] = {12, 0, 0, 0, 0x19, 0x01};
 	CHECK(In(fail, &size) == WYD_DIALECT_PASS);
-	// UpdateScore: same opcode and size in both dialects, different Level and
-	// tail semantics (docs/compatibility.md): not passed through.
-	unsigned char score[152] = {152, 0, 0, 0, 0x36, 0x03};
-	CHECK(In(score, &size) == WYD_DIALECT_DROP);
-	CHECK(In(score, &size) == WYD_DIALECT_DROP);
+	// Chat (0x333) has no verified layout yet: not passed through.
+	unsigned char chat[108] = {108, 0, 0, 0, 0x33, 0x03};
+	CHECK(In(chat, &size) == WYD_DIALECT_DROP);
+	CHECK(In(chat, &size) == WYD_DIALECT_DROP);
 	CHECK(WydDialectStatValue(WYD_STAT_IN_PASS) == 3);
 	CHECK(WydDialectStatValue(WYD_STAT_IN_DROP_UNKNOWN) == 2);
 	CHECK(WydDialectDroppedCount(0) == 2);
-	CHECK(WydDialectDroppedOpcode(0, 1) == 0x336 && WydDialectDroppedTimes(0, 1) == 2);
+	CHECK(WydDialectDroppedOpcode(0, 1) == 0x333 && WydDialectDroppedTimes(0, 1) == 2);
 	CHECK(WydDialectInboundFrames() == 6);
+}
+
+template <typename T, size_t N>
+static const T& Translate(const unsigned char (&frame)[N])
+{
+	int size = 0;
+	CHECK(In(frame, &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == static_cast<int>(sizeof(T)));
+	return *reinterpret_cast<const T*>(g_out);
+}
+
+template <size_t N>
+static void Passes(const unsigned char (&frame)[N])
+{
+	int size = 0;
+	CHECK(In(frame, &size) == WYD_DIALECT_PASS);
+	CHECK(In(frame, &size, static_cast<int>(N) - 1) == WYD_DIALECT_DROP);
+}
+
+static void TestInWorld()
+{
+	WydDialectResetStats();
+	{
+		const auto& m = Translate<MSG_UpdateScore>(k_in_update_score);
+		CHECK(m.Header.Type == 0x336 && m.Header.ID == 5 && m.Header.Size == 152);
+		CHECK(m.Score.Level == 398 && m.Score.Ac == 120 && m.Score.Damage == 300);
+		CHECK(m.Score.Reserved == 0 && m.Score.AttackRun == 0x34);
+		CHECK(m.Score.MaxHp == 5000 && m.Score.MaxMp == 800 && m.Score.Hp == 4999 && m.Score.Mp == 799);
+		CHECK(m.Score.Str == 200 && m.Score.Int == 50 && m.Score.Dex == 100 && m.Score.Con == 150);
+		CHECK(m.Score.Special[0] == 1 && m.Score.Special[3] == 65532);
+		CHECK(m.Critical == 9 && m.SaveMana == 10);
+		CHECK(m.Affect[0] == 0x0102 && m.Affect[31] == 0xABCD && m.Affect[1] == 0);
+		CHECK(m.Guild == 77 && m.GuildLevel == 513);
+		CHECK(m.Resist[0] == -1 && m.Resist[1] == 2 && m.Resist[2] == 3 && m.Resist[3] == 127);
+		CHECK(m.ReqHp == 4999 && m.ReqMp == 799);
+		CHECK(m.Magic == 300 && m.Rsv == 0 && m.LearnedSkill == 0); // not the 0xCC quirk
+	}
+	CHECK(WydDialectStatValue(WYD_STAT_FIELD_ZEROED) == 0);
+	{
+		const auto& m = Translate<MSG_UpdateScore>(k_in_update_score_magic_overflow);
+		CHECK(m.Magic == 0 && m.Score.Level == 398);
+		CHECK(WydDialectStatValue(WYD_STAT_FIELD_ZEROED) == 1);
+	}
+	int size = 0;
+	CHECK(In(k_in_update_score_level_overflow, &size) == WYD_DIALECT_DROP);
+	CHECK(WydDialectStatValue(WYD_STAT_IN_DROP_RANGE) == 1);
+	CHECK(In(k_in_update_score, &size, 148) == WYD_DIALECT_DROP);
+	{
+		const auto& m = Translate<MSG_UpdateAffect>(k_in_send_affect);
+		CHECK(m.Header.Type == 0x3B9 && m.Header.Size == 268);
+		CHECK(m.Affect[0].Type == 8 && m.Affect[0].Value == 0x1F && m.Affect[0].Level == 3 && m.Affect[0].Time == 1234);
+		CHECK(m.Affect[1].Type == 0 && m.Affect[1].Value == 0 && m.Affect[1].Time == 0);
+		CHECK(static_cast<unsigned char>(m.Affect[31].Type) == 255 && m.Affect[31].Value == 255);
+		CHECK(m.Affect[31].Level == 0 && m.Affect[31].Time == 0x7FFFFFFF); // level 200 does not fit a char
+		CHECK(WydDialectStatValue(WYD_STAT_FIELD_ZEROED) == 2);
+	}
+	{
+		const auto& m = Translate<MSG_UpdateEquip>(k_in_update_equip);
+		CHECK(m.Header.Type == 0x36B && m.Header.ID == 5);
+		CHECK(m.sEquip[0] == 1 && m.sEquip[15] == 3500 && m.sEquip[1] == 0);
+		CHECK(m.sEquip[16] == 0 && m.sEquip[17] == 0);
+		CHECK(static_cast<unsigned char>(m.Equip2[0]) == 0x80 && m.Equip2[15] == 0x7F);
+		CHECK(m.Equip2[16] == 0 && m.Equip2[17] == 0);
+	}
+	{
+		const auto& m = Translate<MSG_CreateMobTrade>(k_in_create_mob_trade);
+		CHECK(m.Header.Type == 0x363 && m.Header.Size == 260);
+		CHECK(m.PosX == 2100 && m.PosY == 2101 && m.MobID == 5);
+		CHECK(Name(m.MobName, "Guerreiro", 12) && m.Equip[15] == 3500 && m.Equip[16] == 0);
+		CHECK(m.Affect[31] == 0xFFFF && m.Guild == 77 && m.GuildLevel == 1);
+		CHECK(m.Score.Level == 398 && m.CreateType == 2);
+		CHECK(static_cast<unsigned char>(m.Equip2[0]) == 0x80 && m.Equip2[15] == 0x7F);
+		CHECK(Name(m.Nick, "LojaTab"));
+		CHECK(std::memcmp(m.Desc, "Vendo pocoes baratas 123", 24) == 0 && m.Server == 0);
+	}
+	{
+		const auto& m = Translate<MSG_SetHpDam>(k_in_set_hp_dam);
+		CHECK(m.Header.ID == 1234 && m.Hp == 100 && m.Dam == -250);
+		const auto& o = Translate<MSG_SetHpDam>(k_in_set_hp_dam_overflow);
+		CHECK(o.Hp == 100 && o.Dam == 0);
+		CHECK(WydDialectStatValue(WYD_STAT_FIELD_ZEROED) == 3);
+	}
+	// Pass-through frames are read by the runtime as its own structs.
+	Passes(k_in_set_hp_mp);
+	{
+		const auto& m = *reinterpret_cast<const MSG_SetHpMp*>(k_in_set_hp_mp);
+		CHECK(m.Hp == 4000 && m.Mp == 700 && m.ReqHp == 4999 && m.ReqMp == 799);
+	}
+	Passes(k_in_send_item);
+	{
+		const auto& m = *reinterpret_cast<const MSG_SendItem*>(k_in_send_item);
+		CHECK(m.DestType == 1 && m.DestPos == 63);
+		ItemIs(m.Item, 401, 7, 8, 0, 0, 255, 1);
+	}
+	Passes(k_in_update_etc);
+	{
+		const auto& m = *reinterpret_cast<const MSG_UpdateEtc*>(k_in_update_etc);
+		CHECK(m.FakeExp == 77 && m.Exp == (1LL << 40) + 9);
+		CHECK(m.LearnedSkill[0] == 0x40000001u && m.LearnedSkill[1] == 0x40000001u);
+		CHECK(m.ScoreBonus == 5 && m.SpecialBonus == 6 && m.SkillBonus == 7 && m.Coin == 2000000001);
+	}
+	Passes(k_in_pk_info);
+	Passes(k_in_update_weather);
+	CHECK(reinterpret_cast<const MSG_STANDARDPARM*>(k_in_update_weather)->Parm == 2);
+	{
+		const auto& m = Translate<MSG_MessagePanel>(k_in_notice_bad_pass);
+		CHECK(m.Header.Type == 0x101 && m.Header.ID == 0 && m.Header.Size == 140);
+		CHECK(std::strcmp(m.String, "Senha incorreta.") == 0);
+		const auto& u = Translate<MSG_MessagePanel>(k_in_notice_unknown);
+		CHECK(std::strcmp(u.String, "Aviso do servidor (999).") == 0);
+	}
+	// Distinct dropped opcodes: 0x336 (level overflow + short frame) and the five
+	// truncated pass-through frames.
+	CHECK(WydDialectDroppedCount(0) == 6);
+	CHECK(WydDialectDroppedOpcode(0, 0) == 0x336 && WydDialectDroppedTimes(0, 0) == 2);
+	CHECK(WydDialectStatValue(WYD_STAT_IN_DROP_SIZE) == 6);
 }
 
 static void TestOutbound()
@@ -295,6 +410,13 @@ static void TestOutbound()
 	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&nc), sizeof(nc), wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
 	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&nc), sizeof(nc) - 4, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
 
+	// ReqTeleport / ChangeCity: StandardParm, header-only for the server.
+	for (unsigned char op : {0x90, 0x91})
+	{
+		char parm[16] = {16, 0, 0, 0, static_cast<char>(op), 0x02};
+		CHECK(WydDialectOutbound(parm, 16, wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
+		CHECK(WydDialectOutbound(parm, 12, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	}
 	// Chat (0x333) has a 96- vs 128-byte text divergence: not sent until mapped.
 	char chat[140] = {static_cast<char>(140), 0, 0, 0, 0x33, 0x03};
 	CHECK(WydDialectOutbound(chat, sizeof(chat), wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
@@ -309,6 +431,7 @@ int main()
 	TestCharacterLogin();
 	TestCreateMob();
 	TestInboundPassAndDrop();
+	TestInWorld();
 	TestOutbound();
 	std::printf("%d checks, %d failures\n", g_checks, g_failures);
 	return g_failures == 0 ? 0 : 1;

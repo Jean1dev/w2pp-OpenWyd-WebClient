@@ -1,0 +1,104 @@
+# tm-server (Railway, deploy 98286fdf) — logs lidos via `railway logs --json` (somente leitura).
+# Sanitizado: IPs, contas e nomes de personagem substituídos pela chave do .env; linhas 'nightmare', 'weather' e 'session out queue high' omitidas.
+# Janelas: 20:02–20:06Z (senha errada, PIN, criação, entrada) e 22:32–22:39Z (duas sessões, movimento; início da execução interrompida).
+time=2026-09-28T20:02:11.644Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-09-28T20:02:11.644Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-09-28T20:02:11.644Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-09-28T20:02:11.644Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<W2PP_TEST_ACCOUNT>
+time=2026-09-28T20:02:11.671Z level=WARN msg="account login: bad password" conn=1 account=<W2PP_TEST_ACCOUNT> fails=1
+time=2026-09-28T20:02:22.396Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-09-28T20:02:22.396Z level=INFO msg="session send stats" conn=1 frames=1 bytes=16 out_high_water=0 by_type=0x0102:1
+time=2026-09-28T20:02:22.396Z level=INFO msg="session last sends" conn=1 tail=0x0102(1)/4/-10725ms
+time=2026-09-28T20:02:22.396Z level=INFO msg="connection closed" conn=1
+time=2026-09-28T20:02:39.158Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-09-28T20:02:39.158Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-09-28T20:02:39.158Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-09-28T20:02:39.158Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<W2PP_TEST_ACCOUNT>
+time=2026-09-28T20:02:39.260Z level=INFO msg="account login: OK" conn=1 account=<W2PP_TEST_ACCOUNT> id=160 role=player chars=0
+time=2026-09-28T20:02:44.034Z level=INFO msg="recv packet" conn=1 type=0x0fde len=20 routed=true
+time=2026-09-28T20:02:45.184Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-09-28T20:02:45.184Z level=INFO msg="session send stats" conn=1 frames=2 bytes=2020 out_high_water=0 by_type="0x010a:1 0x0fde:1"
+time=2026-09-28T20:02:45.184Z level=INFO msg="session last sends" conn=1 tail="0x010a(30002)/1996/-5924ms 0x0fde(30000)/0/-1079ms"
+time=2026-09-28T20:02:45.184Z level=INFO msg="connection closed" conn=1
+time=2026-09-28T20:04:10.309Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-09-28T20:04:10.309Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-09-28T20:04:10.309Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-09-28T20:04:10.309Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<W2PP_TEST_ACCOUNT>
+time=2026-09-28T20:04:10.365Z level=WARN msg="account login: bad password" conn=1 account=<W2PP_TEST_ACCOUNT> fails=1
+time=2026-09-28T20:04:22.492Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-09-28T20:04:22.492Z level=INFO msg="session send stats" conn=1 frames=1 bytes=16 out_high_water=0 by_type=0x0102:1
+time=2026-09-28T20:04:22.492Z level=INFO msg="session last sends" conn=1 tail=0x0102(1)/4/-12127ms
+time=2026-09-28T20:04:22.492Z level=INFO msg="connection closed" conn=1
+time=2026-09-28T20:04:39.351Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-09-28T20:04:39.351Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-09-28T20:04:39.351Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-09-28T20:04:39.352Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<W2PP_TEST_ACCOUNT>
+time=2026-09-28T20:04:39.452Z level=INFO msg="account login: OK" conn=1 account=<W2PP_TEST_ACCOUNT> id=160 role=player chars=0
+time=2026-09-28T20:04:44.315Z level=INFO msg="recv packet" conn=1 type=0x0fde len=20 routed=true
+time=2026-09-28T20:04:50.107Z level=INFO msg="recv packet" conn=1 type=0x020f len=24 routed=true
+time=2026-09-28T20:04:50.107Z level=INFO msg="create char" conn=1 slot=0 class=0 name=<W2PP_TEST_CHAR> mode=11 want_mode=11
+time=2026-09-28T20:04:50.213Z level=INFO msg="create char: OK" conn=1 name=<W2PP_TEST_CHAR> slot=0 total=1
+time=2026-09-28T20:05:00.471Z level=INFO msg="recv packet" conn=1 type=0x0213 len=8 routed=true
+time=2026-09-28T20:05:00.471Z level=INFO msg="character login request" conn=1 slot=0 mode=11
+time=2026-09-28T20:05:00.597Z level=INFO msg="char login: sending CNFCharacterLogin" path=template conn=1 slot=0 client_id=1 class=0 name=<W2PP_TEST_CHAR> last_city=0 spawn_x=2097 spawn_y=2100 cnf_pos_x=2097 cnf_pos_y=2100 mob_spx=2096 mob_spy=2096 body=1820
+time=2026-09-28T20:05:22.705Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-09-28T20:05:22.705Z level=INFO msg="session send stats" conn=1 frames=39 bytes=12452 out_high_water=34 by_type="0x0364:32 0x0336:2 0x010a:1 0x0110:1 0x0114:1 0x0166:1 0x0fde:1"
+time=2026-09-28T20:05:22.705Z level=INFO msg="session last sends" conn=1 tail="0x010a(30002)/1996/-43252ms 0x0fde(30000)/0/-38348ms 0x0110(30001)/844/-32492ms 0x0114(30000)/1820/-22108ms 0x0336(1)/140/-22108ms 0x0364(30000)/220/-22108ms 0x0166(1)/4/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0364(30000)/220/-22108ms 0x0336(1)/140/-16907ms"
+time=2026-09-28T20:05:22.705Z level=INFO msg="connection closed" conn=1
+time=2026-09-28T22:32:33.799Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-09-28T22:32:33.799Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-09-28T22:32:33.799Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-09-28T22:32:33.799Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<W2PP_TEST_ACCOUNT>
+time=2026-09-28T22:32:33.917Z level=INFO msg="account login: OK" conn=1 account=<W2PP_TEST_ACCOUNT> id=160 role=player chars=1
+time=2026-09-28T22:32:38.882Z level=INFO msg="recv packet" conn=1 type=0x0fde len=20 routed=true
+time=2026-09-28T22:32:40.292Z level=INFO msg="recv packet" conn=1 type=0x0213 len=8 routed=true
+time=2026-09-28T22:32:40.292Z level=INFO msg="character login request" conn=1 slot=0 mode=11
+time=2026-09-28T22:32:40.366Z level=INFO msg="char login: sending CNFCharacterLogin" path=template conn=1 slot=0 client_id=1 class=0 name=<W2PP_TEST_CHAR> last_city=0 spawn_x=2090 spawn_y=2106 cnf_pos_x=2090 cnf_pos_y=2106 mob_spx=2096 mob_spy=2096 body=1820
+time=2026-09-28T22:32:43.151Z level=INFO msg="recv packet" conn=1 type=0x0291 len=4 routed=true
+time=2026-09-28T22:33:39.628Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-09-28T22:33:39.628Z level=INFO msg="connection accepted" conn=2 ip=<redacted>
+time=2026-09-28T22:33:39.628Z level=INFO msg="recv packet" conn=2 type=0x020d len=104 routed=true
+time=2026-09-28T22:33:39.628Z level=INFO msg="account login: relaying to dbServer" conn=2 account=<W2PP_TEST_ACCOUNT2>
+time=2026-09-28T22:33:39.836Z level=INFO msg="account login: OK" conn=2 account=<W2PP_TEST_ACCOUNT2> id=161 role=player chars=1
+time=2026-09-28T22:33:47.310Z level=INFO msg="recv packet" conn=2 type=0x0fde len=20 routed=true
+time=2026-09-28T22:33:48.833Z level=INFO msg="recv packet" conn=2 type=0x0213 len=8 routed=true
+time=2026-09-28T22:33:48.833Z level=INFO msg="character login request" conn=2 slot=0 mode=11
+time=2026-09-28T22:33:48.952Z level=INFO msg="char login: sending CNFCharacterLogin" path=template conn=2 slot=0 client_id=2 class=0 name=<W2PP_TEST_CHAR2> last_city=0 spawn_x=2092 spawn_y=2103 cnf_pos_x=2092 cnf_pos_y=2103 mob_spx=2096 mob_spy=2096 body=1820
+time=2026-09-28T22:33:55.063Z level=INFO msg="recv packet" conn=2 type=0x0291 len=4 routed=true
+time=2026-09-28T22:34:44.621Z level=INFO msg="recv packet" conn=1 type=0x036c len=40 routed=true
+time=2026-09-28T22:34:44.621Z level=INFO msg="movement: first action after login" conn=1 type=876 client_tick=3928488990 server_x=2090 server_y=2106 login_spawn_x=2090 login_spawn_y=2106 pos_x=2090 pos_y=2106 target_x=2090 target_y=2102 effect=0 speed=4 route="[50 50 50 50 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]"
+time=2026-09-28T22:34:47.067Z level=INFO msg="recv packet" conn=1 type=0x0366 len=40 routed=true
+time=2026-09-28T22:35:19.805Z level=INFO msg="recv packet" conn=2 type=0x036c len=40 routed=true
+time=2026-09-28T22:35:19.805Z level=INFO msg="movement: first action after login" conn=2 type=876 client_tick=3928523918 server_x=2092 server_y=2103 login_spawn_x=2092 login_spawn_y=2103 pos_x=2092 pos_y=2103 target_x=2091 target_y=2106 effect=0 speed=4 route="[55 56 56 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]"
+time=2026-09-28T22:35:21.076Z level=INFO msg="recv packet" conn=2 type=0x0366 len=40 routed=true
+time=2026-09-28T22:36:24.820Z level=INFO msg="connection drop reason" conn=2 ip=<redacted> err=EOF
+time=2026-09-28T22:36:24.820Z level=INFO msg="session send stats" conn=2 frames=51 bytes=13252 out_high_water=37 by_type="0x0364:39 0x0165:4 0x0166:2 0x010a:1 0x0114:1 0x0336:1 0x0366:1 0x036c:1 0x0fde:1"
+time=2026-09-28T22:36:24.820Z level=INFO msg="session last sends" conn=2 tail="0x010a(30002)/1996/-164984ms 0x0fde(30000)/0/-157454ms 0x0114(30000)/1820/-155868ms 0x0336(2)/140/-155868ms 0x0364(30000)/220/-155868ms 0x0166(2)/4/-155868ms 0x0364(30000)/220/-155868ms 0x0166(1)/4/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x0364(30000)/220/-155868ms 0x036c(1)/40/-100199ms 0x0366(1)/40/-97753ms 0x0165(13274)/4/-65015ms 0x0165(13275)/4/-65015ms 0x0165(13276)/4/-65015ms 0x0165(13279)/4/-65015ms 0x0364(30000)/220/-65015ms 0x0364(30000)/220/-63744ms 0x0364(30000)/220/-63744ms 0x0364(30000)/220/-63744ms 0x0364(30000)/220/-63744ms"
+time=2026-09-28T22:36:24.820Z level=INFO msg="connection closed" conn=2
+time=2026-09-28T22:36:24.837Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-09-28T22:36:24.837Z level=INFO msg="session send stats" conn=1 frames=45 bytes=12292 out_high_water=32 by_type="0x0364:35 0x0165:2 0x0166:2 0x010a:1 0x0114:1 0x0336:1 0x0366:1 0x036c:1 0x0fde:1"
+time=2026-09-28T22:36:24.837Z level=INFO msg="session last sends" conn=1 tail="0x010a(30002)/1996/-230920ms 0x0fde(30000)/0/-225916ms 0x0114(30000)/1820/-224471ms 0x0336(1)/140/-224471ms 0x0364(30000)/220/-224471ms 0x0166(1)/4/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-224471ms 0x0364(30000)/220/-155885ms 0x0166(2)/4/-155885ms 0x0165(12462)/4/-100216ms 0x0364(30000)/220/-100216ms 0x0364(30000)/220/-100216ms 0x0364(30000)/220/-100216ms 0x0364(30000)/220/-100216ms 0x036c(2)/40/-65032ms 0x0366(2)/40/-63761ms 0x0165(2)/4/-17ms"
+time=2026-09-28T22:36:24.837Z level=INFO msg="connection closed" conn=1
+time=2026-09-28T22:37:31.982Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-09-28T22:37:31.982Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-09-28T22:37:31.982Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-09-28T22:37:31.982Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<W2PP_TEST_ACCOUNT>
+time=2026-09-28T22:37:32.071Z level=WARN msg="account login: bad password" conn=1 account=<W2PP_TEST_ACCOUNT> fails=1
+time=2026-09-28T22:37:59.951Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-09-28T22:37:59.952Z level=INFO msg="session send stats" conn=1 frames=1 bytes=16 out_high_water=0 by_type=0x0102:1
+time=2026-09-28T22:37:59.952Z level=INFO msg="session last sends" conn=1 tail=0x0102(1)/4/-27881ms
+time=2026-09-28T22:37:59.952Z level=INFO msg="connection closed" conn=1
+time=2026-09-28T22:38:18.261Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-09-28T22:38:18.261Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-09-28T22:38:18.261Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-09-28T22:38:18.261Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<W2PP_TEST_ACCOUNT>
+time=2026-09-28T22:38:18.383Z level=INFO msg="account login: OK" conn=1 account=<W2PP_TEST_ACCOUNT> id=160 role=player chars=1
+time=2026-09-28T22:38:23.054Z level=INFO msg="recv packet" conn=1 type=0x0fde len=20 routed=true
+time=2026-09-28T22:38:29.865Z level=INFO msg="recv packet" conn=1 type=0x0213 len=8 routed=true
+time=2026-09-28T22:38:29.865Z level=INFO msg="character login request" conn=1 slot=0 mode=11
+time=2026-09-28T22:38:29.972Z level=INFO msg="char login: sending CNFCharacterLogin" path=template conn=1 slot=0 client_id=1 class=0 name=<W2PP_TEST_CHAR> last_city=0 spawn_x=2091 spawn_y=2105 cnf_pos_x=2091 cnf_pos_y=2105 mob_spx=2096 mob_spy=2096 body=1820
+time=2026-09-28T22:38:32.771Z level=INFO msg="recv packet" conn=1 type=0x0291 len=4 routed=true
+time=2026-09-28T22:38:50.791Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-09-28T22:38:50.791Z level=INFO msg="session send stats" conn=1 frames=39 bytes=11908 out_high_water=36 by_type="0x0364:34 0x010a:1 0x0114:1 0x0166:1 0x0336:1 0x0fde:1"
+time=2026-09-28T22:38:50.791Z level=INFO msg="session last sends" conn=1 tail="0x010a(30002)/1996/-32408ms 0x0fde(30000)/0/-27681ms 0x0114(30000)/1820/-20819ms 0x0336(1)/140/-20819ms 0x0364(30000)/220/-20819ms 0x0166(1)/4/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms 0x0364(30000)/220/-20819ms"
+time=2026-09-28T22:38:50.791Z level=INFO msg="connection closed" conn=1
