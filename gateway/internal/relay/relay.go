@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -31,6 +32,7 @@ type Gateway struct {
 	dial    func(ctx context.Context, network, addr string) (net.Conn, error)
 	origins map[string]bool
 	mux     *http.ServeMux
+	handler http.Handler
 
 	mu     sync.Mutex
 	total  int
@@ -58,13 +60,26 @@ func New(baseCtx context.Context, cfg *config.Config, log *slog.Logger) *Gateway
 	g.mux.HandleFunc("GET /ws/{channel}", g.handleWS)
 	g.mux.HandleFunc("GET /config.json", g.handleConfig)
 	if cfg.StaticDir != "" {
-		g.mux.Handle("GET /", staticHandler(cfg.StaticDir))
+		g.mux.Handle("GET /", staticHandler(cfg.StaticDir, cfg.AssetDir))
+	}
+	g.handler = g.mux
+	if cfg.BasicAuth != nil {
+		g.handler = basicAuth(*cfg.BasicAuth, g.mux)
 	}
 	return g
 }
 
-// ServeHTTP implements http.Handler.
-func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) { g.mux.ServeHTTP(w, r) }
+// ServeHTTP implements http.Handler. /healthz answers without credentials so
+// the platform can probe liveness; it reveals nothing about the targets.
+func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/healthz" && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = io.WriteString(w, "ok\n")
+		return
+	}
+	g.handler.ServeHTTP(w, r)
+}
 
 // Live reports the number of relays currently open (for tests and metrics).
 func (g *Gateway) Live() int64 { return g.live.Load() }
@@ -119,7 +134,7 @@ func (g *Gateway) handleWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return
 	}
-	ip := remoteIP(r)
+	ip := remoteIP(r, g.cfg.TLSTerminatedByProxy)
 	if !g.acquire(ip) {
 		g.log.Warn("connection limit", "channel", ch.Name, "ip", ip)
 		http.Error(w, "too many connections", http.StatusServiceUnavailable)
@@ -324,9 +339,20 @@ func (g *Gateway) release(ip string) {
 	}
 }
 
-// remoteIP uses the socket peer only. Forwarded headers are not trusted: behind
-// a reverse proxy the per-IP limit degrades to per-proxy, which is safe.
-func remoteIP(r *http.Request) string {
+// remoteIP uses the socket peer. Forwarded headers are trusted only when the
+// operator declared a TLS-terminating platform proxy (tlsTerminatedByProxy):
+// then the peer is always that proxy, and the rightmost X-Forwarded-For entry
+// is the one the proxy appended (a client can only prepend forged entries).
+// Without that declaration the per-IP limit degrades to per-proxy, which is safe.
+func remoteIP(r *http.Request, behindProxy bool) string {
+	if behindProxy {
+		if xff := r.Header.Values("X-Forwarded-For"); len(xff) > 0 {
+			parts := strings.Split(xff[len(xff)-1], ",")
+			if ip := net.ParseIP(strings.TrimSpace(parts[len(parts)-1])); ip != nil {
+				return ip.String()
+			}
+		}
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr

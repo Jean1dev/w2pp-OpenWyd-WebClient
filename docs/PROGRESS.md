@@ -1,6 +1,6 @@
 # Progresso
 
-Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. Cliente Windows e gameplay ainda não foram provados.
+Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. O combate (`MSG_Attack`) está traduzido e testado contra os codecs reais, mas ainda não foi provado online. O deploy no Railway (Dockerfile, Volume de assets, senha) e a CI estão preparados; nenhum deploy foi executado. Cliente Windows e o restante do gameplay ainda não foram provados.
 
 | Etapa | Estado | Evidência |
 |---|---|---|
@@ -8,20 +8,21 @@ Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Pendente | — |
+| 5 Gameplay | Em andamento | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Pendente | — |
-| 8 Entrega | Pendente | — |
+| 8 Entrega | Em andamento | [Imagem e CI verificadas localmente](evidence/08-entrega/README.md) |
 
 ## Próxima ação
 
-1. Etapa 4 — fechar:
-   - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente)); é o único critério de aceite ainda sem evidência;
-   - rodar a suíte completa `npm run world` uma vez, de ponta a ponta (hoje só há cenários independentes, todos confirmados em [29/09](evidence/04-login-mundo/2026-09-29.md));
+1. Etapa 5 — combate online: com memória livre, rodar `node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --env-file .env --phases login,enter,second,attack` e registrar o resultado em [evidências](evidence/05-gameplay/README.md). Depois: morte/respawn (`03AE`→`0289`), máscara `LearnedSkill` das classes para decidir as skills, e as fatias seguintes (chat `0333/0334`, itens, loja, banco, grupo, troca, persistência).
+2. Etapa 4 — fechar:
+   - repetir `npm run world` completo com o trajeto novo até o portal (a execução de 29/09 falhou só na caminhada da `mapchange`);
+   - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
    - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
-2. Etapa 5 (`prompts/05-gameplay.md`): mapear chat (`0333/0334`), combate (`0367/039D/039E`), itens, loja, banco, troca e grupo. Continuam descartados e contados; ao traduzir `0367`, removê-lo de `DEFERRED_INBOUND`.
-3. Fechar a etapa 3 (CNFNew/Delete e AccountSecure já têm prova ponta a ponta; falta DeleteCharacter) e a etapa 1 (consumidores ainda assinalados na [matriz](compatibility.md)).
-4. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
+3. Etapa 8 — primeiro deploy pelo operador ([deploy.md](deploy.md)): serviço, variáveis, Volume, upload dos assets e verificação. Confirmar em execução o reenvio da credencial no WebSocket, o `X-Forwarded-For` e a leitura do Volume pelo uid `nonroot`. Verificar a primeira execução da CI no GitHub.
+4. Fechar a etapa 3 (falta DeleteCharacter ponta a ponta) e a etapa 1 (consumidores ainda assinalados na [matriz](compatibility.md)).
+5. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
 
@@ -163,5 +164,53 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
 - **Verificação:** probe de pixel antes/depois na cena real (Railway, conta B, sem criar personagem). `scene`, `client:stream`, `protocol:dialect` (364) e `world:checks` (6) verdes após religar o WASM.
 - **Pendências:** pose das armas das amostras (hipótese: fase de animação).
 - **`open_create` (mesma data):** patch 0011 troca o controle 5673 ("Voltar") pelo 4613 ("Criar"). O export abre a vista de criação no Railway. `scene`, `client:stream`, `protocol:dialect` e `world:checks` verdes após religar.
+
+### 29/09/2026 — suíte da etapa 4 e etapa 5: combate
+
+- **Suíte completa (`npm run world`), build anterior ao combate:**
+  - passaram `badpass,badpin`, as classes 0–3 e `login,enter,second,move,logout`;
+  - `mapchange` falhou porque A clicou três vezes num ponto sem rota a partir do spawn;
+  - `concurrent` não rodou (fail-fast).
+
+  Saúde de protocolo limpa em todos os cenários.
+- **Arquivos:**
+  - alterados: `client/dialect/WydDialect.{h,cpp}`, `web/client.js`, `tools/protocol/{gen_fixtures.py,dialect_test.cpp,overlay/zz_ext_dialect_test.go}`, `tools/{verify_world,world_checks}.mjs`, `tools/world_checks.test.mjs`, `docs/compatibility.md`;
+  - novos: `patches/openwyd/0012-combat-probes.patch`, ADR 004, `docs/evidence/05-gameplay/README.md`.
+- **Dialeto de combate (ADR 004):**
+  - `0367/039D/039E` traduzidos nos dois sentidos;
+  - `ReqMp@58`→`@16`, porque o runtime descontava o HP do atacante do MP de quem apanha;
+  - `TargetID` i32↔u16;
+  - tamanho `60+8N`↔168/72/80;
+  - saída de `0289`, `0369` e `03AE` com tamanho exato;
+  - contadores `inAttack`/`outAttack`;
+  - `DEFERRED_INBOUND` vazio.
+- **Resultados confirmados em teste:**
+  - C++ wasm32 com 429 verificações;
+  - overlay Go `attack_*` com os encoders e decoders reais;
+  - `world:checks` com 7 testes;
+  - `scene`, `client:stream`, `gateway:test` e `protocol:vectors` verdes com o WASM novo (link com 0 indefinidos).
+- **Online:** cinco execuções do cenário `attack`, nenhuma chegou ao combate:
+  - prazo de 15 minutos;
+  - B preso num canteiro murado, com clique numa loja;
+  - painel de quests aberto sobre o mapa;
+  - interrupção pelo Claude Code por falta de memória.
+
+  As causas foram corrigidas no harness: trajeto por pontos da rua, fechamento de painéis com Esc real (export `wyd_field_open_panels`) e prazo de 25 minutos. Detalhes nas [evidências](evidence/05-gameplay/README.md).
+- **Limitações:** combate, morte/respawn e skills não foram provados online; a máscara inicial de skills depende do conteúdo do servidor, fora do checkout.
+
+### 29/09/2026 — deploy no Railway e CI (etapa 8, preparação)
+
+- **Pedido do usuário:** preparar o deploy no Railway por Dockerfile e a CI de validação; depois, revisar a documentação e fazer o commit. Decisões do usuário: assets num Volume, acesso restrito por senha e WASM compilado na imagem ([ADR 005](decisions/005-railway-deploy-and-ci.md)).
+- **Arquivos:**
+  - novos: `Dockerfile`, `.dockerignore`, `railway.json`, `.github/workflows/ci.yml`, `gateway/internal/config/env.go`, testes `env_test.go`/`deploy_test.go`, `tools/{assemble_site,pack_deploy_assets,fetch_pinned}.py`, `docs/deploy.md`, ADR 005;
+  - alterados: `gateway` (config, relay, static, main), `tools/build_local_scene.py`, `tools/protocol/run_dialect_test.py`, README e setup.
+- **Gateway:** `tlsTerminatedByProxy`, `assetDir`, Basic Auth, `/healthz`, modo `-env` (credencial obrigatória salvo `WYD_ALLOW_PUBLIC=true`) e IP real pelo `X-Forwarded-For` só no modo proxy. `gateway:test` verde.
+- **Confirmado em execução (local):**
+  - `docker build` com cache frio: 115 objetos certificados e link com 0 indefinidos. É o primeiro build Linux do runtime com os patches. A causa do "exit 2 na primeira compilação" foi confirmada (identidade do compilador muda no primeiro uso) e corrigida com aquecimento da toolchain.
+  - Smoke do contêiner: healthz, 401/200, `application/wasm`, `/config.json` sem destino, dados ausentes sem Volume e servidos com Volume.
+  - Imagem de 19 MB, com bases fixadas por digest.
+
+  Detalhes nas [evidências](evidence/08-entrega/README.md).
+- **Não executado:** nenhum serviço, variável ou volume foi criado no Railway; a CI remota só roda depois do push; o jogo via imagem exige TLS e não foi testado localmente.
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

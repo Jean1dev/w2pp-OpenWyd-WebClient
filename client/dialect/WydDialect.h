@@ -63,6 +63,10 @@ enum WydDialectStat
 	WYD_STAT_CARGO_HIDDEN,
 	// Non-zero bytes in wire regions whose meaning is not mapped.
 	WYD_STAT_UNMAPPED_NONZERO,
+	// MSG_Attack frames (0x367/0x39D/0x39E) translated in each direction:
+	// evidence that combat reached the server and its result came back.
+	WYD_STAT_IN_ATTACK,
+	WYD_STAT_OUT_ATTACK,
 	WYD_STAT_COUNT
 };
 

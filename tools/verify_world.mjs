@@ -15,6 +15,7 @@
 //   move      A walks (mouse click on the canvas) and B sees it; then B walks and A sees it
 //   logout    A closes; B loses A. A logs in again and B sees A again
 //   mapchange A walks onto the Armia -> Armia Field portal and confirms; B loses A
+//   attack    A and B go to Armia Field; A attacks a mob with real clicks, B watches
 //   concurrent A's account logs in a second time while A is in the Field
 //
 // Credentials come from W2PP_TEST_{ACCOUNT,PASSWORD,PIN,CHAR}[2] (env or --env-file)
@@ -28,7 +29,7 @@ import { createServer } from 'node:net';
 import { resolve, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, redactEvidence } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -254,7 +255,22 @@ class Session {
   // A real click on the canvas: the Field scene picks the ground and sends Action.
   // Rendering runs at ~1 frame/s headless: hover first, then hold the button
   // across a frame so the scene sees the press.
+  // A stray click can open a local panel (e.g. the quest log) that then eats
+  // every world click. Close it with ESC, as a player would, and record it.
+  // Never with a message box up: ESC would cancel the portal confirmation.
+  async closePanels() {
+    for (let i = 0; i < 4; i++) {
+      const [mask, box] = await this.eval(() => [Module._wyd_field_open_panels?.() ?? 0, Module._wyd_scene_msgbox_message()]);
+      if (!mask || box) return;
+      (this.panelsClosed ??= []).push(mask);
+      await this.page.locator('#canvas').press('Escape');
+      await this.frames(2);
+    }
+    throw new Error(`${this.label}: panels stay open after ESC`);
+  }
+
   async clickGround(dx, dy) {
+    await this.closePanels();
     const box = await this.page.locator('#canvas').boundingBox();
     const x = box.x + box.width / 2 + dx, y = box.y + box.height / 2 + dy;
     await this.page.mouse.move(x, y, { steps: 4 });
@@ -283,9 +299,12 @@ class Session {
   // Walks toward a world tile with real clicks: the runtime's own ground pick
   // (GroundGetPickPos: x = world x, z = world y) finds the screen point whose
   // ground is nearest the target; the scene then routes and sends Action.
-  async walkTo(tx, ty, { maxClicks = 25, stopWhen, maxStalls = 3, near = 1, stallOk = false } = {}) {
+  async walkTo(tx, ty, { maxClicks = 25, stopWhen, maxStalls = 4, near = 1, stallOk = false } = {}) {
     const trail = [];
-    let bestDist = Infinity, stalls = 0;
+    // Screen points whose click did not really move the character (the
+    // runtime found no route from here): the next click picks a different one.
+    const avoid = [];
+    let bestDist = Infinity, stalls = 0, lastPick = null;
     for (let i = 0; i < maxClicks; i++) {
       const me = await this.me();
       trail.push([me.x, me.y]);
@@ -296,19 +315,30 @@ class Session {
       // Fail fast with the trail instead of burning the scenario deadline.
       stalls = dist < bestDist - 1 ? 0 : stalls + 1;
       bestDist = Math.min(bestDist, dist);
+      // A route blocked by a wall moves one step at most: avoid that point too.
+      if (lastPick && trail.length >= 2 && Math.hypot(trail.at(-1)[0] - trail.at(-2)[0], trail.at(-1)[1] - trail.at(-2)[1]) < 2)
+        avoid.push(lastPick);
       if (stalls >= maxStalls && stallOk) break;
       if (stalls >= maxStalls) {
         const err = new Error(`${this.label}: no progress towards ${tx},${ty} after ${stalls} clicks (d=${dist.toFixed(1)})`);
         err.trail = trail;
+        // Why the runtime did not move: input reached it? route target? packets?
+        try {
+          await this.shot('stall');
+          err.stall = { input: await this.input(), outPass: (await this.probe()).dialect.outPass,
+            msgbox: await this.eval(() => Module._wyd_scene_msgbox_message()),
+            hover: await this.eval(() => Module._wyd_field_hover_human_id()), avoid };
+        } catch {}
         throw err;
       }
-      const best = await this.eval(([tx, ty]) => {
+      const best = await this.eval(([tx, ty, avoid]) => {
         const c = document.getElementById('canvas');
         let best = null;
         // Keep off the screen edges: entities enter the frame there and the
         // bottom rows sit next to the HUD.
         for (let ly = 90; ly <= c.height - 150; ly += 30) {
           for (let lx = 70; lx <= c.width - 70; lx += 30) {
+            if (avoid.some(([ax, ay]) => Math.hypot(ax - lx, ay - ly) < 45)) continue;
             if (!Module._wyd_field_pick_at(lx, ly)) continue;
             const wx = Module._wyd_field_last_pick_x(), wy = Module._wyd_field_last_pick_z();
             const d = Math.hypot(wx - tx, wy - ty);
@@ -316,8 +346,9 @@ class Session {
           }
         }
         return best;
-      }, [tx, ty]);
+      }, [tx, ty, avoid]);
       if (!best) throw new Error(`${this.label}: no ground under the cursor`);
+      lastPick = [best.lx, best.ly];
       console.log(`      pick ${best.wx.toFixed(1)},${best.wy.toFixed(1)} at ${best.lx},${best.ly}`);
       const box = await this.page.locator('#canvas').boundingBox();
       const dx = best.lx * box.width / best.cw - box.width / 2;
@@ -369,6 +400,101 @@ class Session {
     const sentAfter = (await this.probe()).dialect.outPass;
     return { from: [start.x, start.y], to: [last.x, last.y], actionsSent: sentAfter - sentBefore,
       input: this.lastInput };
+  }
+
+  ground() {
+    return this.eval(() => [Module._wyd_field_ground_index_x(), Module._wyd_field_ground_index_y()]);
+  }
+
+  // Onto the Armia -> Armia Field portal tile until the client's confirm box
+  // (message 16) opens. The straight line from the city spawn crosses a walled
+  // planter around 2117,2088 where the runtime's route gets stuck, so follow
+  // the street south of it (waypoints from a successful trail).
+  async walkToPortal() {
+    const onBox = () => this.eval(() => Module._wyd_scene_msgbox_message() === 16);
+    const trail = [];
+    for (const [wx, wy] of [[2117.5, 2095.5], [2130.5, 2091.5], [2140.5, 2082.5]]) {
+      const me = await this.me();
+      if (me.x > wx - 2) continue; // already past this waypoint
+      trail.push(...await this.walkTo(wx, wy, { near: 3, stallOk: true }));
+    }
+    trail.push(...await this.walkTo(2141.5, 2069.5, { stopWhen: onBox }));
+    return trail;
+  }
+
+  // Armia -> Armia Field through the server's portal (same path as mapchange).
+  async toArmiaField() {
+    const [gx, gy] = await this.ground();
+    if (gx === 20 && gy === 16) return { already: true, at: await this.me() };
+    const trail = await this.walkToPortal();
+    await this.until('portal confirm box', () => Module._wyd_scene_msgbox_message() === 16, 20000);
+    const before = await this.me();
+    if ((await this.eval(() => Module._wyd_debug_scene_msgbox_ok())) !== 1) throw new Error(`${this.label}: OK refused`);
+    await this.until('teleported', ([x, y]) => Math.hypot(Module._wyd_field_myhuman_x() - x,
+      Module._wyd_field_myhuman_y() - y) > 50, 60000, [before.x, before.y]);
+    await sleep(4000);
+    const at = await this.me();
+    checkTeleport({ ...at, ...Object.fromEntries((await this.ground()).map((v, i) => [i ? 'groundY' : 'groundX', v])) });
+    return { clicks: trail.length, at };
+  }
+
+  // Live non-player entities (server ids >= MaxUser = 1000) the runtime has on
+  // screen, nearest first. Nothing here decides what is hostile: the server
+  // writes 0 damage for non-combat NPCs, which the scenario then reports.
+  mobs() {
+    return this.eval(() => {
+      const c = document.getElementById('canvas');
+      const me = { x: Module._wyd_field_myhuman_x(), y: Module._wyd_field_myhuman_y() };
+      const out = [];
+      for (let id = Module._wyd_field_human_next(999); id; id = Module._wyd_field_human_next(id)) {
+        if (Module._wyd_field_human_die(id) !== 0) continue;
+        const hp = Module._wyd_field_human_hp(id), maxHp = Module._wyd_field_human_max_hp(id);
+        const sx = Module._wyd_field_human_screen(id, 0), sy = Module._wyd_field_human_screen(id, 1);
+        const onScreen = sx >= 70 && sx <= c.width - 70 && sy >= 90 && sy <= c.height - 150;
+        const x = Module._wyd_field_human_x(id), y = Module._wyd_field_human_y(id);
+        out.push({ id, name: Module.UTF8ToString(Module._wyd_field_human_name(id)), hp, maxHp, x, y, sx, sy,
+          onScreen, cw: c.width, ch: c.height, d: Math.hypot(x - me.x, y - me.y) });
+      }
+      return out.sort((p, q) => p.d - q.d);
+    });
+  }
+
+  // A real click on an entity: hover until the runtime's own pick reports it
+  // under the cursor, then press. The scene builds and sends the attack.
+  async clickHuman(id) {
+    await this.closePanels();
+    const box = await this.page.locator('#canvas').boundingBox();
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const [sx, sy, cw, ch] = await this.eval(i => {
+        const c = document.getElementById('canvas');
+        return [Module._wyd_field_human_screen(i, 0), Module._wyd_field_human_screen(i, 1), c.width, c.height];
+      }, id);
+      if (sx < 0) return false;
+      // The chest projection sits above the pick volume's center: aim lower.
+      for (const oy of [0, 20, 40]) {
+        await this.page.mouse.move(box.x + sx * box.width / cw, box.y + (sy + oy) * box.height / ch, { steps: 3 });
+        await this.frames(2);
+        if ((await this.eval(() => Module._wyd_field_hover_human_id())) !== id) continue;
+        await this.page.mouse.down();
+        try { await this.frames(2); } finally { await this.page.mouse.up(); }
+        await this.frames(1);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  combat(id) {
+    return this.eval(i => ({
+      present: Module._wyd_field_human_present(i), die: Module._wyd_field_human_die(i),
+      hp: Module._wyd_field_human_hp(i), maxHp: Module._wyd_field_human_max_hp(i),
+      myHp: Module._wyd_field_my_score(0), myMaxHp: Module._wyd_field_my_score(1),
+      myMp: Module._wyd_field_my_score(2), myLevel: Module._wyd_field_my_score(4),
+      coin: Module._wyd_field_my_score(5), exp: Module._wyd_field_my_exp(),
+      myDie: Module._wyd_field_human_die(Module._wyd_field_myhuman_id()),
+      learnedSkill: Module._wyd_field_my_score(6) >>> 0, myClass: Module._wyd_field_my_score(7),
+      inAttack: window.clientProbe().dialect.inAttack, outAttack: window.clientProbe().dialect.outAttack,
+    }), id);
   }
 }
 
@@ -425,7 +551,9 @@ async function main() {
   const onTerminate = () => stop('SIGTERM');
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
-  const deadline = setTimeout(() => stop('scenario deadline (15 minutes)'), 15 * 60 * 1000);
+  // Combat adds two walks to the portal and the fight itself.
+  const minutes = phases.has('attack') ? 25 : 15;
+  const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
     const s = new Session(browser, gw.origin, label, creds);
@@ -444,7 +572,8 @@ async function main() {
       r[name] = { ok: true, ...(await fn()) };
       for (const s of sessions) if (s.context) await s.healthy();
     } catch (e) {
-      r[name] = { ...r[name], ok: false, error: redact(e?.message ?? e), ...(e?.trail && { trail: e.trail }) };
+      r[name] = { ...r[name], ok: false, error: redact(e?.message ?? e), ...(e?.trail && { trail: e.trail }),
+        ...(e?.stall && { stall: e.stall }) };
       throw e;
     } finally {
       r[name].ms = Date.now() - t0;
@@ -699,11 +828,10 @@ async function main() {
     // 2140..2143 x 2068..2071 -> 2588,2096, free). The client shows its own
     // confirm box (message 16) on the portal; OK sends ReqTeleport.
     await step('mapchange', async () => {
-      const onBox = () => a.eval(() => Module._wyd_scene_msgbox_message() === 16);
       // B walks next to the portal (outside its tile block) so its view covers
       // A at the moment of the teleport; otherwise "B loses A" proves nothing.
       const [trail, bTrail] = await Promise.all([
-        a.walkTo(2141.5, 2069.5, { stopWhen: onBox }),
+        a.walkToPortal(),
         // Position is secondary; the visibility assertion below decides.
         b.walkTo(2136.5, 2075.5, { near: 4, stallOk: true }),
       ]);
@@ -732,6 +860,75 @@ async function main() {
         bSawABeforeTeleport: bSawBefore.present === 1, arrived: after,
         nearArmiaField: Math.hypot(after.x - 2588, after.y - 2096) <= 4, bLostA: bLost === true,
         dialect: dialectSummary(p) };
+    });
+
+    // Stage 5, slice 1: A attacks a mob in Armia Field with real clicks; B, in
+    // the same field, watches. Every number comes from the server: damage via
+    // the 0x0367 broadcast, experience/gold via the echo and UpdateEtc.
+    await step('attack', async () => {
+      const [aTrip, bTrip] = await Promise.all([a.toArmiaField(), b.toArmiaField()]);
+      const tried = [];
+      let res;
+      for (let pick = 0; pick < 3 && !res; pick++) {
+        let mob;
+        for (let i = 0; i < 4 && !mob; i++) {
+          mob = (await a.mobs()).find(m => m.onScreen && m.hp > 0 && m.maxHp > 0 && !tried.some(t => t.id === m.id));
+          if (!mob) await a.walk(i % 2 ? -160 : 160, 80);
+        }
+        assert(mob, `no live entity on screen in Armia Field (tried ${tried.length})`);
+        const c0 = await a.combat(mob.id);
+        const bSees = (await b.eval(i => Module._wyd_field_human_present(i), mob.id)) === 1;
+        const bTrail = bSees ? [(await b.combat(mob.id)).hp] : [];
+        const hpTrail = [c0.hp];
+        let clicks = 0, lastClick = 0, killed = false, lost = false, died = false, bKill = false;
+        const end = Date.now() + 150000;
+        while (Date.now() < end) {
+          const c = await a.combat(mob.id);
+          if (c.myDie === 1 || c.myHp <= 0) { died = true; break; }
+          if (!c.present) { lost = hpTrail.at(-1) > 0; killed = !lost; break; }
+          if (c.hp !== hpTrail.at(-1)) hpTrail.push(c.hp);
+          if (c.die === 1 || c.hp <= 0) { killed = true; break; }
+          if (bSees) {
+            const v = await b.combat(mob.id);
+            if (!v.present || v.die === 1 || v.hp <= 0) bKill = true;
+            if (v.present && v.hp !== bTrail.at(-1)) bTrail.push(v.hp);
+          }
+          // One click per intent; the runtime paces its own swings. Re-click
+          // only when the target is still alive after a while (auto-attack
+          // stops when the target leaves reach).
+          if (Date.now() - lastClick > 6000) {
+            if (await a.clickHuman(mob.id)) clicks++;
+            lastClick = Date.now();
+          }
+          // Target never loses HP after several server echoes: not attackable
+          // (NonCombatNPC gets 0 damage). Try another one.
+          const now = await a.combat(mob.id);
+          if (clicks >= 3 && now.inAttack - c0.inAttack >= 3 && hpTrail.length === 1 && now.outAttack > c0.outAttack) break;
+          await sleep(1000);
+        }
+        await sleep(3000);
+        const c1 = await a.combat(mob.id);
+        if (bSees && !bKill) {
+          const v = await b.combat(mob.id);
+          if (!v.present || v.die === 1 || v.hp <= 0) bKill = true;
+        }
+        const r1 = {
+          target: { id: mob.id, name: mob.name, maxHp: mob.maxHp, distance: Math.round(mob.d) },
+          clicks, attacksSent: c1.outAttack - c0.outAttack, echoes: c1.inAttack - c0.inAttack,
+          hpTrail, killed, lost, died, exp0: c0.exp, exp1: c1.exp, coin0: c0.coin, coin1: c1.coin,
+          learnedSkill: c0.learnedSkill.toString(16), myClass: c0.myClass,
+          level: [c0.myLevel, c1.myLevel], myHp: [c0.myHp, c1.myHp], myMp: [c0.myMp, c1.myMp],
+          observer: { sawTarget: bSees, hpTrail: bTrail, sawKill: bKill },
+        };
+        tried.push(r1);
+        await a.shot(`attack-${pick}`);
+        if (bSees) await b.shot(`attack-${pick}`);
+        if (died || killed || hpTrail.length > 1) res = r1;
+      }
+      assert(res, `no target took damage: ${JSON.stringify(tried.map(t => ({ n: t.target.name, e: t.echoes, s: t.attacksSent })))}`);
+      if (!res.died) checkCombat(res);
+      return { aTrip, bTrip, result: res, tried: tried.length,
+        panelsClosed: { A: a.panelsClosed ?? [], B: b.panelsClosed ?? [] } };
     });
 
     await step('concurrent', async () => {

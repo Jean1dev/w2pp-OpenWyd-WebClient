@@ -126,5 +126,8 @@ Decisões no [ADR 003](decisions/003-in-world-dialect-and-automation.md). As fix
 | S→C | `0102` MessageBoxOk 16 → `0101` MessagePanel 140 (ID 0) | traduz o código local de `notice.go` para texto fixo | unitário + Railway ("Senha incorreta.") |
 | S→C | `0181` 28, `0182` 24, `0337` 48, `0166` 16, `018B` 16 | repassa se o tamanho for exato (`static_assert` dos offsets) | unitário |
 | C→S | `0290` ReqTeleport 16, `0291` ChangeCity 16 | repassa se o tamanho for exato; o servidor lê só o header | unitário; teleporte no Railway (ver evidências) |
+| S→C | `0367/039D/039E` Attack `60+8N` (N 1..13, até a capacidade do opcode) → 168/72/80 | traduz: ReqMp i16@58→i32@16; CurrentHp@16 do atacante sem campo no runtime; TargetID i32→u16 (overflow zerado e contado); FakeExp 0. Contador `inAttack` ([ADR 004](decisions/004-combat-dialect.md)) | unitário + overlay Go; Railway em [etapa 5](evidence/05-gameplay/README.md) |
+| C→S | `0367/039D/039E` Attack 168/72/80 → `60+8N` (N 13/1/2) | traduz por offset; padding e `@16/@58` zerados, TargetID ampliado a i32. Contador `outAttack` | unitário + overlay Go (decoder real) |
+| C→S | `0289` Restart 12, `0369` ReqMobByID 16, `03AE` 16 | repassa se o tamanho for exato; `03AE` não tem rota no servidor (só log `routed=false`) | unitário |
 
-Continuam descartados e contados: chat `0333/0334`, combate `0367/039D/039E`, itens/loja/banco/troca/grupo e os demais opcodes da matriz acima. Isso é trabalho da etapa 5. As verificações da etapa 4 toleram apenas o descarte de `0367` recebido no Field ([ADR 003, revisão 29/09](decisions/003-in-world-dialect-and-automation.md#revisão--29092026)).
+Continuam descartados e contados: chat `0333/0334`, itens/loja/banco/troca/grupo e os demais opcodes da matriz acima (etapa 5, fatias seguintes). O combate foi traduzido em 29/09 ([ADR 004](decisions/004-combat-dialect.md)); com isso `DEFERRED_INBOUND` ficou vazio e nenhum descarte é mais tolerado nas verificações.

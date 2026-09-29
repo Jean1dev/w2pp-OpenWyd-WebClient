@@ -19,17 +19,22 @@ import (
 
 func main() {
 	cfgPath := flag.String("config", "gateway.json", "operator configuration file")
+	fromEnv := flag.Bool("env", false, "read the configuration from WYD_* variables (container deployments)")
 	flag.Parse()
 
 	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
-	if err := run(*cfgPath, log); err != nil {
+	load := func() (*config.Config, error) { return config.Load(*cfgPath) }
+	if *fromEnv {
+		load = func() (*config.Config, error) { return config.FromEnv(os.Getenv) }
+	}
+	if err := run(load, log); err != nil {
 		log.Error("gateway stopped", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run(cfgPath string, log *slog.Logger) error {
-	cfg, err := config.Load(cfgPath)
+func run(load func() (*config.Config, error), log *slog.Logger) error {
+	cfg, err := load()
 	if err != nil {
 		return err
 	}
@@ -51,7 +56,8 @@ func run(cfgPath string, log *slog.Logger) error {
 		channels = append(channels, ch.Name)
 	}
 	log.Info("gateway listening", "addr", cfg.Listen, "tls", cfg.TLSCert != "",
-		"channels", channels, "static", cfg.StaticDir != "")
+		"tlsProxy", cfg.TLSTerminatedByProxy, "channels", channels, "static", cfg.StaticDir != "",
+		"assets", cfg.AssetDir != "", "auth", cfg.BasicAuth != nil)
 
 	errc := make(chan error, 1)
 	go func() {

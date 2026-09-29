@@ -281,6 +281,39 @@ def update_etc(d: dict) -> bytearray:
     return b
 
 
+# MSG_Attack as the server sends it (protocol/messages.go MsgAttackBody):
+# 60 + 8N bytes, CurrentHp@16, CurrentExp@24, PosX..TargetY@34..41,
+# AttackerID@42, Progress@44, Motion@46, DoubleCritical@48, CurrentMp@52,
+# SkillIndex@56, ReqMp@58, Dam[i]{TargetID i32, Damage i32}@60+8i.
+# The server always answers with 0x0367, whatever the request opcode was.
+ATTACK_ECHO = {"id": 30000, "currentHp": 320, "currentExp": (1 << 33) + 7, "posX": 2100, "posY": 2101,
+               "targetX": 2102, "targetY": 2103, "attackerId": 5, "progress": 3, "motion": 4,
+               "doubleCritical": 1, "currentMp": 45, "skillIndex": -1, "reqMp": 40,
+               "dam": [[1500, 37]]}
+ATTACK_MULTI = dict(ATTACK_ECHO, skillIndex=33, motion=6, doubleCritical=0,
+                    dam=[[1000 + i, -3 if i == 4 else 10 * i] for i in range(13)])
+ATTACK_MOB = {"id": 30000, "currentHp": 900, "currentExp": 0, "posX": 2110, "posY": 2111,
+              "targetX": 2100, "targetY": 2101, "attackerId": 1200, "progress": 0, "motion": 0,
+              "doubleCritical": 0, "currentMp": 0, "skillIndex": 0, "reqMp": 0, "dam": [[5, 12]]}
+ATTACK_TARGET_OVER = dict(ATTACK_ECHO, dam=[[70000, 37]])
+ATTACK_TOO_MANY = dict(ATTACK_MULTI, dam=[[1000 + i, 1] for i in range(14)])
+
+
+def attack(d: dict, opcode: int = 0x0367) -> bytearray:
+    n = len(d["dam"])
+    b = header(60 + 8 * n, opcode, d["id"])
+    struct.pack_into("<i", b, 16, d["currentHp"])
+    struct.pack_into("<q", b, 24, d["currentExp"])
+    struct.pack_into("<HHHHHH", b, 34, d["posX"], d["posY"], d["targetX"], d["targetY"],
+                     d["attackerId"], d["progress"])
+    b[46] = d["motion"]
+    b[48] = d["doubleCritical"]
+    struct.pack_into("<ihh", b, 52, d["currentMp"], d["skillIndex"], d["reqMp"])
+    for i, (target, dam) in enumerate(d["dam"]):
+        struct.pack_into("<ii", b, 60 + 8 * i, target, dam)
+    return b
+
+
 def standard_parm(opcode: int, ident: int, parm: int) -> bytearray:
     b = header(16, opcode, ident)
     struct.pack_into("<i", b, 12, parm)
@@ -325,6 +358,26 @@ def out_account_secure() -> bytearray:
     return b
 
 
+# Runtime attacks (dialect_test.cpp fills MSG_Attack* with these values over
+# 0xAB padding): the wire keeps only the server's fields, @16/@58 stay zero.
+OUT_ATTACK_ONE = {"opcode": 0x039D, "id": 5, "posX": 2100, "posY": 2101, "targetX": 2102, "targetY": 2103,
+                  "attackerId": 5, "motion": 4, "skillIndex": -1, "dam": [[1500, -2]]}
+OUT_ATTACK_MULTI = {"opcode": 0x0367, "id": 5, "posX": 2100, "posY": 2101, "targetX": 2102, "targetY": 2103,
+                    "attackerId": 5, "motion": 6, "skillIndex": 33,
+                    "dam": [[1000, -1], [1001, -1]] + [[0, 0]] * 11}
+
+
+def out_attack(d: dict) -> bytearray:
+    n = len(d["dam"])
+    b = header(60 + 8 * n, d["opcode"], d["id"])
+    struct.pack_into("<HHHHH", b, 34, d["posX"], d["posY"], d["targetX"], d["targetY"], d["attackerId"])
+    b[46] = d["motion"]
+    struct.pack_into("<h", b, 56, d["skillIndex"])
+    for i, (target, dam) in enumerate(d["dam"]):
+        struct.pack_into("<ii", b, 60 + 8 * i, target, dam)
+    return b
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.parse_args()
@@ -357,12 +410,20 @@ def main() -> int:
         # handler/notice.go: MsgMessageBoxOk with the local notice code, ID = conn.
         "notice_bad_pass": (standard_parm(0x0102, 7, 3), {"id": 7, "parm": 3}),
         "notice_unknown": (standard_parm(0x0102, 7, 999), {"id": 7, "parm": 999}),
+        # handler/combat.go echo of a one-target request, mobai.go mob strike.
+        "attack_echo": (attack(ATTACK_ECHO), ATTACK_ECHO),
+        "attack_multi": (attack(ATTACK_MULTI), ATTACK_MULTI),
+        "attack_mob": (attack(ATTACK_MOB), ATTACK_MOB),
+        "attack_target_overflow": (attack(ATTACK_TARGET_OVER), ATTACK_TARGET_OVER),
+        "attack_too_many": (attack(ATTACK_TOO_MANY), ATTACK_TOO_MANY),
     }
     outbound = {
         "account_login": (out_account_login(), dict(OUT_ACCOUNT, clientVersion=CLIENT_VERSION)),
         "character_login": (out_character_login(), OUT_CHARLOGIN),
         "delete_character": (out_delete_character(), OUT_DELETE),
         "account_secure": (out_account_secure(), OUT_SECURE),
+        "attack_one": (out_attack(OUT_ATTACK_ONE), OUT_ATTACK_ONE),
+        "attack_multi": (out_attack(OUT_ATTACK_MULTI), OUT_ATTACK_MULTI),
     }
     doc = {
         "generator": "tools/protocol/gen_fixtures.py",

@@ -72,15 +72,34 @@ type Config struct {
 	TLSKey  string `json:"tlsKey"`
 	// AllowInsecure explicitly permits plain HTTP/WS, intended for local development.
 	AllowInsecure bool `json:"allowInsecure"`
+	// TLSTerminatedByProxy declares that a platform edge (e.g. Railway) serves
+	// HTTPS/WSS and forwards plain HTTP to Listen. The public side must then be
+	// wss:// and https:// only; nothing is served insecurely to the browser.
+	TLSTerminatedByProxy bool `json:"tlsTerminatedByProxy"`
 	// AllowedOrigins are exact scheme://host[:port] browser origins.
 	AllowedOrigins []string `json:"allowedOrigins"`
 	// StaticDir optionally serves the built client from the same origin.
-	StaticDir            string    `json:"staticDir"`
+	StaticDir string `json:"staticDir"`
+	// AssetDir is a second read-only root for files absent from StaticDir: the
+	// operator's local game data (never part of the image or the repository).
+	AssetDir string `json:"assetDir"`
+	// BasicAuth, when set, protects every route except /healthz. The password
+	// comes from the operator's environment, never from a committed file.
+	BasicAuth            *BasicAuth `json:"basicAuth"`
 	AssetManifestVersion string    `json:"assetManifestVersion"`
 	DefaultChannel       string    `json:"defaultChannel"`
 	Channels             []Channel `json:"channels"`
 	Limits               Limits    `json:"limits"`
 }
+
+// BasicAuth is a single operator-issued credential for a private deployment.
+type BasicAuth struct {
+	User     string `json:"user"`
+	Password string `json:"password"`
+}
+
+// MinPasswordLen rejects trivially guessable deployment passwords.
+const MinPasswordLen = 12
 
 var channelName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
 
@@ -125,8 +144,29 @@ func (c *Config) Validate() error {
 	if tls && (c.TLSCert == "" || c.TLSKey == "") {
 		errs = append(errs, errors.New("tlsCert and tlsKey must be set together"))
 	}
-	if !tls && !c.AllowInsecure {
-		errs = append(errs, errors.New("no TLS configured: set tlsCert/tlsKey or allowInsecure for local development"))
+	if !tls && !c.AllowInsecure && !c.TLSTerminatedByProxy {
+		errs = append(errs, errors.New("no TLS configured: set tlsCert/tlsKey, tlsTerminatedByProxy, or allowInsecure for local development"))
+	}
+	if c.TLSTerminatedByProxy && c.AllowInsecure {
+		errs = append(errs, errors.New("tlsTerminatedByProxy and allowInsecure are exclusive"))
+	}
+	if c.TLSTerminatedByProxy {
+		for _, o := range c.AllowedOrigins {
+			if !strings.HasPrefix(o, "https://") {
+				errs = append(errs, fmt.Errorf("allowedOrigins: %q must be https:// behind a TLS proxy", o))
+			}
+		}
+	}
+	if a := c.BasicAuth; a != nil {
+		if a.User == "" || strings.Contains(a.User, ":") {
+			errs = append(errs, errors.New("basicAuth.user must be non-empty and contain no ':'"))
+		}
+		if len(a.Password) < MinPasswordLen {
+			errs = append(errs, fmt.Errorf("basicAuth.password must have at least %d characters", MinPasswordLen))
+		}
+	}
+	if c.AssetDir != "" && c.StaticDir == "" {
+		errs = append(errs, errors.New("assetDir requires staticDir"))
 	}
 	if len(c.AllowedOrigins) == 0 {
 		errs = append(errs, errors.New("allowedOrigins is empty"))

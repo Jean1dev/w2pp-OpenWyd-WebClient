@@ -429,6 +429,45 @@ func TestExtDialectInbound(t *testing.T) {
 	t.Run("notice_unknown", func(t *testing.T) {
 		same(t, EncodeStandardParm(999), body(t, "notice_unknown"))
 	})
+	for _, name := range []string{"attack_echo", "attack_multi", "attack_mob", "attack_target_overflow"} {
+		t.Run(name, func(t *testing.T) {
+			var l fxAttack
+			mustJSON(t, d.Inbound[name].Logical, &l)
+			m := l.body()
+			same(t, m.Encode(), body(t, name))
+		})
+	}
+}
+
+// fxAttack is the logical MSG_Attack of gen_fixtures.py.
+type fxAttack struct {
+	CurrentHp      int32      `json:"currentHp"`
+	CurrentExp     int64      `json:"currentExp"`
+	PosX           uint16     `json:"posX"`
+	PosY           uint16     `json:"posY"`
+	TargetX        uint16     `json:"targetX"`
+	TargetY        uint16     `json:"targetY"`
+	AttackerID     uint16     `json:"attackerId"`
+	Progress       uint16     `json:"progress"`
+	Motion         uint8      `json:"motion"`
+	DoubleCritical uint8      `json:"doubleCritical"`
+	CurrentMp      int32      `json:"currentMp"`
+	SkillIndex     int16      `json:"skillIndex"`
+	ReqMp          int16      `json:"reqMp"`
+	Dam            [][2]int32 `json:"dam"`
+}
+
+func (a fxAttack) body() MsgAttackBody {
+	m := MsgAttackBody{
+		CurrentHp: a.CurrentHp, CurrentExp: a.CurrentExp, PosX: a.PosX, PosY: a.PosY,
+		TargetX: a.TargetX, TargetY: a.TargetY, AttackerID: a.AttackerID, Progress: a.Progress,
+		Motion: a.Motion, DoubleCritical: a.DoubleCritical, CurrentMp: a.CurrentMp,
+		SkillIndex: a.SkillIndex, ReqMp: a.ReqMp,
+	}
+	for _, d := range a.Dam {
+		m.Dam = append(m.Dam, DamEntry{TargetID: d[0], Damage: d[1]})
+	}
+	return m
 }
 
 // TestExtDialectOutbound: what the client translator must emit parses, with
@@ -505,4 +544,42 @@ func TestExtDialectOutbound(t *testing.T) {
 			t.Fatalf("decoded %+v", m)
 		}
 	})
+	// The server derives the target count from the length and reads TargetID
+	// as i32: the frame must carry exactly the runtime's N entries, zero-extended.
+	for _, tc := range []struct {
+		name string
+		typ  Type
+	}{{"attack_one", MsgAttackOne}, {"attack_multi", MsgAttack}} {
+		t.Run(tc.name, func(t *testing.T) {
+			h, b := frame(tc.name)
+			var l struct {
+				PosX       uint16     `json:"posX"`
+				PosY       uint16     `json:"posY"`
+				TargetX    uint16     `json:"targetX"`
+				TargetY    uint16     `json:"targetY"`
+				AttackerID uint16     `json:"attackerId"`
+				Motion     uint8      `json:"motion"`
+				SkillIndex int16      `json:"skillIndex"`
+				Dam        [][2]int32 `json:"dam"`
+			}
+			mustJSON(t, d.Outbound[tc.name].Logical, &l)
+			var m MsgAttackBody
+			if h.Type != tc.typ || m.Decode(b) != nil || len(b) != MsgAttackDamOffset+len(l.Dam)*MsgAttackDamStride {
+				t.Fatalf("type %v len %d", h.Type, len(b))
+			}
+			if m.PosX != l.PosX || m.PosY != l.PosY || m.TargetX != l.TargetX || m.TargetY != l.TargetY ||
+				m.AttackerID != l.AttackerID || m.Motion != l.Motion || m.SkillIndex != l.SkillIndex ||
+				m.CurrentHp != 0 || m.ReqMp != 0 || m.CurrentExp != 0 || m.CurrentMp != 0 {
+				t.Fatalf("decoded %+v", m)
+			}
+			if len(m.Dam) != len(l.Dam) {
+				t.Fatalf("dam %d, want %d", len(m.Dam), len(l.Dam))
+			}
+			for i, e := range l.Dam {
+				if m.Dam[i].TargetID != e[0] || m.Dam[i].Damage != e[1] {
+					t.Fatalf("dam[%d] = %+v", i, m.Dam[i])
+				}
+			}
+		})
+	}
 }

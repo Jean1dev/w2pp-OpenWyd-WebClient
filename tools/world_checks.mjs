@@ -14,7 +14,7 @@ export function redactEvidence(value, secrets) {
 }
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
-  'inventory', 'second', 'move', 'logout', 'mapchange', 'concurrent'];
+  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -28,7 +28,7 @@ export function validateOptions(opt) {
   assert(new Set(names).size === names.length, 'duplicate phase');
   const phases = new Set(names);
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
-    move: ['second'], logout: ['second'], mapchange: ['second'], concurrent: ['enter'] };
+    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
     assert(phases.has(dep), `${name} requires ${dep}`);
   return phases;
@@ -36,12 +36,12 @@ export function validateOptions(opt) {
 
 // Inbound gameplay the dialect deliberately drops until its layout is
 // translated (ADR 003: unmapped packets are dropped and counted, never reach a
-// scene). Only these, and only as "unknown" drops, may appear in a stage 4
-// scenario; they are reported in the evidence. Any other drop still fails.
-//   0x0367 MSG_Attack: mob/player combat broadcast in hostile fields (stage 5).
-export const DEFERRED_INBOUND = new Set(['0x0367']);
+// scene). Only these, and only as "unknown" drops, may appear in a scenario;
+// they are reported in the evidence. Any other drop still fails.
+// 0x0367 (MSG_Attack) left the list when it was translated (ADR 004).
+export const DEFERRED_INBOUND = new Set();
 
-export function checkHealth(p, errors = []) {
+export function checkHealth(p, errors = [], deferredIn = DEFERRED_INBOUND) {
   assert.equal(errors.length, 0, 'page errors');
   assert.equal(p.glErrorTotal, 0, 'WebGL errors');
   assert.equal(p.placeholder, 0, 'placeholder scene');
@@ -49,7 +49,7 @@ export function checkHealth(p, errors = []) {
     'outDropSize', 'outDropRange', 'outDropNoVersion'])
     assert.equal(p.dialect[k], 0, `protocol rejection: ${k}`);
   const droppedIn = p.dialect.droppedIn ?? [];
-  const unexpected = droppedIn.filter(d => !DEFERRED_INBOUND.has(d.opcode));
+  const unexpected = droppedIn.filter(d => !deferredIn.has(d.opcode));
   assert.deepEqual(unexpected, [], 'protocol rejection: inbound opcode outside the deferred list');
   const deferred = droppedIn.reduce((n, d) => n + d.times, 0);
   assert(p.dialect.inDropUnknown <= deferred, `protocol rejection: inDropUnknown ${p.dialect.inDropUnknown} > deferred ${deferred}`);
@@ -74,4 +74,20 @@ export function checkTeleport(after) {
   // Loaded terrain block, 128 cells per block: 2588>>7 = 20, 2096>>7 = 16.
   assert.equal(after.groundX, 20, 'destination terrain block X not loaded');
   assert.equal(after.groundY, 16, 'destination terrain block Y not loaded');
+}
+
+// Combat result as observed by the clients. Damage, HP and experience are the
+// server's (0x0367 echo / broadcast); the harness only compares observations.
+export function checkCombat(c) {
+  assert(c.attacksSent > 0, 'no attack left the client');
+  assert(c.echoes > 0, 'no attack echo from the server');
+  assert(c.hpTrail.length >= 2, 'target HP never observed twice');
+  const first = c.hpTrail[0], last = c.hpTrail.at(-1);
+  assert(c.killed || last < first, 'target HP never decreased');
+  if (c.killed) assert(c.exp1 > c.exp0, 'kill without server experience');
+  assert(c.exp1 >= c.exp0, 'experience decreased while attacking');
+  for (let i = 1; i < c.hpTrail.length; i++)
+    assert(c.hpTrail[i] <= c.hpTrail[i - 1] || c.regen, 'target HP rose without regeneration');
+  if (c.observer?.sawTarget) assert(c.observer.hpTrail.at(-1) < c.observer.hpTrail[0] || c.observer.sawKill,
+    'observer did not see the damage');
 }

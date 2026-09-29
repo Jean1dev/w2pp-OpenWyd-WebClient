@@ -1,0 +1,123 @@
+Read-only probes for the stage 5 harness: entity HP/death/screen position,
+entity enumeration, own score/exp/skill mask and visible Field panels.
+Attacks stay real mouse clicks; panels are closed with the real ESC key.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -18,6 +18,7 @@
+ #include "TMScene.h"
+ #include "TMSelectCharScene.h"
+ #include "TMSelectServerScene.h"
++#include "TMFieldScene.h"
+ #include "TMSkinMesh.h"
+ 
+ #include <cstring>
+@@ -745,6 +746,107 @@ extern "C" WYD_EXPORT int wyd_field_human_look_mesh(unsigned int id, int part) {
+   return reinterpret_cast<const short*>(&h->m_stLookInfo)[part * 2];
+ }
+ 
++// Combat probes (read-only). HP is what the runtime shows: CreateMob score
++// minus the server's Dam[] from 0x367 echoes; nothing here computes damage.
++extern "C" WYD_EXPORT int wyd_field_human_hp(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_stScore.Hp : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_human_max_hp(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_stScore.MaxHp : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_human_die(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_cDie : -1;
++}
++
++// Smallest live human id greater than `after` (0 when none): lets the harness
++// enumerate the scene without a buffer protocol. Same walk as
++// ObjectManager::GetHumanByID.
++extern "C" WYD_EXPORT unsigned int wyd_field_human_next(unsigned int after) {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return 0;
++  TreeNode* root = g_pCurrentScene->m_pHumanContainer;
++  TreeNode* node = root;
++  unsigned int best = 0;
++  if (!node) return 0;
++  do {
++    if (!node->m_cDeleted) {
++      if (node->m_dwID > after && (!best || node->m_dwID < best)) best = node->m_dwID;
++      if (node->m_pDown) {
++        node = node->m_pDown;
++        continue;
++      }
++    }
++    do {
++      if (node->m_pNextLink) {
++        node = node->m_pNextLink;
++        break;
++      }
++      node = node->m_pTop;
++    } while (node != root && node);
++  } while (node != root && node);
++  return best;
++}
++
++// Screen position (device pixels, which = 0 x, 1 y) of a human's chest, the
++// same projection the scene uses for damage numbers; -1 when off screen.
++extern "C" WYD_EXPORT int wyd_field_human_screen(unsigned int id, int which) {
++  TMHuman* h = WydFieldHuman(id);
++  if (!h) return -1;
++  int x = 0, y = 0;
++  if (!BASE_Get3DTo2DPos(h->m_vecPosition.x, h->m_fHeight + 1.0f, h->m_vecPosition.y, &x, &y)) return -1;
++  return which == 0 ? x : y;
++}
++
++extern "C" WYD_EXPORT unsigned int wyd_field_hover_human_id() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || !g_pCurrentScene->m_pMouseOverHuman)
++    return 0;
++  return g_pCurrentScene->m_pMouseOverHuman->m_dwID;
++}
++
++// Own score as the client holds it (field 0 Hp, 1 MaxHp, 2 Mp, 3 MaxMp,
++// 4 Level, 5 Coin, 6 LearnedSkill mask, 7 Class) and experience (double: exact up to 2^53).
++extern "C" WYD_EXPORT int wyd_field_my_score(int field) {
++  if (!g_pObjectManager) return -1;
++  const STRUCT_MOB& m = g_pObjectManager->m_stMobData;
++  switch (field) {
++    case 0: return m.CurrentScore.Hp;
++    case 1: return m.CurrentScore.MaxHp;
++    case 2: return m.CurrentScore.Mp;
++    case 3: return m.CurrentScore.MaxMp;
++    case 4: return m.CurrentScore.Level;
++    case 5: return m.Coin;
++    case 6: return static_cast<int>(m.LearnedSkill[0]);
++    case 7: return static_cast<int>(m.Class);
++    default: return -1;
++  }
++}
++
++// Field panels currently visible, as a bitmask in TMFieldScene::OnESC order
++// (bit i = panels[i]). Automation must not click the world through a panel
++// that a stray click opened; ESC closes the topmost one, as for a player.
++extern "C" WYD_EXPORT unsigned int wyd_field_open_panels() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return 0;
++  auto* f = static_cast<TMFieldScene*>(g_pCurrentScene);
++  SControl* panels[] = {f->m_pAutoTrade, f->m_pPGTPanel, f->m_pQuestPanel, f->m_pShopPanel,
++    f->m_pCargoPanel, f->m_pTradePanel, f->m_pSkillPanel, f->m_pInvenPanel, f->m_pCPanel,
++    f->m_pPartyPanel, f->m_pHelpPanel, f->m_pTotoPanel, f->m_pServerPanel, f->m_pPotalPanel,
++    f->m_pSystemPanel, f->m_pInputGoldPanel, f->m_pFireWorkPanel};
++  unsigned int mask = 0;
++  for (unsigned int i = 0; i < sizeof(panels) / sizeof(panels[0]); ++i)
++    if (panels[i] && panels[i]->IsVisible()) mask |= 1u << i;
++  return mask;
++}
++
++extern "C" WYD_EXPORT double wyd_field_my_exp() {
++  return g_pObjectManager ? static_cast<double>(g_pObjectManager->m_stMobData.Exp) : -1.0;
++}
++
+ extern "C" int wyd_start_client() {
+   wchar_t empty_cmdline[] = L"";
+   return wWinMain(reinterpret_cast<HINSTANCE>(1), nullptr, empty_cmdline, 1);

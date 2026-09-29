@@ -1,0 +1,13 @@
+# Only the sources the Dockerfile copies; never local data, toolchains or secrets.
+.git
+.env
+.env.*
+.cache
+.emscripten_cache
+external
+assets-local
+node_modules
+reference
+gateway.local.json
+**/__pycache__
+*.log

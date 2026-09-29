@@ -424,6 +424,125 @@ static void TestOutbound()
 	CHECK(WydDialectDroppedOpcode(1, WydDialectDroppedCount(1) - 1) == 0x333);
 }
 
+static void TestAttack()
+{
+	WydDialectResetStats();
+	{
+		// One-target echo: the server answers 0x367 with N = 1.
+		const auto& m = Translate<MSG_Attack>(k_in_attack_echo);
+		CHECK(m.Header.Type == 0x367 && m.Header.ID == 30000 && m.Header.Size == 168);
+		CHECK(m.FakeExp == 0);
+		CHECK(m.ReqMp == 40); // server ReqMp@58, not its CurrentHp@16 (320)
+		CHECK(m.CurrentExp == (1LL << 33) + 7 && m.Rsv == 0);
+		CHECK(m.PosX == 2100 && m.PosY == 2101 && m.TargetX == 2102 && m.TargetY == 2103);
+		CHECK(m.AttackerID == 5 && m.Progress == 3 && m.Motion == 4 && m.FlagLocal == 0);
+		CHECK(m.DoubleCritical == 1 && m.SkillParm == 0 && m.CurrentMp == 45 && m.SkillIndex == -1);
+		CHECK(m.Dam[0].TargetID == 1500 && m.Dam[0].Damage == 37);
+		for (int i = 1; i < 13; ++i)
+			CHECK(m.Dam[i].TargetID == 0 && m.Dam[i].Damage == 0);
+	}
+	{
+		const auto& m = Translate<MSG_Attack>(k_in_attack_multi);
+		CHECK(m.SkillIndex == 33 && m.Motion == 6 && m.ReqMp == 40);
+		CHECK(m.Dam[0].TargetID == 1000 && m.Dam[0].Damage == 0);
+		CHECK(m.Dam[4].TargetID == 1004 && m.Dam[4].Damage == -3); // miss code kept
+		CHECK(m.Dam[12].TargetID == 1012 && m.Dam[12].Damage == 120);
+	}
+	{
+		const auto& m = Translate<MSG_Attack>(k_in_attack_mob);
+		CHECK(m.AttackerID == 1200 && m.ReqMp == 0 && m.SkillIndex == 0);
+		CHECK(m.Dam[0].TargetID == 5 && m.Dam[0].Damage == 12);
+	}
+	CHECK(WydDialectStatValue(WYD_STAT_FIELD_ZEROED) == 0);
+	{
+		const auto& m = Translate<MSG_Attack>(k_in_attack_target_overflow);
+		CHECK(m.Dam[0].TargetID == 0 && m.Dam[0].Damage == 37);
+		CHECK(WydDialectStatValue(WYD_STAT_FIELD_ZEROED) == 1);
+	}
+	CHECK(WydDialectStatValue(WYD_STAT_IN_TRANSLATED) == 4);
+	CHECK(WydDialectStatValue(WYD_STAT_IN_ATTACK) == 4);
+
+	int size = 0;
+	CHECK(In(k_in_attack_too_many, &size) == WYD_DIALECT_DROP); // N = 14
+	CHECK(In(k_in_attack_echo, &size, 60) == WYD_DIALECT_DROP);  // N = 0
+	CHECK(In(k_in_attack_echo, &size, 64) == WYD_DIALECT_DROP);  // half an entry
+	CHECK(In(k_in_attack_echo, &size, 12) == WYD_DIALECT_DROP);
+	{
+		// The typed opcodes keep their own capacity.
+		unsigned char two[sizeof(k_in_attack_multi)];
+		std::memcpy(two, k_in_attack_multi, sizeof(two));
+		two[4] = 0x9E;
+		two[5] = 0x03;
+		CHECK(In(two, &size, 76) == WYD_DIALECT_TRANSLATED && size == 80);
+		CHECK(reinterpret_cast<const MSG_AttackTwo*>(g_out)->Dam[1].TargetID == 1001);
+		CHECK(In(two, &size, 84) == WYD_DIALECT_DROP); // three targets in AttackTwo
+		two[4] = 0x9D;
+		CHECK(In(two, &size, 68) == WYD_DIALECT_TRANSLATED && size == 72);
+		CHECK(In(two, &size, 76) == WYD_DIALECT_DROP);
+	}
+	CHECK(WydDialectStatValue(WYD_STAT_IN_DROP_SIZE) == 6);
+	CHECK(WydDialectStatValue(WYD_STAT_IN_DROP_UNKNOWN) == 0);
+
+	// Outbound: runtime structs over non-zero padding.
+	char wire[WYD_DIALECT_MAX_FRAME];
+	MSG_Attack a;
+	std::memset(&a, 0xAB, sizeof(a));
+	a.Header.Size = sizeof(MSG_AttackOne);
+	a.Header.KeyWord = 0;
+	a.Header.CheckSum = 0;
+	a.Header.Type = 0x39D;
+	a.Header.ID = 5;
+	a.Header.Tick = 0x01020304;
+	a.FakeExp = 0;
+	a.ReqMp = 999; // runtime-only: must not reach the server
+	a.CurrentExp = 0;
+	a.Rsv = 0;
+	a.PosX = 2100;
+	a.PosY = 2101;
+	a.TargetX = 2102;
+	a.TargetY = 2103;
+	a.AttackerID = 5;
+	a.Progress = 0;
+	a.Motion = 4;
+	a.FlagLocal = 0;
+	a.DoubleCritical = 0;
+	a.SkillParm = 0;
+	a.CurrentMp = 0;
+	a.SkillIndex = -1;
+	a.Dam[0].TargetID = 1500;
+	a.Dam[0].Damage = -2;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), sizeof(MSG_AttackOne), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 68 && std::memcmp(wire, k_out_attack_one, 68) == 0);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), sizeof(MSG_Attack), wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+
+	a.Header.Size = sizeof(MSG_Attack);
+	a.Header.Type = 0x367;
+	a.Motion = 6;
+	a.SkillIndex = 33;
+	for (int i = 0; i < 13; ++i)
+	{
+		a.Dam[i].TargetID = i < 2 ? static_cast<unsigned short>(1000 + i) : 0;
+		a.Dam[i].Damage = i < 2 ? -1 : 0;
+	}
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), sizeof(MSG_Attack), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 164 && std::memcmp(wire, k_out_attack_multi, 164) == 0);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), 164, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_TRANSLATED) == 2);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_ATTACK) == 2);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_SIZE) == 2);
+
+	// Restart (header only) and ReqMobByID (StandardParm) pass unchanged.
+	char restart[12] = {12, 0, 0, 0, static_cast<char>(0x89), 0x02};
+	CHECK(WydDialectOutbound(restart, 12, wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
+	CHECK(WydDialectOutbound(restart, 16, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	char reqMob[16] = {16, 0, 0, 0, 0x69, 0x03};
+	CHECK(WydDialectOutbound(reqMob, 16, wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
+	CHECK(WydDialectOutbound(reqMob, 12, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	char delay[16] = {16, 0, 0, 0, static_cast<char>(0xAE), 0x03};
+	CHECK(WydDialectOutbound(delay, 16, wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
+	CHECK(WydDialectOutbound(delay, 12, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+}
+
 int main()
 {
 	TestAccountLogin();
@@ -433,6 +552,7 @@ int main()
 	TestInboundPassAndDrop();
 	TestInWorld();
 	TestOutbound();
+	TestAttack();
 	std::printf("%d checks, %d failures\n", g_checks, g_failures);
 	return g_failures == 0 ? 0 : 1;
 }

@@ -48,9 +48,9 @@ $wasmArtifact = Get-ChildItem external/OpenWyd/webclient/client-wasm/build/link 
 & ./.cache/toolchains/emsdk/node/22.16.0_64bit/bin/node.exe tools/verify_wasm.mjs $wasmArtifact.FullName
 ```
 
-A primeira compilação produziu 114 objetos, mas **retornou 2** porque seu fingerprint mudou durante a execução. A repetição retornou 0 com `contract_unchanged=true` e `certified=true`. Não alterar o contrato para ignorar esse erro. A causa exata da primeira diferença não foi isolada; inicialização da toolchain é hipótese, não conclusão.
+A primeira compilação produziu 114 objetos, mas **retornou 2** porque seu fingerprint mudou durante a execução. A repetição retornou 0 com `contract_unchanged=true` e `certified=true`. Não alterar o contrato para ignorar esse erro. Causa confirmada em execução em 29/09/2026 no build Docker com cache frio: a identidade do compilador inclui a saída de `em++ --version`, que muda na primeira execução de uma toolchain nova (mensagens de sanity/cache). Aquecer a toolchain antes do build resolve ([evidências](evidence/08-entrega/README.md)).
 
-O link `--dev` compilou os objetos incrementais, `wyd_client_entry.cpp` e `win32_emscripten_stubs.cpp`, e produziu JS/WASM com 0 símbolos indefinidos. `--dev` deixa os assets externos; não significa runtime pronto para jogar. Há warnings de capitalização de includes Windows/D3D9. Linux/macOS não foram validados.
+O link `--dev` compilou os objetos incrementais, `wyd_client_entry.cpp` e `win32_emscripten_stubs.cpp`, e produziu JS/WASM com 0 símbolos indefinidos. `--dev` deixa os assets externos; não significa runtime pronto para jogar. Há warnings de capitalização de includes Windows/D3D9. O build Linux foi validado em 29/09/2026 dentro do `Dockerfile` (`emscripten/emsdk:6.0.0`); macOS não foi validado.
 
 Resultados gerados, todos fora do Git: `webclient/client-wasm/build/obj/`, relatórios de objetos/link, `.pch`, response file e `build/link/tmproject_startup.<id>.{js,wasm}` com bootstrap `tmproject_startup.js`. O WASM medido tem 1.893.013 bytes; JS principal, 252.904 bytes. O probe Node verificou o módulo e quatro exports de ciclo de vida sem instanciá-lo ou abrir rede.
 
@@ -144,3 +144,27 @@ npx -y @railway/cli@5.63.1 link --project 08049b1a-6753-4274-b436-0dff658a5df1 -
 npx -y @railway/cli@5.63.1 variables --service tm-server --json   # ler só RAILWAY_TCP_PROXY_* e W2PP_CLIENT_VERSION; não imprimir segredos
 node tools/verify_client_stream.mjs --mode server --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env
 ```
+
+## Checkouts fixados, CI e imagem (29/09/2026)
+
+`tools/fetch_pinned.py` faz o sparse clone do servidor ou do upstream no commit do `dependencies.lock.json` e confere o `HEAD`. Com checkout existente, apenas verifica o SHA:
+
+```powershell
+python tools/fetch_pinned.py server     # external/server
+python tools/fetch_pinned.py upstream   # external/OpenWyd
+```
+
+A CI (`.github/workflows/ci.yml`) usa Go 1.25.13, Node 22.16.0, Python 3.13 e o contêiner `emscripten/emsdk:6.0.0`. Ela roda gateway com `-race`, reprodutibilidade de `docs/evidence/03-protocolo`, vetores contra o codec do servidor fixado, teste do dialeto em wasm32 e build da imagem com smoke sem assets. `run_dialect_test.py` usa o emsdk local em `.cache/toolchains/emsdk` quando existe e, senão, o `EMSDK` do ambiente.
+
+Imagem local, a mesma do deploy ([deploy.md](deploy.md)):
+
+```powershell
+docker build --build-arg BUILD_JOBS=4 -t wyd-webclient:local .
+python tools/pack_deploy_assets.py      # dados do operador para o Volume (.cache/deploy-assets)
+docker run --rm -p 8080:8080 -e PORT=8080 -e WYD_PUBLIC_ORIGIN=https://exemplo.invalid `
+  -e WYD_TARGET=reseau.proxy.rlwy.net:56950 -e WYD_CLIENT_VERSION=12000 `
+  -e WYD_BASIC_AUTH_USER=operador -e WYD_BASIC_AUTH_PASSWORD=<senha local> `
+  -v ${PWD}/.cache/deploy-assets:/data/assets:ro wyd-webclient:local
+```
+
+Sem TLS local, o navegador não abre `wss://exemplo.invalid`. Esse `docker run` serve para conferir rotas, autenticação e assets; o jogo local continua usando `make dev`.
