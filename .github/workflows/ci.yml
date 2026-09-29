@@ -56,6 +56,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: Pinned server + upstream checkouts (CPSock table sources)
+        run: |
+          python tools/fetch_pinned.py server
+          python tools/fetch_pinned.py upstream
       - name: world_checks unit tests
         run: node --test tools/world_checks.test.mjs
       - name: Harness scripts parse
@@ -80,8 +84,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Pinned server checkout
-        run: python tools/fetch_pinned.py server
+      - name: Pinned server + upstream checkouts
+        run: |
+          python tools/fetch_pinned.py server
+          python tools/fetch_pinned.py upstream
       - name: Transport vectors + dialect overlay (server encoders/decoders)
         env:
           GOTOOLCHAIN: local
