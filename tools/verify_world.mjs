@@ -16,6 +16,7 @@
 //   logout    A closes; B loses A. A logs in again and B sees A again
 //   mapchange A walks onto the Armia -> Armia Field portal and confirms; B loses A
 //   attack    A and B walk to Armia's Gremlins; A attacks, B watches, then A relogs
+//   death     A dies to the Armia Field Trolls, returns to town (box 11, 0x03AE/0x0289); B at the spawn sees it
 //   concurrent A's account logs in a second time while A is in the Field
 //
 // Credentials come from W2PP_TEST_{ACCOUNT,PASSWORD,PIN,CHAR}[2] (env or --env-file)
@@ -30,7 +31,7 @@ import { resolve, join } from 'node:path';
 import { freemem, totalmem } from 'node:os';
 import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, redactEvidence } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -601,7 +602,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = phases.has('attack') ? 25 : 15;
+  const minutes = phases.has('attack') || phases.has('death') ? 25 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -928,6 +929,78 @@ async function main() {
         bSawABeforeTeleport: bSawBefore.present === 1, arrived: after,
         nearArmiaField: Math.hypot(after.x - 2588, after.y - 2096) <= 4, bLostA: bLost === true,
         dialect: dialectSummary(p) };
+    });
+
+    // Stage 5, slice 2: A dies to the Armia Field Trolls (the portal route that
+    // killed the starter character in the first combat run) and returns to town
+    // through the runtime's own box 11 -> 0x03AE -> 0x0289. B waits at the
+    // Armia spawn and must see A come back. Death, revival HP and the city
+    // spawn are all decided by the server (mobai.go, character.go restart).
+    await step('death', async () => {
+      const c0 = await a.combat(0);
+      const before = { level: c0.myLevel, exp: c0.exp, hp: c0.myHp, maxHp: c0.myMaxHp };
+      // Baseline before the portal: the Trolls can kill a starter character
+      // during toArmiaField's post-teleport wait (first death run: mobHits 0).
+      const hits0 = c0.inAttack;
+      const trip = await a.toArmiaField();
+      await sample('death: A in Armia Field');
+      const hpTrail = [c0.myHp];
+      let dead, approaches = 0, lastApproach = Date.now();
+      const end = Date.now() + 180000;
+      while (Date.now() < end) {
+        const c = await a.combat(0);
+        if (c.myHp !== hpTrail.at(-1)) hpTrail.push(c.myHp);
+        if (c.myHp <= 0 || c.myDie === 1) { dead = c; break; }
+        // Trolls aggro on sight; if none has after a while, step next to the
+        // nearest live mob with a real ground click. A never attacks.
+        if (Date.now() - lastApproach > 20000) {
+          const mob = (await a.mobs()).find(m => m.hp > 0);
+          if (mob) { approaches++; await a.walkTo(mob.x, mob.y, { near: 2, maxClicks: 3, stallOk: true }); }
+          lastApproach = Date.now();
+        }
+        await sleep(1000);
+      }
+      assert(dead, `A did not die within 3 minutes (HP ${hpTrail.join(',')})`);
+      console.log(`    A died: HP ${hpTrail.join(',')}`);
+      await sleep(2000);
+      await a.shot('dead');
+      // A left click on the field while dead opens box 11 (TMFieldScene
+      // OnMouseEvent); a Troll under the cursor is skipped, not clicked.
+      let box = 0;
+      for (const [dx, dy] of [[0, 120], [-160, 60], [160, 60], [0, -120], [120, 120], [-120, 120]]) {
+        try { await a.clickGround(dx, dy); }
+        catch (e) { if (String(e.message).includes('overlaps entity')) continue; throw e; }
+        box = await a.eval(() => Module._wyd_scene_msgbox_message());
+        if (box === 11) break;
+      }
+      await a.shot('return-box');
+      const at0 = await a.me();
+      assert.equal(await a.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'OK refused');
+      // The runtime sends 0x03AE now and 0x0289 about 5 s later; record the
+      // sequence of last-sent opcodes until the server's recall moves A.
+      const sent = [];
+      let moved;
+      const t0 = Date.now();
+      while (Date.now() - t0 < 30000) {
+        const op = '0x' + (await a.eval(() => window.clientProbe().socket.lastSentOpcode)).toString(16).padStart(4, '0');
+        if (sent.at(-1) !== op) sent.push(op);
+        const me = await a.me();
+        if (Math.hypot(me.x - at0.x, me.y - at0.y) > 50) { moved = me; break; }
+        await sleep(100);
+      }
+      assert(moved, `no recall within 30 s (sent ${sent.join(',')})`);
+      await sleep(3000);
+      const c1 = await a.combat(0);
+      const after = { ...(await a.me()), hp: c1.myHp, maxHp: c1.myMaxHp, die: c1.myDie, level: c1.myLevel, exp: c1.exp };
+      const sawRespawn = (await b.until('B sees A back in town', id => Module._wyd_field_human_present(id) === 1,
+        30000, a.id)) === true;
+      await a.shot('respawned');
+      await b.shot('respawn-observer');
+      const res = { before, trip, hpTrail, hpAtDeath: dead.myHp, mobHits: dead.inAttack - hits0, approaches,
+        died: true, box, sent, firstHpAfterRecall: moved.hp, after, observer: { sawRespawn, at: await b.me() } };
+      r.death = res;
+      checkRespawn(res);
+      return res;
     });
 
     // Stage 5, slice 1: A attacks a Gremlin with real clicks; B, in

@@ -14,7 +14,7 @@ export function redactEvidence(value, secrets) {
 }
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
-  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'concurrent'];
+  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -28,9 +28,13 @@ export function validateOptions(opt) {
   assert(new Set(names).size === names.length, 'duplicate phase');
   const phases = new Set(names);
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
-    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], concurrent: ['enter'] };
+    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
     assert(phases.has(dep), `${name} requires ${dep}`);
+  // death takes A through the portal and needs B waiting at the Armia spawn;
+  // mapchange/attack move B away (attack also closes it).
+  for (const other of ['mapchange', 'attack'])
+    assert(!(phases.has('death') && phases.has(other)), `death cannot run with ${other}`);
   return phases;
 }
 
@@ -104,4 +108,26 @@ export function checkCombatRelogin(before, after) {
   for (const key of ['name', 'characterClass', 'equip', 'look', 'level', 'exp'])
     assert.deepEqual(after[key], before[key], `post-combat persistence differs: ${key}`);
   checkArmiaSpawn(after);
+}
+
+// Death and respawn (stage 5). Everything is server-confirmed state seen by the
+// clients: A's HP reaches 0 through mob attacks (0x0367 broadcast), the
+// runtime opens box 11 on a field click, OK sends 0x03AE and, 5 s later,
+// 0x0289; handler/character.go restart revives (HP = 2) and recalls to
+// CitySpawn(LastCity). Mortal characters below level 35 lose no EXP
+// (death_exp.go FREEEXP gate), so level and EXP must be unchanged there.
+export function checkRespawn(d) {
+  assert(d.died, 'A never died');
+  assert(d.hpAtDeath <= 0, 'death without HP 0');
+  assert(d.mobHits > 0, 'death without a server attack on A');
+  assert.equal(d.box, 11, 'return-to-town box did not open');
+  assert(d.sent.includes('0x03ae'), 'DelayStart (0x03AE) not sent');
+  assert(d.sent.includes('0x0289'), 'Restart (0x0289) not sent');
+  checkArmiaSpawn(d.after);
+  assert(d.after.hp > 0 && d.after.hp <= d.after.maxHp, 'respawned without valid HP');
+  assert.notEqual(d.after.die, 1, 'still dead after respawn');
+  assert.equal(d.after.level, d.before.level, 'level changed by death');
+  if (d.before.level < 35) assert.equal(d.after.exp, d.before.exp, 'EXP lost below the level-35 gate');
+  else assert(d.after.exp <= d.before.exp, 'EXP rose on death');
+  assert(d.observer?.sawRespawn, 'B did not see A back in the city');
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, redactEvidence } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
   const value = { error: 'fixture-secret', nested: ['prefix fixture-secret suffix'], x: 123456 };
@@ -12,7 +12,8 @@ test('redaction removes nested diagnostic strings without corrupting JSON number
 
 const options = phases => ({ target: 'localhost:8281', 'client-version': '12000', class: '0', phases });
 test('rejects incomplete, unknown and duplicate scenarios before connecting', () => {
-  for (const phases of ['', 'logout', 'login,enter,mapchange', 'login,enter,attack', 'login,enter,typo', 'login,login'])
+  for (const phases of ['', 'logout', 'login,enter,mapchange', 'login,enter,attack', 'login,enter,typo', 'login,login', 'login,enter,death',
+    'login,enter,second,attack,death', 'login,enter,second,mapchange,death'])
     assert.throws(() => validateOptions(options(phases)));
   assert.doesNotThrow(() => validateOptions(options('login,enter,second,logout')));
   assert.doesNotThrow(() => validateOptions(options('badpin,classes')));
@@ -87,4 +88,21 @@ test('spawn and teleport use server bounds, not proximity to an arbitrary previo
   checkTeleport({ x: 2590.5, y: 2098.5, groundX: 20, groundY: 16 });
   assert.throws(() => checkTeleport({ x: 2600, y: 2096, groundX: 20, groundY: 16 }));
   assert.throws(() => checkTeleport({ x: 2588.5, y: 2096.5, groundX: 16, groundY: 16 }));
+});
+
+test('death and respawn require server death, recall packets, city spawn and an observer', () => {
+  const ok = { died: true, hpAtDeath: 0, mobHits: 3, box: 11, sent: ['0x03a0', '0x03ae', '0x0289'],
+    before: { level: 1, exp: 548 },
+    after: { x: 2090.5, y: 2100.5, hp: 2, maxHp: 105, die: 0, level: 1, exp: 548 },
+    observer: { sawRespawn: true } };
+  checkRespawn(ok);
+  assert.doesNotThrow(() => validateOptions(options('login,enter,second,death')));
+  for (const bad of [{ died: false }, { hpAtDeath: 5 }, { mobHits: 0 }, { box: 16 },
+    { sent: ['0x0289'] }, { sent: ['0x03ae'] }, { observer: { sawRespawn: false } }, { observer: undefined }])
+    assert.throws(() => checkRespawn({ ...ok, ...bad }));
+  for (const after of [{ x: 2588.5, y: 2096.5 }, { hp: 0 }, { die: 1 }, { level: 2 }, { exp: 500 }])
+    assert.throws(() => checkRespawn({ ...ok, after: { ...ok.after, ...after } }));
+  // Above the gate the server may subtract EXP, never add it.
+  checkRespawn({ ...ok, before: { level: 40, exp: 1000 }, after: { ...ok.after, level: 40, exp: 900 } });
+  assert.throws(() => checkRespawn({ ...ok, before: { level: 40, exp: 1000 }, after: { ...ok.after, level: 40, exp: 1001 } }));
 });

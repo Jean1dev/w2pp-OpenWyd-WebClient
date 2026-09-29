@@ -12,7 +12,7 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 | `0289` Restart, `0369` ReqMobByID, `03AE`, `0378` SetShortSkill (saída) | confirmado em teste | C++ (tamanho exato; tamanho errado é descartado) |
 | `5000` Exp_Msg_Panel_ (entrada) | diferido | customizado do servidor, sem handler no runtime; Exp chega pelo eco de ataque. Em `DEFERRED_INBOUND` |
 | Ataque básico: A acerta um mob, B vê, relogin | **confirmado em execução** | [execução 7](2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados): Gremlin HP 70→0, Exp 274→548, B vê o mesmo, relogin preserva equipamento/nível/Exp, protocolo limpo |
-| Morte e respawn (`03AE` → `0289`) | pendente | fluxo mapeado em fonte (`TMFieldScene.cpp:6218`, `16663`, `11928`) |
+| Morte e respawn (`03AE` → `0289`) | **confirmado em execução** | [morte e respawn](2026-09-29-death-respawn.md): A morre para os Trolls (HP 105→0), caixa 11, `0x03AE`/`0x0289`, revive com HP 2 no spawn de Armia, EXP intacta, B vê A voltar |
 | Skills das quatro classes | pendente | `LearnedSkill` passa a ser registrado pelo cenário (export 0012); a máscara inicial vem dos templates de classe do conteúdo do servidor, ausentes do checkout |
 | Inventário, drop, loja, banco, teleporte, chat, grupo, troca e persistência | pendente | fatias seguintes |
 
@@ -51,6 +51,7 @@ Detalhes em [2026-09-29-basic-combat.md](2026-09-29-basic-combat.md). Critérios
 ```powershell
 npm run protocol:dialect      # 435 verificações
 npm run protocol:vectors      # inclui TestExtDialect{Inbound,Outbound}/attack_*
-npm run world:checks          # 8 testes (checkCombat, checkCombatRelogin, DEFERRED_INBOUND = {0x5000})
+npm run world:checks          # 9 testes (checkCombat, checkCombatRelogin, checkRespawn, DEFERRED_INBOUND = {0x5000})
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,attack
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,death
 ```
