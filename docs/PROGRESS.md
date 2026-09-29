@@ -1,6 +1,6 @@
 # Progresso
 
-Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, A matou um Gremlin (HP 70→3→0, Exp 0→274) e B observou o mesmo dano e a morte ([execução 5](evidence/05-gameplay/2026-09-29-basic-combat.md)). A execução ainda reprovou na saúde de protocolo, corrigida depois; falta uma execução limpa com o relogin pós-combate. O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. Cliente Windows e o restante do gameplay ainda não foram provados.
+Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. Cliente Windows e o restante do gameplay ainda não foram provados.
 
 | Etapa | Estado | Evidência |
 |---|---|---|
@@ -8,14 +8,14 @@ Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (combate básico aprovado) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Pendente | — |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
 
 ## Próxima ação
 
-1. Etapa 5 — combate online: com memória livre, repetir `node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file ../start/.env --phases login,enter,second,attack` com o runtime `tmproject_startup.1790711169720373100` (dialeto com `0x039D` por tamanho e `0x0378` passando; `0x5000` diferido). O dano e a morte observados por A/B já estão confirmados na execução 5; faltam saúde de protocolo limpa e relogin pós-combate. A execução 6 foi interrompida por falta de memória na fase `second`, sem resultado. O PC de desenvolvimento não comporta dois Chromium de forma confiável; alternativas em [issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6). Depois: morte/respawn (`03AE`→`0289`), máscara `LearnedSkill` das classes para decidir as skills, e as fatias seguintes (chat `0333/0334`, itens, loja, banco, grupo, troca, persistência).
+1. Etapa 5 — próximas fatias de gameplay: morte/respawn (`03AE`→`0289`), máscara `LearnedSkill` das classes para decidir as skills, depois chat `0333/0334`, itens, loja, banco, grupo, troca e persistência. Combate básico com relogin já aprovado (execução 7). Rodar os cenários online como processo separado (`Start-Process`), por causa da memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar:
    - repetir `npm run world` completo com o trajeto novo até o portal (a execução de 29/09 falhou só na caminhada da `mapchange`);
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
@@ -259,6 +259,7 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
 - **Confirmado em execução (Railway, execução 5):** A atacou um Gremlin (HP 70→3→0) e ganhou 274 de Exp; B viu o mesmo HP e a morte. A execução reprovou na saúde de protocolo, que foi corrigida depois.
 - **Não executado:** execução limpa com relogin pós-combate. A execução 6 foi interrompida por falta de memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)). Validação do cliente Windows, skills e morte/respawn também ficam de fora.
 - **Memória (issue #6):** o harness passou a amostrar memória por fase e a fechar B antes do relogin de A. Medido: uma página usa 865 MiB no Chromium (heap JS 497 MiB, WASM 150 MiB), com 1,9 GB livres de 8 GB. Hipótese: o preload integral de `openwyd_assets.data` domina o heap JS. [Detalhes](evidence/05-gameplay/2026-09-29-basic-combat.md#memória-do-harness-issue-6).
-- **Próximo passo:** repetir o cenário `attack` num ambiente com memória suficiente (issue #6).
+- **Execução 7 (aprovada):** `login,enter,second,attack` passou no Railway, rodando como processo separado. Gremlin HP 70→0, Exp 274→548, B observou, relogin preservou o estado, protocolo limpo. Três `0x039D` roteados no servidor (N=1 e N=13).
+- **Próximo passo:** morte/respawn e skills (etapa 5 continua Em andamento).
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

@@ -107,3 +107,27 @@ O harness passa por `2138.5,2102.5`, `2152.5,2102.5`, `2166.5,2102.5` e `2184.5,
 | Heap JS da página | 497 |
 
 **Hipótese:** o heap JS é dominado pelo pacote pré-carregado `openwyd_assets.data` (305 MiB), que cada página mantém inteiro em memória. Duas páginas precisam de cerca de 1,7 GB, perto da RAM livre, o que explica as interrupções. A alavanca seguinte seria carregar os assets sob demanda em vez do preload integral. É mudança no runtime e fica registrada na issue.
+
+## Execução 7: combate básico e relogin aprovados
+
+**Confirmado em execução, aprovada (`ok: true`):** `2026-09-29T20:03:14Z` até `20:17:37Z`, [JSON sanitizado](2026-09-29-combat-passed.json), [logs do Railway](2026-09-29-combat-passed-server.txt). Runtime `tmproject_startup.1790711169720373100`, harness `cd5568f`. Executada como processo separado (`Start-Process`), fora dos shells em segundo plano do Claude Code, sem fechar aplicativos do usuário.
+
+- Fases `login` (26 s), `enter` (19 s), `second` (127 s), `attack` (671 s): todas `ok`.
+- Alvo `Gremlin` 1031, HP 70. A fez 1 clique; saíram 3 ataques, com 9 ecos. HP `[70, 0]` e morte. B viu o mesmo HP e a morte, com 10 broadcasts.
+- Experiência de A 274→548. Os 274 da execução 5 já tinham persistido no servidor. HP de A 105→103, gold inalterado.
+- Servidor: três `recv packet type=0x039d routed=true` de A, dois com corpo de 56 bytes (N=1) e um de 152 (N=13). Isso confirma que o runtime usa os dois tamanhos com o mesmo opcode, e que os dois chegam ao handler.
+- Relogin pós-combate: identidade, classe, equipamento, aparência, nível 1 e Exp 548 iguais. Spawn na cidade (`2096.5,2107.5`).
+- Saúde de protocolo: `final_B` e `final_A-combat-relogin` sem descartes de entrada ou saída, zero erros de página e de WebGL.
+
+**Memória (amostras de `ev.memory`, PC de 8 GB):**
+
+| Ponto | Livre (MiB) | Chromium (MiB) | Páginas |
+|---|---|---|---|
+| fim `login` | 1867 | 883 | A: wasm 150, js 497 |
+| fim `enter` | 1864 | 976 | A: wasm 216, js 497 |
+| fim `second` | 1246 | 1749 | A: wasm 216, js 497; B: wasm 216, js 561 |
+| nos Gremlins | 2031 | 1589 | A e B |
+| B fechado, antes do relogin | 2124 | 244 | — |
+| fim `attack` (A relogado) | 1937 | 1001 | A: wasm 216, js 561 |
+
+O pico é a fase `second`, com cerca de 1,75 GB para duas páginas. Fechar B tirou o relogin do pico. As interrupções anteriores vieram do encerramento automático do Claude Code sob pressão de memória, não do sistema operacional ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).

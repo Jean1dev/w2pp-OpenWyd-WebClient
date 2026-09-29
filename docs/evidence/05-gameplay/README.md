@@ -11,7 +11,7 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 | Dialeto `0367/039D/039E` (entrada/saída) | confirmado em teste e em execução | C++ com 435 verificações; overlay Go com `MsgAttackBody.Encode/Decode` reais (`attack_*`). Saída pelo tamanho (168/80/72 → N 13/2/1), opcode preservado: o corpo a corpo envia `0x039D` com 168 bytes |
 | `0289` Restart, `0369` ReqMobByID, `03AE`, `0378` SetShortSkill (saída) | confirmado em teste | C++ (tamanho exato; tamanho errado é descartado) |
 | `5000` Exp_Msg_Panel_ (entrada) | diferido | customizado do servidor, sem handler no runtime; Exp chega pelo eco de ataque. Em `DEFERRED_INBOUND` |
-| Ataque básico: A acerta um mob, B vê | **confirmado em execução** (saúde de protocolo e relogin pendentes) | [execução 5](2026-09-29-basic-combat.md): Gremlin HP 70→3→0, Exp 0→274, B vê o mesmo |
+| Ataque básico: A acerta um mob, B vê, relogin | **confirmado em execução** | [execução 7](2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados): Gremlin HP 70→0, Exp 274→548, B vê o mesmo, relogin preserva equipamento/nível/Exp, protocolo limpo |
 | Morte e respawn (`03AE` → `0289`) | pendente | fluxo mapeado em fonte (`TMFieldScene.cpp:6218`, `16663`, `11928`) |
 | Skills das quatro classes | pendente | `LearnedSkill` passa a ser registrado pelo cenário (export 0012); a máscara inicial vem dos templates de classe do conteúdo do servidor, ausentes do checkout |
 | Inventário, drop, loja, banco, teleporte, chat, grupo, troca e persistência | pendente | fatias seguintes |
@@ -44,6 +44,7 @@ Detalhes em [2026-09-29-basic-combat.md](2026-09-29-basic-combat.md). Critérios
 | 4 | falhou | Rota ok; 19 `0x039D` de 168 bytes descartados (`outDropSize`). Dialeto passa a usar o tamanho |
 | 5 | **dano e morte confirmados**, reprovou na saúde | `0x0378` descartado → passa com 32 bytes; `0x5000` → diferido |
 | 6 | interrompida | Falta de memória na fase `second`, sem resultado ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)) |
+| 7 | **aprovada** | Processo separado; B fecha antes do relogin; memória amostrada por fase |
 
 ## Comandos
 
