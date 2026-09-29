@@ -43,7 +43,7 @@ RUN em++ --version >/dev/null 2>&1 \
         --repo-root external/OpenWyd --jobs "${BUILD_JOBS}" \
  && python3 external/OpenWyd/webclient/client-wasm/tools/link_tmproject_wasm_startup.py \
         --repo-root external/OpenWyd --dev --jobs "${BUILD_JOBS}" --link-opt-level O2 \
- && python3 tools/assemble_site.py --out /site
+ && python3 tools/assemble_site.py --out /site --index client.html
 
 # ---- gateway ------------------------------------------------------------------
 FROM golang:${GO_VERSION}-bookworm@sha256:e401dae1bf814e29204a8cb7915682e1780951e609ca0dd8865ee1937f510c48 AS gateway

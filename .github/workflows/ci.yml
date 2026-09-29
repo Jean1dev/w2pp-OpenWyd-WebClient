@@ -139,6 +139,8 @@ jobs:
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/healthz && break; sleep 1; done
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/client.html)" = 401
           curl -fsS -u "ci:$pass" http://127.0.0.1:8080/client.html -o /dev/null
+          # The root of a deployment is the connected client, not the offline scene.
+          cmp <(curl -fsS -u "ci:$pass" http://127.0.0.1:8080/) <(curl -fsS -u "ci:$pass" http://127.0.0.1:8080/client.html)
           curl -fsS -u "ci:$pass" http://127.0.0.1:8080/runtime.js -o /dev/null
           wasm="$(curl -fsS -u "ci:$pass" http://127.0.0.1:8080/runtime.js | grep -o 'tmproject_startup\.[0-9]*\.wasm' | head -1)"
           test -n "$wasm"
