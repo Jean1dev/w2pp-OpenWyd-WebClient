@@ -47,3 +47,22 @@ Os assets do Volume vieram de `python tools/pack_deploy_assets.py`: 15 arquivos,
 - **Jogo pela imagem:** login pelo contêiner e navegador exigem `wss://`, e não há TLS local. O jogo local continua via `make dev`.
 - **No primeiro deploy:** reenvio da credencial Basic no WebSocket, `X-Forwarded-For` do Railway, leitura do Volume pelo uid `nonroot`, porta interna do tm-server e upload com `railway volume files upload`.
 - **CI no GitHub:** o workflow foi escrito, mas só roda depois do push.
+
+## Bucket e serviço no Railway (29/09/2026, mesma data)
+
+- **Projeto `wyd-client-web` / serviço `w2pp-OpenWyd-WebClient`,** já existente e ligado ao repositório:
+  - domínio gerado: `https://w2pp-openwyd-webclient-production.up.railway.app`, na porta 8080;
+  - 14 variáveis definidas com `--skip-deploys`; os segredos passaram por stdin e nenhum valor foi impresso.
+- **Upload** (`tools/upload_assets_s3.py --railway-bucket arranged-orb`): 16 objetos, 346.600.204 bytes em `assets-f4c03289374bd614/`, todos verificados por `HEAD`. O `railway bucket info` confirma 16 objetos e 346,6 MB.
+- **Gateway contra o bucket real, localmente** (imagem `sha256:94b4e1c5…`, credenciais num env-file temporário apagado em seguida):
+
+  | Verificação | Resultado |
+  |---|---|
+  | `openwyd_assets.js` | 200, `text/javascript` |
+  | Range `bytes=0-99` | 206, 100 bytes |
+  | objeto ausente | 404 |
+  | sem senha | 401 |
+  | `openwyd_assets.data` completo | SHA-256 igual ao do manifesto, em 95 s |
+  | segredos nos logs | ausentes |
+
+- **Primeiro deploy do `main` (`0296e48`): FAILED.** O builder do Railway disse: "dockerfile invalid: flag '--mount=type=cache,id=wyd-emsdk-cache,…' is missing the cacheKey prefix from its id". O Railway **usou o Dockerfile**; o `RAILPACK` no manifesto do deployment é só o valor salvo nas configurações do serviço. Correção: remover o cache mount (ver ADR 005, revisão).

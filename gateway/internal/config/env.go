@@ -11,18 +11,26 @@ import (
 // Environment variables read by FromEnv (container deployments such as
 // Railway). Secrets stay in the platform's variables, never in the image.
 const (
-	EnvPort          = "PORT"                   // listen port given by the platform
-	EnvPublicOrigin  = "WYD_PUBLIC_ORIGIN"      // https://host the browser uses
-	EnvTarget        = "WYD_TARGET"             // tmserver host:port (private network)
-	EnvClientVersion = "WYD_CLIENT_VERSION"     // AccountLogin version of the target
-	EnvChannel       = "WYD_CHANNEL"            // public channel name (default "server")
-	EnvStaticDir     = "WYD_STATIC_DIR"         // built page + runtime (in the image)
-	EnvAssetDir      = "WYD_ASSET_DIR"          // operator game data (mounted volume)
-	EnvManifest      = "WYD_ASSET_MANIFEST"     // optional asset manifest version label
-	EnvAuthUser      = "WYD_BASIC_AUTH_USER"    // private deployment credential
+	EnvPort          = "PORT"               // listen port given by the platform
+	EnvPublicOrigin  = "WYD_PUBLIC_ORIGIN"  // https://host the browser uses
+	EnvTarget        = "WYD_TARGET"         // tmserver host:port (private network)
+	EnvClientVersion = "WYD_CLIENT_VERSION" // AccountLogin version of the target
+	EnvChannel       = "WYD_CHANNEL"        // public channel name (default "server")
+	EnvStaticDir     = "WYD_STATIC_DIR"     // built page + runtime (in the image)
+	EnvAssetDir      = "WYD_ASSET_DIR"      // operator game data (mounted volume)
+	// Operator game data in a private S3-compatible bucket (exclusive with WYD_ASSET_DIR).
+	EnvS3Endpoint    = "WYD_ASSET_S3_ENDPOINT"
+	EnvS3Region      = "WYD_ASSET_S3_REGION"
+	EnvS3Bucket      = "WYD_ASSET_S3_BUCKET"
+	EnvS3Prefix      = "WYD_ASSET_S3_PREFIX"
+	EnvS3URLStyle    = "WYD_ASSET_S3_URL_STYLE"
+	EnvS3KeyID       = "WYD_ASSET_S3_ACCESS_KEY_ID"
+	EnvS3Secret      = "WYD_ASSET_S3_SECRET_ACCESS_KEY"
+	EnvManifest      = "WYD_ASSET_MANIFEST"      // optional asset manifest version label
+	EnvAuthUser      = "WYD_BASIC_AUTH_USER"     // private deployment credential
 	EnvAuthPassword  = "WYD_BASIC_AUTH_PASSWORD" //
-	EnvAllowPublic   = "WYD_ALLOW_PUBLIC"       // "true" to run without a credential
-	EnvMaxConns      = "WYD_MAX_CONNS"          // optional limits
+	EnvAllowPublic   = "WYD_ALLOW_PUBLIC"        // "true" to run without a credential
+	EnvMaxConns      = "WYD_MAX_CONNS"           // optional limits
 	EnvMaxConnsPerIP = "WYD_MAX_CONNS_PER_IP"
 )
 
@@ -61,7 +69,20 @@ func FromEnv(getenv func(string) string) (*Config, error) {
 		AssetDir:             strings.TrimSpace(getenv(EnvAssetDir)),
 		AssetManifestVersion: strings.TrimSpace(getenv(EnvManifest)),
 		DefaultChannel:       channel,
-		Channels: []Channel{{Name: channel, Target: target, PublicWSURL: wsURL, ClientVersion: version}},
+		Channels:             []Channel{{Name: channel, Target: target, PublicWSURL: wsURL, ClientVersion: version}},
+	}
+	if b := strings.TrimSpace(getenv(EnvS3Bucket)); b != "" {
+		c.AssetS3 = &S3Assets{
+			Endpoint: strings.TrimSuffix(strings.TrimSpace(getenv(EnvS3Endpoint)), "/"),
+			Region:   strings.TrimSpace(getenv(EnvS3Region)), Bucket: b,
+			Prefix: strings.TrimSpace(getenv(EnvS3Prefix)), URLStyle: strings.TrimSpace(getenv(EnvS3URLStyle)),
+			AccessKeyID: getenv(EnvS3KeyID), SecretAccessKey: getenv(EnvS3Secret),
+		}
+		if c.AssetS3.Region == "" {
+			c.AssetS3.Region = "auto"
+		}
+		// The image sets WYD_ASSET_DIR by default; a bucket replaces it.
+		c.AssetDir = ""
 	}
 	user, pass := getenv(EnvAuthUser), getenv(EnvAuthPassword)
 	switch {

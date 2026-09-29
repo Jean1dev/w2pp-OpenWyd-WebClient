@@ -2,8 +2,8 @@
 #
 # Web client image: gateway (Go) + page + WASM runtime compiled from the
 # upstream pinned in dependencies.lock.json with patches/openwyd applied.
-# Game data is NOT in this image: the gateway serves it from a mounted volume
-# (WYD_ASSET_DIR). See docs/deploy.md.
+# Game data is NOT in this image: the gateway serves it from a private bucket
+# (WYD_ASSET_S3_*) or a mounted volume (WYD_ASSET_DIR). See docs/deploy.md.
 
 ARG EMSCRIPTEN_VERSION=6.0.0
 ARG GO_VERSION=1.25.13
@@ -33,8 +33,9 @@ RUN python3 tools/apply_openwyd_patches.py
 # includes the `em++ --version` output. A fresh toolchain prints first-use
 # sanity/cache messages there, so the identity changes mid-build and the builder
 # rightly refuses to certify (exit 2). Warm the toolchain and its cache first.
-RUN --mount=type=cache,id=wyd-emsdk-cache,target=/emsdk/upstream/emscripten/cache \
-    em++ --version >/dev/null 2>&1 \
+# No BuildKit cache mount: Railway's builder only accepts cache ids bound to one
+# service ("s/<service-id>-..."), which would tie this file to one project.
+RUN em++ --version >/dev/null 2>&1 \
  && echo 'int main() { return 0; }' > /tmp/warm.cpp \
  && em++ -std=c++17 -O2 -c /tmp/warm.cpp -o /tmp/warm.o \
  && em++ /tmp/warm.o -o /tmp/warm.js \

@@ -25,7 +25,7 @@ npm run world:checks      # regras do harness online
 npm run world -- --target <host:porta> --env-file .env   # cenários reais com duas contas
 ```
 
-A CI (`.github/workflows/ci.yml`) roda o que não depende de dados privados: gateway com `-race`, reprodutibilidade de vetores e fixtures, vetores contra o codec do servidor fixado, dialeto em wasm32 e build da imagem Docker com smoke sem assets. O deploy (`Dockerfile`, `railway.json`) serve página e runtime da imagem e os dados do jogo a partir de um Volume do operador, atrás de senha. Veja [docs/deploy.md](docs/deploy.md).
+A CI (`.github/workflows/ci.yml`) roda o que não depende de dados privados: gateway com `-race`, reprodutibilidade de vetores e fixtures, vetores contra o codec do servidor fixado, dialeto em wasm32 e build da imagem Docker com smoke sem assets. O deploy (`Dockerfile`, `railway.json`, projeto `wyd-client-web`) serve página e runtime da imagem e os dados do jogo a partir de um bucket privado, lidos pelo gateway, tudo atrás de senha. Veja [docs/deploy.md](docs/deploy.md).
 
 ## Começar
 

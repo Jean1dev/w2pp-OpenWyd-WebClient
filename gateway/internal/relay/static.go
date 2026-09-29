@@ -21,14 +21,11 @@ func init() {
 }
 
 // staticHandler serves the built client from dir and, for paths absent there,
-// the operator's game data from assetDir (optional). Directory listings are
-// disabled and HTML is never cached so a rebuilt page is picked up immediately.
-func staticHandler(dir, assetDir string) http.Handler {
+// the operator's game data from assets (a volume directory or a bucket;
+// optional). Directory listings are disabled and HTML is never cached so a
+// rebuilt page is picked up immediately.
+func staticHandler(dir string, assets http.Handler) http.Handler {
 	site := http.FileServer(http.Dir(dir))
-	var assets http.Handler
-	if assetDir != "" {
-		assets = http.FileServer(http.Dir(assetDir))
-	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
 			http.NotFound(w, r)

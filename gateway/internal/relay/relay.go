@@ -60,7 +60,14 @@ func New(baseCtx context.Context, cfg *config.Config, log *slog.Logger) *Gateway
 	g.mux.HandleFunc("GET /ws/{channel}", g.handleWS)
 	g.mux.HandleFunc("GET /config.json", g.handleConfig)
 	if cfg.StaticDir != "" {
-		g.mux.Handle("GET /", staticHandler(cfg.StaticDir, cfg.AssetDir))
+		var assets http.Handler
+		switch {
+		case cfg.AssetS3 != nil:
+			assets = newS3Assets(*cfg.AssetS3, cfg.Limits.DialTimeout.Std(), log)
+		case cfg.AssetDir != "":
+			assets = http.FileServer(http.Dir(cfg.AssetDir))
+		}
+		g.mux.Handle("GET /", staticHandler(cfg.StaticDir, assets))
 	}
 	g.handler = g.mux
 	if cfg.BasicAuth != nil {
