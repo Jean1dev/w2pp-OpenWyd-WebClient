@@ -13,7 +13,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-EMSDK = ROOT / ".cache/toolchains/emsdk"
+# The pinned local toolchain (docs/setup.md); CI uses the emscripten/emsdk image
+# of the same version, which exports EMSDK.
+LOCAL_EMSDK = ROOT / ".cache/toolchains/emsdk"
+EMSDK = LOCAL_EMSDK if LOCAL_EMSDK.is_dir() else Path(os.environ.get("EMSDK", LOCAL_EMSDK))
 EMXX = EMSDK / "upstream/emscripten" / ("em++.exe" if os.name == "nt" else "em++")
 NODE_GLOB = "node/*/bin/node" + (".exe" if os.name == "nt" else "")
 OUT = ROOT / ".cache/dialect"

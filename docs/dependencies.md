@@ -15,7 +15,13 @@ Auditoria: 28/09/2026. O arquivo `dependencies.lock.json` fixa revisões; caminh
 | Python do emsdk | 3.13.3 | Instalado pelo SDK no Windows; scripts de auditoria executados com Python 3.14 local |
 | Playwright | 1.54.2 | Fixado em `package.json`; usado nos smokes de cena e de conexão (Chromium headless) |
 | github.com/coder/websocket | v1.8.15, `go.sum` `h1:6B2JPeOG…NUA=` | Única dependência do `gateway/`; licença ISC no próprio módulo. Escolhida por ser mantida, sem cgo e com `NetConn`; `NetConn` desativa o limite de leitura e o gateway o restaura (ver ADR 002) |
-| Railway CLI | `@railway/cli` 5.63.1 via `npx` | Uso somente leitura no ambiente do operador: status, variáveis redigidas, deploys e logs. Sem deploy, restart ou mudança de variáveis |
+| Railway CLI | `@railway/cli` 5.63.1 via `npx` | Uso somente leitura no ambiente do operador: status, variáveis redigidas, deploys e logs. Sem deploy, restart ou mudança de variáveis. O deploy documentado em `docs/deploy.md` (volume, upload) é executado pelo operador |
+| Imagem de build `emscripten/emsdk` | `6.0.0@sha256:9eed2e47b4206928b22f99d2917013ad5462d777bb24cb546a652729896badd8` | Estágio WASM do `Dockerfile` e job `dialect` da CI; mesma versão do lock. Só no build; nada dela vai para a imagem final além do site compilado |
+| Imagem de build `golang` | `1.25.13-bookworm@sha256:e401dae1bf814e29204a8cb7915682e1780951e609ca0dd8865ee1937f510c48` | Estágio do gateway (binário estático, `CGO_ENABLED=0`) |
+| Imagem final `gcr.io/distroless/static-debian12` | `nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab` | Base sem shell; contém apenas `wydgateway` e `/srv/site` |
+| GitHub Actions | `actions/checkout@v4`, `setup-go@v5`, `setup-node@v4`, `setup-python@v5`, `docker/setup-buildx-action@v3`, `docker/build-push-action@v6` | CI; fixadas por versão principal (não por SHA) |
+
+**Imagem publicada:** contém o gateway próprio, a página (`web/`) e o runtime compilado do upstream com os patches deste repositório. O runtime é derivado de código cuja licença de conjunto não está resolvida (ver abaixo), por isso o deploy é **restrito por senha** ([ADR 005](decisions/005-railway-deploy-and-ci.md)). Os dados do jogo nunca entram na imagem: ficam no Volume do operador. Os headers DirectX são usados só no estágio de build e não são copiados para a imagem final.
 
 ## Direitos: achados confirmados em fonte
 

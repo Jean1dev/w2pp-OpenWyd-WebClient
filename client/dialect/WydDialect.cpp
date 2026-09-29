@@ -1,6 +1,6 @@
 // See WydDialect.h. Wire offsets below are absolute frame offsets (header
 // included) of the Go tmserver codecs at the pinned revision:
-//   tmserver/internal/protocol/{selchar,mob,createmob,messages}.go
+//   tmserver/internal/protocol/{selchar,mob,createmob,messages,score,affect,shop,autotrade}.go
 // and docs/compatibility.md. Runtime-side values are written by field, so the
 // runtime's own ABI decides its layout; static_asserts pin the layouts that
 // pass-through frames rely on.
@@ -12,6 +12,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 
 namespace
@@ -39,6 +40,37 @@ static_assert(sizeof(MSG_CHARPASSWORD) == 32 && offsetof(MSG_CHARPASSWORD, ItemP
 static_assert(sizeof(STRUCT_SELCHAR) == 904, "STRUCT_SELCHAR");
 static_assert(sizeof(STRUCT_MOB) == 1040, "STRUCT_MOB");
 static_assert(sizeof(MSG_CreateMob) == 236, "MSG_CreateMob");
+static_assert(sizeof(MSG_CreateMobTrade) == 260, "MSG_CreateMobTrade");
+static_assert(sizeof(MSG_UpdateScore) == 152 && offsetof(MSG_UpdateScore, Critical) == 60 &&
+	offsetof(MSG_UpdateScore, Affect) == 62 && offsetof(MSG_UpdateScore, Guild) == 126 &&
+	offsetof(MSG_UpdateScore, Resist) == 130 && offsetof(MSG_UpdateScore, ReqHp) == 136 &&
+	offsetof(MSG_UpdateScore, Magic) == 144 && offsetof(MSG_UpdateScore, LearnedSkill) == 148, "UpdateScore");
+static_assert(sizeof(STRUCT_AFFECT) == 8 && sizeof(MSG_UpdateAffect) == 268, "UpdateAffect");
+static_assert(sizeof(MSG_UpdateEquip) == 68, "UpdateEquip");
+static_assert(sizeof(MSG_SetHpDam) == 20 && offsetof(MSG_SetHpDam, Dam) == 16, "SetHpDam");
+// Pass-through in-world frames: byte layout equals the server's.
+static_assert(sizeof(MSG_SetHpMp) == 28 && offsetof(MSG_SetHpMp, Hp) == 12 &&
+	offsetof(MSG_SetHpMp, ReqMp) == 24, "SetHpMp");
+static_assert(sizeof(MSG_SendItem) == 24 && offsetof(MSG_SendItem, DestPos) == 14 &&
+	offsetof(MSG_SendItem, Item) == 16, "SendItem");
+// UpdateEtc: server Hold@12 lands on FakeExp, Learn(i64)@24 on LearnedSkill[2],
+// server Magic(u16)@38 on the runtime's padding before Coin.
+static_assert(sizeof(MSG_UpdateEtc) == 48 && offsetof(MSG_UpdateEtc, Exp) == 16 &&
+	offsetof(MSG_UpdateEtc, LearnedSkill) == 24 && offsetof(MSG_UpdateEtc, ScoreBonus) == 32 &&
+	offsetof(MSG_UpdateEtc, SkillBonus) == 36 && offsetof(MSG_UpdateEtc, Coin) == 40, "UpdateEtc");
+// Attack: the three runtime structs share one prefix and differ in Dam[] length.
+static_assert(sizeof(STRUCT_DAM) == 8 && offsetof(STRUCT_DAM, Damage) == 4, "STRUCT_DAM");
+static_assert(sizeof(MSG_Attack) == 168 && sizeof(MSG_AttackOne) == 72 && sizeof(MSG_AttackTwo) == 80, "Attack sizes");
+static_assert(offsetof(MSG_Attack, FakeExp) == 12 && offsetof(MSG_Attack, ReqMp) == 16 &&
+	offsetof(MSG_Attack, CurrentExp) == 24 && offsetof(MSG_Attack, Rsv) == 32 &&
+	offsetof(MSG_Attack, PosX) == 34 && offsetof(MSG_Attack, TargetY) == 40 &&
+	offsetof(MSG_Attack, AttackerID) == 42 && offsetof(MSG_Attack, Progress) == 44 &&
+	offsetof(MSG_Attack, Motion) == 46 && offsetof(MSG_Attack, FlagLocal) == 47 &&
+	offsetof(MSG_Attack, DoubleCritical) == 48 && offsetof(MSG_Attack, SkillParm) == 49 &&
+	offsetof(MSG_Attack, CurrentMp) == 52 && offsetof(MSG_Attack, SkillIndex) == 56 &&
+	offsetof(MSG_Attack, Dam) == 60, "MSG_Attack");
+static_assert(offsetof(MSG_AttackOne, Dam) == 60 && offsetof(MSG_AttackTwo, Dam) == 60 &&
+	offsetof(MSG_AttackOne, SkillIndex) == 56 && offsetof(MSG_AttackTwo, SkillIndex) == 56, "Attack prefix");
 
 // ---- server wire contract ----
 constexpr int kHeader = 12;
@@ -52,6 +84,15 @@ constexpr int kCNFAccountLogin = 2008;
 constexpr int kCNFSelChar = 856; // CNFNewCharacter / CNFDeleteCharacter
 constexpr int kCNFCharacterLogin = 1832;
 constexpr int kCreateMob = 232;
+constexpr int kCreateMobTrade = 252;
+constexpr int kUpdateScore = 152;
+constexpr int kSendAffect = 268;
+constexpr int kUpdateEquip = 60;
+constexpr int kSetHpDam = 20;
+// Attack: fixed part up to Dam[] @60, then N x {TargetID i32, Damage i32}.
+constexpr int kAttackFixed = 60;
+constexpr int kAttackDam = 8;
+constexpr int kMaxTarget = 13;
 
 constexpr int kAccountLoginWire = 116;
 constexpr int kCharacterLoginWire = 20;
@@ -74,13 +115,31 @@ enum : unsigned short
 	OpAlreadyPlaying = 0x11C,
 	OpAlreadyPlaying2 = 0x11D,
 	OpRemoveMob = 0x165,
+	OpPKInfo = 0x166,
+	OpSetHpMp = 0x181,
+	OpSendItem = 0x182,
+	OpSetHpDam = 0x18A,
+	OpUpdateWeather = 0x18B,
+	OpUpdateScore = 0x336,
+	OpUpdateEtc = 0x337,
+	OpCreateMobTrade = 0x363,
+	OpUpdateEquip = 0x36B,
+	OpSendAffect = 0x3B9,
 	OpAccountLogin = 0x20D,
 	OpNewCharacter = 0x20F,
 	OpDeleteCharacter = 0x211,
 	OpCharacterLogin = 0x213,
 	OpCharacterLogout = 0x215,
+	OpReqTeleport = 0x290,
+	OpChangeCity = 0x291,
 	OpCreateMob = 0x364,
 	OpActionStop = 0x366,
+	OpAttack = 0x367,
+	OpAttackOne = 0x39D,
+	OpAttackTwo = 0x39E,
+	OpRestart = 0x289,
+	OpReqMobByID = 0x369,
+	OpDelayStart = 0x3AE,
 	OpAction2 = 0x368,
 	OpAction = 0x36C,
 	OpPing = 0x3A0,
@@ -164,6 +223,26 @@ char NarrowChar(std::int64_t v)
 		return 0;
 	}
 	return static_cast<char>(v);
+}
+
+short NarrowShort(std::int64_t v)
+{
+	if (v < -32768 || v > 32767)
+	{
+		Count(WYD_STAT_FIELD_ZEROED);
+		return 0;
+	}
+	return static_cast<short>(v);
+}
+
+unsigned short NarrowUShort(std::int64_t v)
+{
+	if (v < 0 || v > 65535)
+	{
+		Count(WYD_STAT_FIELD_ZEROED);
+		return 0;
+	}
+	return static_cast<unsigned short>(v);
 }
 
 void ReadItem(const char* w, int off, STRUCT_ITEM& it)
@@ -333,11 +412,11 @@ int InCNFCharacterLogin(const char* w, char* out, int outCap, int* outSize)
 	return WYD_DIALECT_TRANSLATED;
 }
 
-int InCreateMob(const char* w, char* out, int outCap, int* outSize)
+// MSG_CreateMob and MSG_CreateMobTrade share their first 202 wire bytes and the
+// runtime fields up to Nick; only the runtime offsets differ (18 equip slots).
+template <typename T>
+bool ReadCreateMob(const char* w, T* m)
 {
-	auto* m = Begin<MSG_CreateMob>(w, out, outCap, outSize);
-	if (!m)
-		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpCreateMob);
 	m->PosX = I16(w, 12);
 	m->PosY = I16(w, 14);
 	m->MobID = U16(w, 16);
@@ -349,10 +428,203 @@ int InCreateMob(const char* w, char* out, int outCap, int* outSize)
 	m->Guild = U16(w, 130);
 	m->GuildLevel = static_cast<char>(U8(w, 132)); // server: GuildMemberType
 	if (!ReadScore(w, 136, m->Score))
-		return Fail(WYD_STAT_IN_DROP_RANGE, 0, OpCreateMob);
+		return false;
 	m->CreateType = U16(w, 184);
 	std::memcpy(m->Equip2, w + 186, kEquipWire); // AnctCode[16]
+	return true;
+}
+
+int InCreateMob(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_CreateMob>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpCreateMob);
+	if (!ReadCreateMob(w, m))
+		return Fail(WYD_STAT_IN_DROP_RANGE, 0, OpCreateMob);
 	CountNonZero(w, 202, kCreateMob);
+	return WYD_DIALECT_TRANSLATED;
+}
+
+// Shop-owner stall pose: CreateMob + Tab[26]@202 + Desc[24]@228.
+int InCreateMobTrade(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_CreateMobTrade>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpCreateMobTrade);
+	if (!ReadCreateMob(w, m))
+		return Fail(WYD_STAT_IN_DROP_RANGE, 0, OpCreateMobTrade);
+	std::memcpy(m->Nick, w + 202, 26); // server Tab -> runtime Nick: hypothesis
+	std::memcpy(m->Desc, w + 228, 24);
+	return WYD_DIALECT_TRANSLATED;
+}
+
+// Same size, different tail: server CurrHp@136, CurrMp@140, Magic i32@144 and
+// the legacy 0xCC quirk @148..151. The runtime reads ReqHp/ReqMp@136/140, Magic
+// u16@144, Rsv@146 and a LearnedSkill byte @148 with no server source (zero).
+int InUpdateScore(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_UpdateScore>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpUpdateScore);
+	if (!ReadScore(w, 12, m->Score))
+		return Fail(WYD_STAT_IN_DROP_RANGE, 0, OpUpdateScore);
+	m->Critical = static_cast<char>(U8(w, 60));
+	m->SaveMana = static_cast<char>(U8(w, 61));
+	for (int i = 0; i < 32; ++i)
+		m->Affect[i] = U16(w, 62 + i * 2);
+	m->Guild = U16(w, 126);
+	m->GuildLevel = U16(w, 128);
+	std::memcpy(m->Resist, w + 130, 4);
+	CountNonZero(w, 134, 136);
+	m->ReqHp = I32(w, 136);
+	m->ReqMp = I32(w, 140);
+	m->Magic = NarrowUShort(I32(w, 144));
+	return WYD_DIALECT_TRANSLATED;
+}
+
+// STRUCT_AFFECT: server {Type u8, Value u8, Level u16, Time u32}; runtime
+// {Type char, Level char, Value short, Time int}.
+int InSendAffect(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_UpdateAffect>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpSendAffect);
+	for (int i = 0; i < 32; ++i)
+	{
+		const int o = 12 + i * 8;
+		m->Affect[i].Type = static_cast<char>(U8(w, o));
+		m->Affect[i].Value = static_cast<short>(U8(w, o + 1));
+		m->Affect[i].Level = NarrowChar(U16(w, o + 2));
+		m->Affect[i].Time = I32(w, o + 4);
+	}
+	return WYD_DIALECT_TRANSLATED;
+}
+
+// Equip[16] + AnctCode[16] on the wire; the runtime has 18 of each.
+int InUpdateEquip(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_UpdateEquip>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpUpdateEquip);
+	for (int i = 0; i < kEquipWire; ++i)
+		m->sEquip[i] = U16(w, 12 + i * 2);
+	std::memcpy(m->Equip2, w + 44, kEquipWire);
+	return WYD_DIALECT_TRANSLATED;
+}
+
+// Dam is int32 on the wire, short in the runtime.
+int InSetHpDam(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_SetHpDam>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpSetHpDam);
+	m->Hp = I32(w, 12);
+	m->Dam = NarrowShort(I32(w, 16));
+	return WYD_DIALECT_TRANSLATED;
+}
+
+int AttackCapacity(unsigned short op)
+{
+	return op == OpAttackOne ? 1 : op == OpAttackTwo ? 2 : kMaxTarget;
+}
+
+// Server MSG_Attack (protocol/messages.go MsgAttackBody, handler/combat.go):
+// 60 + 8N bytes, N = 1..13. It echoes the attacker's own frame after
+// overwriting HP/Exp/MP/ReqMp and Dam[].Damage, so Rsv, FlagLocal and
+// SkillParm are the runtime's bytes coming back. Divergences from Basedef.h:
+//   @16 server CurrentHp (attacker)  -> runtime ReqMp; no runtime field, not copied
+//   @58 server ReqMp i16             -> runtime padding; widened into ReqMp@16
+//   Dam[].TargetID i32               -> u16 + padding
+// The runtime subtracts ReqMp from its own MP when a player hits it
+// (TMFieldScene::OnPacketAttack), so passing @16 through would drain MP by
+// the attacker's HP.
+template <typename T>
+int InAttackAs(const char* w, int n, char* out, int outCap, int* outSize, unsigned short op)
+{
+	auto* m = Begin<T>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	CountNonZero(w, 12, 16); // FakeExp: the server never writes it
+	m->FakeExp = 0;
+	m->ReqMp = I16(w, 58);
+	m->CurrentExp = static_cast<long long>(U64(w, 24));
+	m->Rsv = I16(w, 32);
+	m->PosX = U16(w, 34);
+	m->PosY = U16(w, 36);
+	m->TargetX = U16(w, 38);
+	m->TargetY = U16(w, 40);
+	m->AttackerID = U16(w, 42);
+	m->Progress = U16(w, 44);
+	m->Motion = static_cast<char>(U8(w, 46));
+	m->FlagLocal = static_cast<char>(U8(w, 47));
+	m->DoubleCritical = static_cast<char>(U8(w, 48));
+	m->SkillParm = static_cast<char>(U8(w, 49));
+	m->CurrentMp = I32(w, 52);
+	m->SkillIndex = I16(w, 56);
+	for (int i = 0; i < n; ++i)
+	{
+		m->Dam[i].TargetID = NarrowUShort(I32(w, kAttackFixed + i * kAttackDam));
+		m->Dam[i].Damage = I32(w, kAttackFixed + i * kAttackDam + 4);
+	}
+	return WYD_DIALECT_TRANSLATED;
+}
+
+int InAttack(const char* w, int wireSize, char* out, int outCap, int* outSize, unsigned short op)
+{
+	const int body = wireSize - kAttackFixed;
+	if (body < kAttackDam || body % kAttackDam)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	const int n = body / kAttackDam;
+	if (n > AttackCapacity(op))
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	Count(WYD_STAT_IN_ATTACK);
+	if (op == OpAttackOne)
+		return InAttackAs<MSG_AttackOne>(w, n, out, outCap, outSize, op);
+	if (op == OpAttackTwo)
+		return InAttackAs<MSG_AttackTwo>(w, n, out, outCap, outSize, op);
+	return InAttackAs<MSG_Attack>(w, n, out, outCap, outSize, op);
+}
+
+// The server's MSG_MessageBoxOk carries its own local notice code (handler/
+// notice.go iota, which the server itself marks as a placeholder format), not a
+// runtime message-table index, and is sent with Header.ID = conn, which the
+// scenes ignore. It becomes a MessagePanel (ID 0) with a fixed text, so the
+// reason for a refused login or action is shown instead of silently dropped.
+const char* NoticeText(std::uint32_t code)
+{
+	static const char* const kTexts[] = {
+		"Versao do cliente incompativel com o servidor.", // VersionMismatch
+		"Login em andamento, aguarde.",                     // LoginNow
+		"Senha incorreta 3 vezes. Aguarde para tentar.",    // 3WrongPass
+		"Senha incorreta.",                                 // BadPass
+		"Conta inexistente.",                               // NoAccount
+		"Conta bloqueada.",                                 // Blocked
+		"Selecione um personagem.",                         // SelectCharacter
+		"Apagando personagem, aguarde.",                    // DeletingWait
+		"Erro no banco de dados do servidor.",              // DBError
+		"Nao e possivel largar aqui.",                      // CantDropHere
+		"Indisponivel com a loja aberta.",                  // CantAutoTrade
+		"Jogador nao conectado.",                           // NotConnected
+		"O jogador recusa sussurros.",                      // DenyWhisper
+		"Entrada negada pelo servidor.",                    // BillingDenied
+		"Limite do banco atingido.",                        // CargoFull
+		"Requisitos do item nao atendidos.",                // ReqNotMet
+	};
+	return code < sizeof(kTexts) / sizeof(kTexts[0]) ? kTexts[code] : nullptr;
+}
+
+int InMessageBoxOk(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_MessagePanel>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpMessageBoxOk);
+	m->Header.Type = OpMessagePanel;
+	m->Header.ID = 0;
+	const std::uint32_t code = U32(w, 12);
+	if (const char* text = NoticeText(code))
+		std::snprintf(m->String, sizeof(m->String), "%s", text);
+	else
+		std::snprintf(m->String, sizeof(m->String), "Aviso do servidor (%u).", static_cast<unsigned>(code));
 	return WYD_DIALECT_TRANSLATED;
 }
 
@@ -398,16 +670,44 @@ int WydDialectInbound(const char* wire, int wireSize, char* out, int outCap, int
 	case OpCreateMob:
 		return exact(kCreateMob) ? Translated(InCreateMob(wire, out, outCap, outSize))
 			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpCreateMobTrade:
+		return exact(kCreateMobTrade) ? Translated(InCreateMobTrade(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpUpdateScore:
+		return exact(kUpdateScore) ? Translated(InUpdateScore(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpSendAffect:
+		return exact(kSendAffect) ? Translated(InSendAffect(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpUpdateEquip:
+		return exact(kUpdateEquip) ? Translated(InUpdateEquip(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpSetHpDam:
+		return exact(kSetHpDam) ? Translated(InSetHpDam(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpAttack:
+	case OpAttackOne:
+	case OpAttackTwo:
+		return Translated(InAttack(wire, wireSize, out, outCap, outSize, op));
 	case OpRemoveMob:
+	case OpPKInfo:        // StandardParm; the runtime has no consumer
+	case OpUpdateWeather: // StandardParm (int32 weather)
 		return PassIfSize(wireSize, 16, op);
+	case OpSetHpMp:
+		return PassIfSize(wireSize, 28, op);
+	case OpSendItem:
+		return PassIfSize(wireSize, 24, op);
+	case OpUpdateEtc:
+		return PassIfSize(wireSize, 48, op);
 	case OpAction:
 	case OpActionStop:
 	case OpAction2:
 		return PassIfSize(wireSize, 52, op);
 	case OpMessagePanel:
 		return PassIfSize(wireSize, 140, op);
-	case OpMessageBoxOk: // notice index (StandardParm)
-		return PassIfSize(wireSize, 16, op);
+	case OpMessageBoxOk: // server-local notice code (StandardParm)
+		return exact(16) ? Translated(InMessageBoxOk(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
 	case OpCNFCharacterLogout:
 	case OpCharacterLoginFail:
 	case OpNewCharacterFail:
@@ -514,6 +814,59 @@ int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int*
 		Put32(out, 28, static_cast<std::uint32_t>(static_cast<int>(in->State)));
 		return OutDone(outSize, kAccountSecureWire);
 	}
+	case OpAttack:
+	case OpAttackOne:
+	case OpAttackTwo:
+	{
+		// Runtime sizes are fixed per opcode (168/72/80, trailing alignment
+		// included); the server derives N from the length. Every field is
+		// rewritten by offset so padding never reaches the server, where
+		// Dam[].TargetID is an i32 and would absorb it.
+		const int n = AttackCapacity(op);
+		const int want = op == OpAttackOne ? static_cast<int>(sizeof(MSG_AttackOne))
+			: op == OpAttackTwo ? static_cast<int>(sizeof(MSG_AttackTwo)) : static_cast<int>(sizeof(MSG_Attack));
+		const int wireSize = kAttackFixed + n * kAttackDam;
+		if (msgSize != want || outCap < wireSize)
+			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		const auto* in = reinterpret_cast<const MSG_Attack*>(msg); // shared prefix
+		std::memset(out, 0, wireSize);
+		std::memcpy(out, msg, kHeader);
+		out[0] = static_cast<char>(wireSize & 0xFF);
+		out[1] = static_cast<char>(wireSize >> 8);
+		Put32(out, 12, static_cast<std::uint32_t>(in->FakeExp));
+		// @16 is the server's CurrentHp (overwritten by it) and @58 its ReqMp:
+		// the runtime's ReqMp has no server input, so both stay zero.
+		Put32(out, 24, static_cast<std::uint32_t>(in->CurrentExp));
+		Put32(out, 28, static_cast<std::uint32_t>(static_cast<unsigned long long>(in->CurrentExp) >> 32));
+		Put16(out, 32, static_cast<std::uint16_t>(in->Rsv));
+		Put16(out, 34, in->PosX);
+		Put16(out, 36, in->PosY);
+		Put16(out, 38, in->TargetX);
+		Put16(out, 40, in->TargetY);
+		Put16(out, 42, in->AttackerID);
+		Put16(out, 44, in->Progress);
+		out[46] = in->Motion;
+		out[47] = in->FlagLocal;
+		out[48] = in->DoubleCritical;
+		out[49] = in->SkillParm;
+		Put32(out, 52, static_cast<std::uint32_t>(in->CurrentMp));
+		Put16(out, 56, static_cast<std::uint16_t>(in->SkillIndex));
+		for (int i = 0; i < n; ++i)
+		{
+			Put32(out, kAttackFixed + i * kAttackDam, in->Dam[i].TargetID);
+			Put32(out, kAttackFixed + i * kAttackDam + 4, static_cast<std::uint32_t>(in->Dam[i].Damage));
+		}
+		Count(WYD_STAT_OUT_ATTACK);
+		return OutDone(outSize, wireSize);
+	}
+	case OpRestart: // header only (TMFieldScene recall after death / town)
+		return OutPass(msgSize, kHeader, op);
+	case OpReqMobByID: // StandardParm(mob id): unknown attacker, ask for CreateMob
+		return OutPass(msgSize, 16, op);
+	case OpDelayStart: // StandardParm; "return to town" box (TMFieldScene msg 11) before
+		// Restart. The server has no route for it and only logs it, as it does
+		// for the Windows client; dropping it here would hide nothing.
+		return OutPass(msgSize, 16, op);
 	case OpNewCharacter:
 		return OutPass(msgSize, 36, op);
 	case OpAction:
@@ -523,6 +876,9 @@ int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int*
 	case OpCharacterLogout:
 	case OpPing:
 		return OutPass(msgSize, kHeader, op);
+	case OpReqTeleport: // StandardParm(0); the server reads only the header
+	case OpChangeCity:  // StandardParm(village); the server derives it from the position
+		return OutPass(msgSize, 16, op);
 	default:
 		return OutFail(WYD_STAT_OUT_DROP_UNKNOWN, op);
 	}

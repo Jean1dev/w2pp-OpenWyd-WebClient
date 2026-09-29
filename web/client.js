@@ -15,7 +15,7 @@ const MK = { LBUTTON: 0x0001, RBUTTON: 0x0002, SHIFT: 0x0004, CONTROL: 0x0008, M
 // Contadores do tradutor de dialeto (WydDialect.h, enum WydDialectStat).
 const STATS = ["inPass", "inTranslated", "inDropUnknown", "inDropSize", "inDropRange",
   "outPass", "outTranslated", "outDropUnknown", "outDropSize", "outDropRange", "outDropNoVersion",
-  "fieldZeroed", "cargoHidden", "unmappedNonZero"];
+  "fieldZeroed", "cargoHidden", "unmappedNonZero", "inAttack", "outAttack"];
 
 window.clientEvidence = { ready: false, frames: 0, errors: [], diagnostics: [], config: null };
 

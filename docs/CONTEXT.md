@@ -1,6 +1,6 @@
 # Contexto técnico e decisões iniciais
 
-Atualização de execução em 28/09/2026: a continuidade do OpenWyd foi confirmada pelo usuário. Servidor-alvo `98286fdf`, Emscripten6.0.0 compilado/linkado localmente e incompatibilidades adicionais de assets identificadas. O [ADR001](decisions/001-client-architecture.md), a [matriz](compatibility.md) e as [evidências](evidence/01-auditoria/README.md) complementam/superam hipóteses históricas abaixo; não há gameplay validado.
+Atualização de execução em 28/09/2026: a continuidade do OpenWyd foi confirmada pelo usuário. Servidor-alvo `98286fdf`, Emscripten6.0.0 compilado/linkado localmente e incompatibilidades adicionais de assets identificadas. O [ADR001](decisions/001-client-architecture.md), a [matriz](compatibility.md) e as [evidências](evidence/01-auditoria/README.md) complementam/superam hipóteses históricas abaixo; não há gameplay validado. Em 29/09/2026: mundo com duas sessões provado no Railway (etapa 4, falta o cliente Windows); combate traduzido, mas não provado online; deploy e CI preparados sem execução ([progresso](PROGRESS.md), [deploy](deploy.md)).
 
 ## Objetivo e escopo
 

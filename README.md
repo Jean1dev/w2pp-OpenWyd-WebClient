@@ -2,7 +2,14 @@
 
 Pacote de contexto e prompts para construir nosso cliente WYD no navegador, integrado ao servidor Go [Jean1dev/w2pp-OpenWYD](https://github.com/Jean1dev/w2pp-OpenWYD).
 
-Estado em **28/09/2026**: auditoria em andamento e continuidade do OpenWyd escolhida. O runtime do Alan roda em WASM no navegador sobre os assets locais do operador. Um gateway próprio (`gateway/`) e uma camada de dialeto (`client/dialect/`) o conectam ao tm-server Go: o login real no servidor de teste do operador chega à seleção de personagem. Personagem, mundo com servidor, duas sessões e gameplay ainda não foram provados. Veja [progresso](docs/PROGRESS.md), [setup reproduzível](docs/setup.md) e as evidências de [auditoria](docs/evidence/01-auditoria/README.md), [cena](docs/evidence/02-build/README.md) e [protocolo](docs/evidence/03-protocolo/README.md).
+Estado em **29/09/2026**:
+- O runtime do Alan roda em WASM no navegador sobre os assets locais do operador.
+- Um gateway próprio (`gateway/`) e uma camada de dialeto (`client/dialect/`) o conectam ao tm-server Go.
+- No servidor de teste do operador (Railway), já foram provados: login e PIN, criação das quatro classes, entrada no Field, duas sessões que se veem e veem o movimento, relogin e troca de mapa.
+- O combate (`MSG_Attack`) está traduzido e coberto por testes, mas ainda **não foi provado online**.
+- O cliente Windows e o restante do gameplay estão pendentes.
+
+Veja [progresso](docs/PROGRESS.md), [setup reproduzível](docs/setup.md), [deploy no Railway](docs/deploy.md) e as evidências de [auditoria](docs/evidence/01-auditoria/README.md), [cena](docs/evidence/02-build/README.md), [protocolo](docs/evidence/03-protocolo/README.md), [mundo](docs/evidence/04-login-mundo/README.md) e [gameplay](docs/evidence/05-gameplay/README.md).
 
 Jogar localmente contra o servidor de teste do Railway: `make dev` (ou `npm run dev` no Windows sem `make`). O comando aplica os patches, recompila o runtime só se necessário, monta o site, sobe o gateway e abre o Chrome em `http://127.0.0.1:8290/client.html`.
 
@@ -14,7 +21,11 @@ npm run gateway:test      # gateway WS→TCP
 npm run protocol:vectors  # vetores CPSock independentes contra o codec Go
 npm run protocol:dialect  # tradutor do dialeto (wasm32)
 npm run client:stream     # navegador + gateway + servidor roteirizado
+npm run world:checks      # regras do harness online
+npm run world -- --target <host:porta> --env-file .env   # cenários reais com duas contas
 ```
+
+A CI (`.github/workflows/ci.yml`) roda o que não depende de dados privados: gateway com `-race`, reprodutibilidade de vetores e fixtures, vetores contra o codec do servidor fixado, dialeto em wasm32 e build da imagem Docker com smoke sem assets. O deploy (`Dockerfile`, `railway.json`) serve página e runtime da imagem e os dados do jogo a partir de um Volume do operador, atrás de senha. Veja [docs/deploy.md](docs/deploy.md).
 
 ## Começar
 

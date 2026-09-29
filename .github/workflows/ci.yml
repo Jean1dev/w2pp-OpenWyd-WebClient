@@ -1,0 +1,153 @@
+# CI runs only real commands on distributable inputs: this repository, the
+# public server/upstream checkouts pinned in dependencies.lock.json and the
+# synthetic fixtures under docs/evidence. The operator's game data and the
+# test accounts are private and never used here; the online scenarios
+# (tools/verify_world*.mjs) and the asset-backed browser smoke run locally
+# (docs/setup.md, docs/deploy.md).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.25.13"
+  NODE_VERSION: "22.16.0"
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  gateway:
+    name: Gateway (vet, race tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: gateway/go.sum
+      - name: go vet / test -race
+        working-directory: gateway
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          go mod verify
+          go vet ./...
+          go test -race -count=1 ./...
+
+  checks:
+    name: Harness rules and generated fixtures
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Pinned server + upstream checkouts (CPSock table sources)
+        run: |
+          python tools/fetch_pinned.py server
+          python tools/fetch_pinned.py upstream
+      - name: world_checks unit tests
+        run: node --test tools/world_checks.test.mjs
+      - name: Harness scripts parse
+        run: node --check tools/verify_world.mjs && node --check tools/verify_world_suite.mjs
+      - name: Vectors and dialect fixtures are reproducible
+        run: |
+          python tools/protocol/cpsock_ref.py --check
+          python tools/protocol/gen_vectors.py
+          python tools/protocol/gen_fixtures.py
+          git diff --exit-code -- docs/evidence/03-protocolo
+
+  protocol:
+    name: Vectors against the pinned Go server codec
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Pinned server + upstream checkouts
+        run: |
+          python tools/fetch_pinned.py server
+          python tools/fetch_pinned.py upstream
+      - name: Transport vectors + dialect overlay (server encoders/decoders)
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          python tools/protocol/gen_vectors.py
+          python tools/protocol/run_go_vectors.py
+
+  dialect:
+    name: Dialect translator on wasm32 (emsdk 6.0.0)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container: emscripten/emsdk:6.0.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pinned upstream checkout + patches
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          python3 tools/fetch_pinned.py upstream
+          python3 tools/apply_openwyd_patches.py
+      - name: Field-by-field test
+        run: python3 tools/protocol/run_dialect_test.py
+
+  image:
+    name: Docker image (WASM build) + gateway smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    needs: [gateway, dialect]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: wyd-webclient:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke without game data
+        run: |
+          set -eu
+          # Throwaway credential for this job only; the target is unreachable on purpose.
+          pass="ci-$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+          docker run -d --name wyd -p 8080:8080 \
+            -e PORT=8080 -e WYD_PUBLIC_ORIGIN=https://wyd.ci.invalid \
+            -e WYD_TARGET=127.0.0.1:9 -e WYD_CLIENT_VERSION=12000 \
+            -e WYD_BASIC_AUTH_USER=ci -e WYD_BASIC_AUTH_PASSWORD="$pass" \
+            wyd-webclient:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/healthz && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/client.html)" = 401
+          curl -fsS -u "ci:$pass" http://127.0.0.1:8080/client.html -o /dev/null
+          curl -fsS -u "ci:$pass" http://127.0.0.1:8080/runtime.js -o /dev/null
+          wasm="$(curl -fsS -u "ci:$pass" http://127.0.0.1:8080/runtime.js | grep -o 'tmproject_startup\.[0-9]*\.wasm' | head -1)"
+          test -n "$wasm"
+          test "$(curl -s -o /dev/null -w '%{content_type}' -u "ci:$pass" "http://127.0.0.1:8080/$wasm")" = application/wasm
+          cfg="$(curl -fsS -u "ci:$pass" http://127.0.0.1:8080/config.json)"
+          echo "$cfg" | grep -q '"wsUrl":"wss://wyd.ci.invalid/ws/server"'
+          if echo "$cfg" | grep -q '127.0.0.1:9'; then echo "config leaks the target"; exit 1; fi
+          # No game data in the image: the data file must not be served.
+          test "$(curl -s -o /dev/null -w '%{http_code}' -u "ci:$pass" http://127.0.0.1:8080/openwyd_assets.data)" = 404
+      - name: Container logs
+        if: always()
+        run: docker logs wyd || true

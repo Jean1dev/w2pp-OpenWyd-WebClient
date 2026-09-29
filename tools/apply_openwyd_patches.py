@@ -13,9 +13,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +33,35 @@ def git(*args: str, check: bool = False) -> subprocess.CompletedProcess:
 
 def sha(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def touched_paths(patches: list[Path]) -> list[str]:
+    paths = set()
+    for patch in patches:
+        for line in patch.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.startswith("diff --git a/"):
+                paths.add(line.split(" b/", 1)[1])
+    return sorted(paths)
+
+
+def applied_prefix(patches: list[Path]) -> int:
+    """Largest n such that patches[:n] are applied to the working tree.
+
+    Later patches may change context that earlier ones added, so a patch cannot
+    be checked in isolation. For each candidate n (largest first), the stack
+    patches[n-1] .. patches[0] is reversed on a temporary index holding the
+    working-tree content of the touched files; n is applied if all reverse.
+    """
+    paths = touched_paths(patches)
+    with tempfile.TemporaryDirectory() as tmp:
+        for n in range(len(patches), 0, -1):
+            env = dict(os.environ, GIT_INDEX_FILE=str(Path(tmp) / f"index{n}"))
+            run = lambda *a: subprocess.run(["git", "-C", str(UPSTREAM), *a], capture_output=True, text=True, env=env)
+            if run("read-tree", "HEAD").returncode or run("add", "--", *paths).returncode:
+                raise SystemExit("cannot build the temporary index")
+            if all(run("apply", "--cached", "--reverse", str(p)).returncode == 0 for p in reversed(patches[:n])):
+                return n
+    return 0
 
 
 def main() -> int:
@@ -54,10 +85,11 @@ def main() -> int:
             shutil.copyfile(src, dst)
             print(f"  copied -> {dst.relative_to(ROOT)}")
 
-    for patch in sorted(PATCHES.glob("*.patch")):
-        if git("apply", "--reverse", "--check", str(patch)).returncode == 0:
-            print(f"patch {patch.name}: applied")
-            continue
+    patches = sorted(PATCHES.glob("*.patch"))
+    applied = applied_prefix(patches)
+    for patch in patches[:applied]:
+        print(f"patch {patch.name}: applied")
+    for patch in patches[applied:]:
         probe = git("apply", "--check", str(patch))
         if probe.returncode != 0:
             print(f"patch {patch.name}: DOES NOT APPLY\n{probe.stderr}", file=sys.stderr)

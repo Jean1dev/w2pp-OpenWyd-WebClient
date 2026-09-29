@@ -1,0 +1,18 @@
+Read-only hover probe: automation must not click NPCs/items when testing movement.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -679,6 +679,12 @@ extern "C" WYD_EXPORT int wyd_field_character_class() {
+   return static_cast<int>(g_pObjectManager->m_stMobData.Class);
+ }
+ 
++extern "C" WYD_EXPORT int wyd_field_hover_entity() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return -1;
++  return g_pCurrentScene->m_pMouseOverHuman || g_pCurrentScene->m_pMouseOverItem ? 1 : 0;
++}
++
+ // Other entities in the field, by server id (read-only).
+ static TMHuman* WydFieldHuman(unsigned int id) {
+   if (!g_pObjectManager || !g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)

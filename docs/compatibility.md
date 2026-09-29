@@ -1,6 +1,6 @@
 # Compatibilidade OpenWyd ↔ servidor Go
 
-Data: 28/09/2026. SHAs fixados em `dependencies.lock.json`. Estado: **auditoria parcial; cliente integrado até a seleção de personagem** (etapa 3, [evidências](evidence/03-protocolo/README.md), [ADR 002](decisions/002-gateway-and-dialect.md)).
+Data: 28/09/2026. SHAs fixados em `dependencies.lock.json`. Estado: **auditoria parcial; cliente integrado até o Field com duas sessões** (etapa 3, [evidências](evidence/03-protocolo/README.md), [ADR 002](decisions/002-gateway-and-dialect.md); etapa 4, [evidências](evidence/04-login-mundo/README.md), [ADR 003](decisions/003-in-world-dialect-and-automation.md)).
 
 Fontes principais: servidor `tmserver/internal/protocol/` e `tmserver/internal/handler/`; cliente `Projects/TMProject/Basedef.h`, `CPSock.cpp`, `TMSelectServerScene.cpp`, `TMSelectCharScene.cpp`, `TMFieldScene.cpp`, `TMHuman.cpp`. O [inventário](evidence/01-auditoria/source-inventory.json) lista 102 constantes de opcode Go, 61 atribuições diretas no dispatcher e 69 declarações de opcode upstream. Rotas montadas em loops não estão na contagem de atribuições diretas. Igualdade de opcode não é compatibilidade.
 
@@ -111,3 +111,23 @@ Qualquer opcode que não esteja abaixo é **descartado e contado** nas duas dire
 | C→S | `020D` AccountLogin 116 (Version = ClientVersion do canal; TID zerado; senha apagada) | traduz | Railway + roteirizado + unitário |
 | C→S | `0213` CharacterLogin 36 → 20; `0211` DeleteCharacter 48 → 44 (senha ≤ 12); `0FDE` AccountSecure 32 | traduz | unitário + decoders Go |
 | C→S | `020F` 36, `036C/0366/0368` 52, `0215` 12, `03A0` 12 | repassa se o tamanho for exato | unitário; `03A0` no roteirizado |
+
+## Tradução acrescentada na etapa 4
+
+Decisões no [ADR 003](decisions/003-in-world-dialect-and-automation.md). As fixtures são independentes (`gen_fixtures.py`), iguais byte a byte aos encoders Go via overlay e conferidas campo a campo no teste C++ (364 verificações). A prova online está nas [evidências da etapa 4](evidence/04-login-mundo/README.md).
+
+| Direção | Opcode | Ação | Prova |
+|---|---|---|---|
+| S→C | `0336` UpdateScore 152 | traduz: Level i32→short (recusa fora do intervalo); CurrHp/CurrMp@136/140 → ReqHp/ReqMp; Magic i32→u16 (overflow zerado e contado); Rsv/LearnedSkill@146/148 zerados em vez de `0xCC` | unitário + Railway (entrada no Field sem descarte) |
+| S→C | `03B9` SendAffect 268 → `MSG_UpdateAffect` | traduz: {Type, Value u8, Level u16} → {Type, Level char, Value short}; Level > 127 zerado e contado | unitário |
+| S→C | `036B` UpdateEquip 60 → 68 | traduz 16→18 slots | unitário |
+| S→C | `0363` CreateMobTrade 252 → 260 | traduz como CreateMob + Desc[24]; Tab[26]→Nick é **hipótese** | unitário |
+| S→C | `018A` SetHpDam 20 | traduz: Dam i32→short, overflow zerado e contado | unitário |
+| S→C | `0102` MessageBoxOk 16 → `0101` MessagePanel 140 (ID 0) | traduz o código local de `notice.go` para texto fixo | unitário + Railway ("Senha incorreta.") |
+| S→C | `0181` 28, `0182` 24, `0337` 48, `0166` 16, `018B` 16 | repassa se o tamanho for exato (`static_assert` dos offsets) | unitário |
+| C→S | `0290` ReqTeleport 16, `0291` ChangeCity 16 | repassa se o tamanho for exato; o servidor lê só o header | unitário; teleporte no Railway (ver evidências) |
+| S→C | `0367/039D/039E` Attack `60+8N` (N 1..13, até a capacidade do opcode) → 168/72/80 | traduz: ReqMp i16@58→i32@16; CurrentHp@16 do atacante sem campo no runtime; TargetID i32→u16 (overflow zerado e contado); FakeExp 0. Contador `inAttack` ([ADR 004](decisions/004-combat-dialect.md)) | unitário + overlay Go; Railway em [etapa 5](evidence/05-gameplay/README.md) |
+| C→S | `0367/039D/039E` Attack 168/72/80 → `60+8N` (N 13/1/2) | traduz por offset; padding e `@16/@58` zerados, TargetID ampliado a i32. Contador `outAttack` | unitário + overlay Go (decoder real) |
+| C→S | `0289` Restart 12, `0369` ReqMobByID 16, `03AE` 16 | repassa se o tamanho for exato; `03AE` não tem rota no servidor (só log `routed=false`) | unitário |
+
+Continuam descartados e contados: chat `0333/0334`, itens/loja/banco/troca/grupo e os demais opcodes da matriz acima (etapa 5, fatias seguintes). O combate foi traduzido em 29/09 ([ADR 004](decisions/004-combat-dialect.md)); com isso `DEFERRED_INBOUND` ficou vazio e nenhum descarte é mais tolerado nas verificações.

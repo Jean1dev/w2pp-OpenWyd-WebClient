@@ -1,0 +1,34 @@
+Read-only probe: the loaded terrain block proves a map change; HomeTownX/Y does not change on teleport.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -13,6 +13,7 @@
+ #include "SControlContainer.h"
+ #include "TimerManager.h"
+ #include "TMGlobal.h"
++#include "TMGround.h"
+ #include "TMHuman.h"
+ #include "TMScene.h"
+ #include "TMSelectCharScene.h"
+@@ -682,6 +683,20 @@
+   return g_pCurrentScene->m_pMouseOverHuman || g_pCurrentScene->m_pMouseOverItem ? 1 : 0;
+ }
+ 
++// Loaded terrain block (TMGround offset index, 128x128 cells per block). This is
++// the map the client actually rendered, unlike HomeTownX/Y which a teleport keeps.
++extern "C" WYD_EXPORT int wyd_field_ground_index_x() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || !g_pCurrentScene->m_pGround)
++    return -1;
++  return g_pCurrentScene->m_pGround->m_vecOffsetIndex.x;
++}
++
++extern "C" WYD_EXPORT int wyd_field_ground_index_y() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || !g_pCurrentScene->m_pGround)
++    return -1;
++  return g_pCurrentScene->m_pGround->m_vecOffsetIndex.y;
++}
++
+ // Other entities in the field, by server id (read-only).
+ static TMHuman* WydFieldHuman(unsigned int id) {
+   if (!g_pObjectManager || !g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)

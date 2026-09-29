@@ -293,6 +293,181 @@ func TestExtDialectInbound(t *testing.T) {
 			same(t, EncodeCreateMobBody(l.data()), body(t, name))
 		})
 	}
+
+	// In-world frames (etapa 4).
+	for _, name := range []string{"update_score", "update_score_magic_overflow", "update_score_level_overflow"} {
+		t.Run(name, func(t *testing.T) {
+			var l struct {
+				Level      int32             `json:"level"`
+				Ac         int32             `json:"ac"`
+				Damage     int32             `json:"damage"`
+				AttackRun  uint8             `json:"attackRun"`
+				MaxHp      int32             `json:"maxHp"`
+				MaxMp      int32             `json:"maxMp"`
+				Hp         int32             `json:"hp"`
+				Mp         int32             `json:"mp"`
+				Str        int16             `json:"str"`
+				Int        int16             `json:"int"`
+				Dex        int16             `json:"dex"`
+				Con        int16             `json:"con"`
+				Special    [4]int16          `json:"special"`
+				Critical   uint8             `json:"critical"`
+				SaveMana   uint8             `json:"saveMana"`
+				Affect     map[string]uint16 `json:"affect"`
+				Guild      uint16            `json:"guild"`
+				GuildLevel uint16            `json:"guildLevel"`
+				Resist     [4]int8           `json:"resist"`
+				Magic      int32             `json:"magic"`
+			}
+			mustJSON(t, d.Inbound[name].Logical, &l)
+			s := ScoreData{Level: l.Level, Ac: l.Ac, Damage: l.Damage, AttackRun: l.AttackRun, MaxHp: l.MaxHp,
+				MaxMp: l.MaxMp, Hp: l.Hp, Mp: l.Mp, Str: l.Str, Int: l.Int, Dex: l.Dex, Con: l.Con,
+				Special: l.Special, Critical: l.Critical, SaveMana: l.SaveMana, Guild: l.Guild,
+				GuildLevel: l.GuildLevel, Resist: l.Resist, Magic: l.Magic}
+			for k, v := range l.Affect {
+				s.Affect[atoi(k)] = v
+			}
+			same(t, EncodeUpdateScore(s), body(t, name))
+		})
+	}
+	t.Run("send_affect", func(t *testing.T) {
+		var l struct {
+			Affects map[string]struct {
+				Type  uint8  `json:"type"`
+				Value uint8  `json:"value"`
+				Level uint16 `json:"level"`
+				Time  uint32 `json:"time"`
+			} `json:"affects"`
+		}
+		mustJSON(t, d.Inbound["send_affect"].Logical, &l)
+		var a [MaxAffect]AffectData
+		for k, v := range l.Affects {
+			a[atoi(k)] = AffectData{Type: v.Type, Value: v.Value, Level: v.Level, Time: v.Time}
+		}
+		same(t, EncodeSendAffect(a), body(t, "send_affect"))
+	})
+	t.Run("update_equip", func(t *testing.T) {
+		var l struct {
+			Equip map[string]uint16 `json:"equip"`
+			Anct  map[string]uint8  `json:"anct"`
+		}
+		mustJSON(t, d.Inbound["update_equip"].Logical, &l)
+		var visual [16]uint16
+		var anct [16]uint8
+		for k, v := range l.Equip {
+			visual[atoi(k)] = v
+		}
+		for k, v := range l.Anct {
+			anct[atoi(k)] = v
+		}
+		same(t, EncodeUpdateEquip(visual, anct), body(t, "update_equip"))
+	})
+	t.Run("create_mob_trade", func(t *testing.T) {
+		var l struct {
+			Mob  fxCreateMob `json:"mob"`
+			Tab  string      `json:"tab"`
+			Desc string      `json:"desc"`
+		}
+		mustJSON(t, d.Inbound["create_mob_trade"].Logical, &l)
+		tab := make([]byte, 26)
+		copy(tab, l.Tab)
+		same(t, EncodeCreateMobTradeBody(l.Mob.data(), tab, l.Desc), body(t, "create_mob_trade"))
+	})
+	for _, name := range []string{"set_hp_dam", "set_hp_dam_overflow"} {
+		t.Run(name, func(t *testing.T) {
+			var l struct {
+				Hp  int32 `json:"hp"`
+				Dam int32 `json:"dam"`
+			}
+			mustJSON(t, d.Inbound[name].Logical, &l)
+			same(t, EncodeSetHpDam(l.Hp, l.Dam), body(t, name))
+		})
+	}
+	t.Run("set_hp_mp", func(t *testing.T) {
+		var l struct {
+			Hp    int32 `json:"hp"`
+			Mp    int32 `json:"mp"`
+			ReqHp int32 `json:"reqHp"`
+			ReqMp int32 `json:"reqMp"`
+		}
+		mustJSON(t, d.Inbound["set_hp_mp"].Logical, &l)
+		same(t, EncodeSetHpMp(l.Hp, l.Mp, l.ReqHp, l.ReqMp), body(t, "set_hp_mp"))
+	})
+	t.Run("send_item", func(t *testing.T) {
+		var l struct {
+			InvType int    `json:"invType"`
+			Slot    int    `json:"slot"`
+			Item    fxItem `json:"item"`
+		}
+		mustJSON(t, d.Inbound["send_item"].Logical, &l)
+		same(t, EncodeSendItemBody(l.InvType, l.Slot, l.Item.sel()), body(t, "send_item"))
+	})
+	t.Run("update_etc", func(t *testing.T) {
+		var l struct {
+			Hold         uint32 `json:"hold"`
+			Exp          int64  `json:"exp"`
+			Learn        int64  `json:"learn"`
+			ScoreBonus   uint16 `json:"scoreBonus"`
+			SpecialBonus uint16 `json:"specialBonus"`
+			SkillBonus   uint16 `json:"skillBonus"`
+			Magic        uint16 `json:"magic"`
+			Coin         int32  `json:"coin"`
+		}
+		mustJSON(t, d.Inbound["update_etc"].Logical, &l)
+		same(t, EncodeUpdateEtc(UpdateEtcData(l)), body(t, "update_etc"))
+	})
+	t.Run("pk_info", func(t *testing.T) {
+		same(t, EncodeStandardParm(75), body(t, "pk_info"))
+	})
+	t.Run("update_weather", func(t *testing.T) {
+		same(t, EncodeUpdateWeather(2), body(t, "update_weather"))
+	})
+	// handler.notify writes the notice code as a little-endian uint32 body.
+	t.Run("notice_bad_pass", func(t *testing.T) {
+		same(t, EncodeStandardParm(3), body(t, "notice_bad_pass"))
+	})
+	t.Run("notice_unknown", func(t *testing.T) {
+		same(t, EncodeStandardParm(999), body(t, "notice_unknown"))
+	})
+	for _, name := range []string{"attack_echo", "attack_multi", "attack_mob", "attack_target_overflow"} {
+		t.Run(name, func(t *testing.T) {
+			var l fxAttack
+			mustJSON(t, d.Inbound[name].Logical, &l)
+			m := l.body()
+			same(t, m.Encode(), body(t, name))
+		})
+	}
+}
+
+// fxAttack is the logical MSG_Attack of gen_fixtures.py.
+type fxAttack struct {
+	CurrentHp      int32      `json:"currentHp"`
+	CurrentExp     int64      `json:"currentExp"`
+	PosX           uint16     `json:"posX"`
+	PosY           uint16     `json:"posY"`
+	TargetX        uint16     `json:"targetX"`
+	TargetY        uint16     `json:"targetY"`
+	AttackerID     uint16     `json:"attackerId"`
+	Progress       uint16     `json:"progress"`
+	Motion         uint8      `json:"motion"`
+	DoubleCritical uint8      `json:"doubleCritical"`
+	CurrentMp      int32      `json:"currentMp"`
+	SkillIndex     int16      `json:"skillIndex"`
+	ReqMp          int16      `json:"reqMp"`
+	Dam            [][2]int32 `json:"dam"`
+}
+
+func (a fxAttack) body() MsgAttackBody {
+	m := MsgAttackBody{
+		CurrentHp: a.CurrentHp, CurrentExp: a.CurrentExp, PosX: a.PosX, PosY: a.PosY,
+		TargetX: a.TargetX, TargetY: a.TargetY, AttackerID: a.AttackerID, Progress: a.Progress,
+		Motion: a.Motion, DoubleCritical: a.DoubleCritical, CurrentMp: a.CurrentMp,
+		SkillIndex: a.SkillIndex, ReqMp: a.ReqMp,
+	}
+	for _, d := range a.Dam {
+		m.Dam = append(m.Dam, DamEntry{TargetID: d[0], Damage: d[1]})
+	}
+	return m
 }
 
 // TestExtDialectOutbound: what the client translator must emit parses, with
@@ -369,4 +544,42 @@ func TestExtDialectOutbound(t *testing.T) {
 			t.Fatalf("decoded %+v", m)
 		}
 	})
+	// The server derives the target count from the length and reads TargetID
+	// as i32: the frame must carry exactly the runtime's N entries, zero-extended.
+	for _, tc := range []struct {
+		name string
+		typ  Type
+	}{{"attack_one", MsgAttackOne}, {"attack_multi", MsgAttack}} {
+		t.Run(tc.name, func(t *testing.T) {
+			h, b := frame(tc.name)
+			var l struct {
+				PosX       uint16     `json:"posX"`
+				PosY       uint16     `json:"posY"`
+				TargetX    uint16     `json:"targetX"`
+				TargetY    uint16     `json:"targetY"`
+				AttackerID uint16     `json:"attackerId"`
+				Motion     uint8      `json:"motion"`
+				SkillIndex int16      `json:"skillIndex"`
+				Dam        [][2]int32 `json:"dam"`
+			}
+			mustJSON(t, d.Outbound[tc.name].Logical, &l)
+			var m MsgAttackBody
+			if h.Type != tc.typ || m.Decode(b) != nil || len(b) != MsgAttackDamOffset+len(l.Dam)*MsgAttackDamStride {
+				t.Fatalf("type %v len %d", h.Type, len(b))
+			}
+			if m.PosX != l.PosX || m.PosY != l.PosY || m.TargetX != l.TargetX || m.TargetY != l.TargetY ||
+				m.AttackerID != l.AttackerID || m.Motion != l.Motion || m.SkillIndex != l.SkillIndex ||
+				m.CurrentHp != 0 || m.ReqMp != 0 || m.CurrentExp != 0 || m.CurrentMp != 0 {
+				t.Fatalf("decoded %+v", m)
+			}
+			if len(m.Dam) != len(l.Dam) {
+				t.Fatalf("dam %d, want %d", len(m.Dam), len(l.Dam))
+			}
+			for i, e := range l.Dam {
+				if m.Dam[i].TargetID != e[0] || m.Dam[i].Damage != e[1] {
+					t.Fatalf("dam[%d] = %+v", i, m.Dam[i])
+				}
+			}
+		})
+	}
 }
