@@ -66,3 +66,33 @@ Os assets do Volume vieram de `python tools/pack_deploy_assets.py`: 15 arquivos,
   | segredos nos logs | ausentes |
 
 - **Primeiro deploy do `main` (`0296e48`): FAILED.** O builder do Railway disse: "dockerfile invalid: flag '--mount=type=cache,id=wyd-emsdk-cache,…' is missing the cacheKey prefix from its id". O Railway **usou o Dockerfile**; o `RAILPACK` no manifesto do deployment é só o valor salvo nas configurações do serviço. Correção: remover o cache mount (ver ADR 005, revisão).
+
+## Deploy verificado no Railway (29/09/2026, branch `Jean1dev/railway-bucket`, `railway up`)
+
+- **Build no builder do Railway, pelo Dockerfile:**
+  - 115 objetos, `contract_unchanged=true certified=true`, link com `undefined_total=0`;
+  - imagem `sha256:79d54fb5defe95fae06aa0ba08d12670d32794f741e55b5d0808048fd0311a88`; "Deploy complete".
+- **Pelo domínio público** `https://w2pp-openwyd-webclient-production.up.railway.app`:
+
+  | Verificação | Resultado |
+  |---|---|
+  | `/healthz` | `ok` |
+  | página sem senha / senha errada / com senha | 401 / 401 / 200 |
+  | `/config.json` | `wss://<domínio>/ws/server`, `clientVersion` 12000, `assetManifestVersion` `f4c03289374bd614`, sem o destino TCP |
+  | `.wasm` | 200 `application/wasm`, 1.916.659 bytes |
+  | `openwyd_assets.js` (bucket) | 200 `text/javascript`, 522.188 bytes |
+  | `openwyd_assets.data` com Range | 206, 1.024 bytes |
+  | `music/login.mp3` | 200 |
+  | dados sem senha | 401 |
+  | WebSocket sem senha / origem errada / correto | 401 / 403 / 101 (log: `origin rejected`, `relay open`, `relay closed`) |
+
+- **Navegador real (Chromium headless, Playwright 1.54.2)** com a credencial Basic e a conta de teste A:
+  - página carregada, 320 MB baixados do bucket via gateway;
+  - runtime na seleção de servidor em 64 s;
+  - login real no tm-server (`0x10A`) e "Select Character" em 71 s;
+  - WebSocket aberto na mesma origem, com a credencial reenviada pelo navegador (a abertura sem ela daria 401);
+  - dialeto sem descartes; 0 erros GL; 0 erros de página;
+  - captura local `.cache/suite/deploy-selchar.png`: seleção texturizada, personagens da conta e teclado de PIN.
+
+  Com isso, dois pontos antes "a confirmar" estão **confirmados em execução**: o reenvio da credencial no WebSocket e o acesso ao tm-server pelo proxy TCP a partir de outro projeto.
+- **Ainda não confirmado:** o `X-Forwarded-For` do Railway como IP real, que exige duas origens distintas.
