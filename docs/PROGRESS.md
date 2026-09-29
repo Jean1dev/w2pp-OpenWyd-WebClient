@@ -11,7 +11,7 @@ Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 5 Gameplay | Em andamento | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Pendente | — |
-| 8 Entrega | Em andamento | [Imagem e CI verificadas localmente](evidence/08-entrega/README.md) |
+| 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
 
 ## Próxima ação
 
@@ -230,6 +230,13 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
   - `gateway:test` verde;
   - gateway em Docker contra o bucket real: SHA-256 do `.data` igual ao do manifesto, Range 206, 401 sem senha.
 - **Falha observada:** o deploy do merge (`0296e48`) falhou no builder do Railway por causa do cache mount.
-- **Pendente:** merge do PR com bucket e correção, novo deploy automático, verificação pelo domínio público, login real pelo navegador e confirmação da credencial no WebSocket.
+- **Deploy verificado** (`railway up` da branch do PR #3):
+  - build no Railway certificado, com 0 indefinidos;
+  - pelo domínio público: 401/403/101 conforme o esperado e assets vindos do bucket;
+  - Chromium real com a conta A chegou a "Select Character" em 71 s pelo tm-server;
+  - credencial reenviada no WebSocket.
+
+  Detalhes nas [evidências](evidence/08-entrega/README.md).
+- **Pendente:** merge do PR #3 (o deploy automático do `main` substitui o `railway up`); confirmar o `X-Forwarded-For`; flag de build para as exports `wyd_debug_*` antes de qualquer abertura pública.
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

@@ -1,6 +1,6 @@
 # Deploy no Railway
 
-Estado em 29/09/2026: **serviço configurado e assets no bucket; o primeiro deploy do `main` falhou no Dockerfile** (cache mount recusado pelo builder do Railway, corrigido no PR seguinte). Decisões do operador: assets num **bucket** privado (mudança de 29/09; o Volume segue como alternativa), acesso por senha e WASM compilado no build da imagem ([ADR 005](decisions/005-railway-deploy-and-ci.md)).
+Estado em 29/09/2026: **no ar e verificado.** Deploy pela branch do PR #3 (`railway up`): build no Railway, assets do bucket e login real até a seleção de personagem pelo domínio público ([evidências](evidence/08-entrega/README.md)). O primeiro deploy do `main` tinha falhado por causa do cache mount no Dockerfile, corrigido no PR #3. Decisões do operador: assets num **bucket** privado (mudança de 29/09; o Volume segue como alternativa), acesso por senha e WASM compilado no build da imagem ([ADR 005](decisions/005-railway-deploy-and-ci.md)).
 
 ## Ambiente atual
 
@@ -67,10 +67,7 @@ GET /openwyd_assets.data           -> 200, application/octet-stream; Range -> 20
 
 Localmente, contra o bucket real (29/09): `.js` 200, Range 206, ausente 404, sem senha 401, e o `.data` de 320 MB chegou pelo gateway com o SHA-256 do manifesto ([evidências](evidence/08-entrega/README.md)).
 
-**A confirmar no primeiro deploy bem-sucedido:**
-- o reenvio da credencial Basic na abertura do WebSocket de mesma origem;
-- que o `X-Forwarded-For` do Railway traz o IP do cliente como última entrada;
-- o login real pelo domínio.
+No Railway (29/09): o navegador reenviou a credencial ao abrir o WebSocket, e o login real chegou à seleção de personagem. **A confirmar:** que o `X-Forwarded-For` do Railway traz o IP do cliente como última entrada.
 
 ## Rollback
 
