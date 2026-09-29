@@ -90,3 +90,34 @@ func TestTLSProxyValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestFromEnvBucket(t *testing.T) {
+	c, err := FromEnv(env(map[string]string{EnvS3Endpoint: "https://t3.storageapi.dev/", EnvS3Bucket: "arranged-orb-x1",
+		EnvS3Prefix: "assets-v1", EnvS3KeyID: "id", EnvS3Secret: "s3-secret-value"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.AssetDir != "" || c.AssetS3 == nil || c.AssetS3.Region != "auto" || c.AssetS3.Endpoint != "https://t3.storageapi.dev" {
+		t.Fatalf("bucket config %+v", c.AssetS3)
+	}
+	for name, over := range map[string]map[string]string{
+		"http endpoint": {EnvS3Endpoint: "http://t3.storageapi.dev"},
+		"no secret":     {EnvS3Secret: ""},
+		"bad bucket":    {EnvS3Bucket: "Bad_Bucket"},
+		"bad style":     {EnvS3URLStyle: "dns"},
+		"traversal":     {EnvS3Prefix: "../x"},
+	} {
+		base := map[string]string{EnvS3Endpoint: "https://t3.storageapi.dev", EnvS3Bucket: "arranged-orb-x1",
+			EnvS3KeyID: "id", EnvS3Secret: "s3-secret-value"}
+		for k, v := range over {
+			base[k] = v
+		}
+		_, err := FromEnv(env(base))
+		if err == nil {
+			t.Fatalf("%s accepted", name)
+		}
+		if strings.Contains(err.Error(), "s3-secret-value") {
+			t.Fatalf("%s: error leaks the secret", name)
+		}
+	}
+}

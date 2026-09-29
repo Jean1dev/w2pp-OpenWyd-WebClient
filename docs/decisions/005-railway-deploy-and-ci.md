@@ -44,3 +44,14 @@ O operador pediu um deploy no Railway com Dockerfile e uma CI de validação. Tr
 - O primeiro deploy exige passos manuais do operador: serviço, domínio, variáveis, volume e upload. Estão descritos, mas não foram executados por esta entrega.
 - **A confirmar em execução:** reenvio da credencial Basic na abertura do WebSocket de mesma origem; leitura do volume pelo uid `nonroot` (alternativa: `RAILWAY_RUN_UID=0`); porta interna do tm-server na rede privada.
 - As exports `wyd_debug_*` continuam no build publicado. A ADR 003 pede uma flag de build antes de uma entrega **pública**. Com o acesso restrito isso é aceitável, mas continua pendente para a etapa 8.
+
+## Revisão — 29/09/2026 (bucket)
+
+- **Nova decisão do operador:** os assets ficam no bucket privado do Railway (`arranged-orb`, projeto `wyd-client-web`) em vez do Volume. Alternativas apresentadas: Volume (sem código novo, uma réplica) e bucket (código novo, várias réplicas, tráfego bucket→gateway).
+- **Gateway:** `assetS3` / `WYD_ASSET_S3_*`, exclusivo com `assetDir`.
+  - SigV4 só com a biblioteca padrão, conferida contra o vetor "GET Object" da documentação da AWS.
+  - Streaming do objeto sob a mesma origem e autenticação, repassando `Range`/`If-*` e 206/304/416; 403/404 viram 404; outros erros viram 502.
+  - O navegador nunca vê bucket, endpoint nem credenciais.
+- **Upload:** `tools/upload_assets_s3.py`, com um SigV4 independente em Python. Credenciais lidas da CLI em memória, prefixo versionado e verificação por `HEAD`.
+- **Projeto:** o operador escolheu o `wyd-client-web` existente. O tm-server está no projeto `wyd`, e a rede privada não atravessa projetos, por isso `WYD_TARGET` usa o proxy TCP público.
+- **Dockerfile:** o builder do Railway recusa cache mounts cujo id não tenha o prefixo do serviço (`s/<service-id>-…`). O mount foi removido em vez de prender o arquivo a um serviço. O aquecimento da toolchain continua, e o cache do emscripten fica na camada do estágio de build.

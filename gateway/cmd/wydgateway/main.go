@@ -57,7 +57,7 @@ func run(load func() (*config.Config, error), log *slog.Logger) error {
 	}
 	log.Info("gateway listening", "addr", cfg.Listen, "tls", cfg.TLSCert != "",
 		"tlsProxy", cfg.TLSTerminatedByProxy, "channels", channels, "static", cfg.StaticDir != "",
-		"assets", cfg.AssetDir != "", "auth", cfg.BasicAuth != nil)
+		"assets", assetSource(cfg), "auth", cfg.BasicAuth != nil)
 
 	errc := make(chan error, 1)
 	go func() {
@@ -83,4 +83,15 @@ func run(load func() (*config.Config, error), log *slog.Logger) error {
 	cancelRelays()
 	g.Wait()
 	return err
+}
+
+// assetSource names where game data comes from, without secrets.
+func assetSource(cfg *config.Config) string {
+	switch {
+	case cfg.AssetS3 != nil:
+		return "s3:" + cfg.AssetS3.Bucket + "/" + cfg.AssetS3.Prefix
+	case cfg.AssetDir != "":
+		return "dir:" + cfg.AssetDir
+	}
+	return "none"
 }

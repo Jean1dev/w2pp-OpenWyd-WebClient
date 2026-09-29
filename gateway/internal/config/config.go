@@ -83,13 +83,16 @@ type Config struct {
 	// AssetDir is a second read-only root for files absent from StaticDir: the
 	// operator's local game data (never part of the image or the repository).
 	AssetDir string `json:"assetDir"`
+	// AssetS3 is the alternative to AssetDir: a private S3-compatible bucket
+	// (e.g. Railway) the gateway reads with SigV4 and streams to the browser.
+	AssetS3 *S3Assets `json:"assetS3"`
 	// BasicAuth, when set, protects every route except /healthz. The password
 	// comes from the operator's environment, never from a committed file.
 	BasicAuth            *BasicAuth `json:"basicAuth"`
-	AssetManifestVersion string    `json:"assetManifestVersion"`
-	DefaultChannel       string    `json:"defaultChannel"`
-	Channels             []Channel `json:"channels"`
-	Limits               Limits    `json:"limits"`
+	AssetManifestVersion string     `json:"assetManifestVersion"`
+	DefaultChannel       string     `json:"defaultChannel"`
+	Channels             []Channel  `json:"channels"`
+	Limits               Limits     `json:"limits"`
 }
 
 // BasicAuth is a single operator-issued credential for a private deployment.
@@ -97,6 +100,20 @@ type BasicAuth struct {
 	User     string `json:"user"`
 	Password string `json:"password"`
 }
+
+// S3Assets locates the game data in a private bucket. Keys are
+// Prefix + site path. Credentials come from the operator's environment.
+type S3Assets struct {
+	Endpoint        string `json:"endpoint"` // https://host of the S3 API
+	Region          string `json:"region"`   // SigV4 region ("auto" on Railway)
+	Bucket          string `json:"bucket"`
+	Prefix          string `json:"prefix"`   // e.g. "assets-f4c03289374bd614"
+	URLStyle        string `json:"urlStyle"` // "virtual-host" (default) or "path"
+	AccessKeyID     string `json:"accessKeyId"`
+	SecretAccessKey string `json:"secretAccessKey"`
+}
+
+var bucketName = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
 
 // MinPasswordLen rejects trivially guessable deployment passwords.
 const MinPasswordLen = 12
@@ -167,6 +184,33 @@ func (c *Config) Validate() error {
 	}
 	if c.AssetDir != "" && c.StaticDir == "" {
 		errs = append(errs, errors.New("assetDir requires staticDir"))
+	}
+	if a := c.AssetS3; a != nil {
+		if c.AssetDir != "" {
+			errs = append(errs, errors.New("assetDir and assetS3 are exclusive"))
+		}
+		if c.StaticDir == "" {
+			errs = append(errs, errors.New("assetS3 requires staticDir"))
+		}
+		u, err := url.Parse(a.Endpoint)
+		switch {
+		case err != nil || u.Host == "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.User != nil:
+			errs = append(errs, errors.New("assetS3.endpoint must be a bare scheme://host URL"))
+		case u.Scheme != "https" && !(u.Scheme == "http" && c.AllowInsecure):
+			errs = append(errs, errors.New("assetS3.endpoint must be https:// (http only with allowInsecure)"))
+		}
+		if !bucketName.MatchString(a.Bucket) {
+			errs = append(errs, errors.New("assetS3.bucket is not a valid bucket name"))
+		}
+		if a.Region == "" || a.AccessKeyID == "" || a.SecretAccessKey == "" {
+			errs = append(errs, errors.New("assetS3 needs region, accessKeyId and secretAccessKey"))
+		}
+		if a.URLStyle != "" && a.URLStyle != "virtual-host" && a.URLStyle != "path" {
+			errs = append(errs, errors.New("assetS3.urlStyle must be virtual-host or path"))
+		}
+		if strings.Contains(a.Prefix, "..") {
+			errs = append(errs, errors.New("assetS3.prefix must not contain '..'"))
+		}
 	}
 	if len(c.AllowedOrigins) == 0 {
 		errs = append(errs, errors.New("allowedOrigins is empty"))

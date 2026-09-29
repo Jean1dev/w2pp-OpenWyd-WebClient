@@ -21,7 +21,7 @@ Auditoria: 28/09/2026. O arquivo `dependencies.lock.json` fixa revisões; caminh
 | Imagem final `gcr.io/distroless/static-debian12` | `nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab` | Base sem shell; contém apenas `wydgateway` e `/srv/site` |
 | GitHub Actions | `actions/checkout@v4`, `setup-go@v5`, `setup-node@v4`, `setup-python@v5`, `docker/setup-buildx-action@v3`, `docker/build-push-action@v6` | CI; fixadas por versão principal (não por SHA) |
 
-**Imagem publicada:** contém o gateway próprio, a página (`web/`) e o runtime compilado do upstream com os patches deste repositório. O runtime é derivado de código cuja licença de conjunto não está resolvida (ver abaixo), por isso o deploy é **restrito por senha** ([ADR 005](decisions/005-railway-deploy-and-ci.md)). Os dados do jogo nunca entram na imagem: ficam no Volume do operador. Os headers DirectX são usados só no estágio de build e não são copiados para a imagem final.
+**Imagem publicada:** contém o gateway próprio, a página (`web/`) e o runtime compilado do upstream com os patches deste repositório. O runtime é derivado de código cuja licença de conjunto não está resolvida (ver abaixo), por isso o deploy é **restrito por senha** ([ADR 005](decisions/005-railway-deploy-and-ci.md)). Os dados do jogo nunca entram na imagem: ficam no bucket privado do operador (ou num Volume). Os headers DirectX são usados só no estágio de build e não são copiados para a imagem final.
 
 ## Direitos: achados confirmados em fonte
 

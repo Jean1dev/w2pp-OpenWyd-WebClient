@@ -213,4 +213,23 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
   Detalhes nas [evidências](evidence/08-entrega/README.md).
 - **Não executado:** nenhum serviço, variável ou volume foi criado no Railway; a CI remota só roda depois do push; o jogo via imagem exige TLS e não foi testado localmente.
 
+### 29/09/2026 — Railway: serviço, bucket e correção do Dockerfile
+
+- **Pedido do usuário:** criar o deploy no Railway (projeto `wyd-client-lib`), usar o bucket existente como storage e verificar as configurações. Não havia projeto com esse nome; o usuário escolheu o `wyd-client-web` já existente. Também escolheu o bucket em vez do Volume, depois de uma recomendação pelo Volume ([ADR 005, revisão](decisions/005-railway-deploy-and-ci.md)).
+- **Feito no Railway:**
+  - domínio gerado e 14 variáveis definidas (segredos por stdin);
+  - 16 objetos (346,6 MB) enviados ao bucket `arranged-orb` e verificados.
+
+  Nada foi apagado, e o serviço não foi recriado.
+- **Código:**
+  - gateway: fonte de assets S3 (`s3.go`, `sigv4.go`, config e env), com testes (vetor AWS, S3 falso, env);
+  - `tools/upload_assets_s3.py`;
+  - log de inicialização com a fonte de assets;
+  - `Dockerfile` sem cache mount.
+- **Confirmado em execução:**
+  - `gateway:test` verde;
+  - gateway em Docker contra o bucket real: SHA-256 do `.data` igual ao do manifesto, Range 206, 401 sem senha.
+- **Falha observada:** o deploy do merge (`0296e48`) falhou no builder do Railway por causa do cache mount.
+- **Pendente:** merge do PR com bucket e correção, novo deploy automático, verificação pelo domínio público, login real pelo navegador e confirmação da credencial no WebSocket.
+
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.
