@@ -541,9 +541,10 @@ class Session {
         return [Module._wyd_field_human_screen(i, 0), Module._wyd_field_human_screen(i, 1), c.width, c.height];
       }, id);
       if (sx < 0) return false;
-      // The chest projection sits above the pick volume's center: aim lower.
-      for (const oy of [0, 20, 40]) {
-        await this.page.mouse.move(box.x + sx * box.width / cw, box.y + (sy + oy) * box.height / ch, { steps: 3 });
+      // The chest projection sits above the pick volume's center: aim lower,
+      // then sideways (a neighbouring NPC or player can cover the center).
+      for (const [ox, oy] of [[0, 0], [0, 20], [0, 40], [-14, 20], [14, 20], [-14, 40], [14, 40]]) {
+        await this.page.mouse.move(box.x + (sx + ox) * box.width / cw, box.y + (sy + oy) * box.height / ch, { steps: 3 });
         await this.frames(2);
         if ((await this.eval(() => Module._wyd_field_hover_human_id())) !== id) continue;
         if (beforePress && !(await beforePress())) return false;
@@ -652,11 +653,20 @@ class Session {
     if (Math.hypot(seen.x - me.x, seen.y - me.y) > 3)
       await this.walkTo(seen.x, seen.y, { near: 2, maxClicks: 8, stallOk: true });
     // Ctrl only once hover confirms B: closePanels/hover must not run with Ctrl held.
+    // If B's pick volume stays covered (NPC crowd, A on top of it), step around B.
     let ctrl = false;
     try {
-      const picked = await this.clickHuman(other.id, 'right', async () => {
-        await this.page.keyboard.down('Control'); ctrl = true; await this.frames(1); return true;
-      });
+      let picked = false;
+      for (const [dx, dy] of [[0, 0], [-3, 2], [3, 2], [0, -3]]) {
+        if (dx || dy) {
+          const at = await this.other(other.id);
+          await this.walkTo(at.x + dx, at.y + dy, { near: 1, maxClicks: 6, stallOk: true });
+        }
+        picked = await this.clickHuman(other.id, 'right', async () => {
+          await this.page.keyboard.down('Control'); ctrl = true; await this.frames(1); return true;
+        });
+        if (picked) break;
+      }
       if (!picked) {
         await this.shot('party-pick-failed');
         throw new Error(`party target not picked: ${JSON.stringify({ me: await this.me(), other: await this.other(other.id),

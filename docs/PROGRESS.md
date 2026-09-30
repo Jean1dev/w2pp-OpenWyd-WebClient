@@ -1,6 +1,6 @@
 # Progresso
 
-Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. A morte para os Trolls e a volta à cidade (caixa 11, `0x03AE`/`0x0289`, HP 2 no spawn) também foram aprovadas ([morte e respawn](evidence/05-gameplay/2026-09-29-death-respawn.md)). Também foram aprovados no Railway a poção (fatia 2) e a fatia 3: loja NPC (venda, compra, recusa, clique repetido), banco (item e ouro nos dois sentidos, recusas), chat (fala, sussurro, aviso de offline) e teleporte por comando `/cidade` ([fatia 3](evidence/05-gameplay/2026-09-30-shop-bank-chat.md)). O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. Cliente Windows, grupo, troca e reinício do servidor ainda não foram provados.
+Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. A morte para os Trolls e a volta à cidade (caixa 11, `0x03AE`/`0x0289`, HP 2 no spawn) também foram aprovadas ([morte e respawn](evidence/05-gameplay/2026-09-29-death-respawn.md)). Também foram aprovados no Railway a poção (fatia 2) e a fatia 3: loja NPC (venda, compra, recusa, clique repetido), banco (item e ouro nos dois sentidos, recusas), chat (fala, sussurro, aviso de offline) e teleporte por comando `/cidade` ([fatia 3](evidence/05-gameplay/2026-09-30-shop-bank-chat.md)). O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. O grupo foi aprovado no Railway (recusa, aceite, saída, expulsão, desconexão e relogin; [fatia 4](evidence/05-gameplay/2026-09-30-party.md)). Cliente Windows, troca e reinício do servidor ainda não foram provados.
 
 | Etapa | Estado | Evidência |
 |---|---|---|
@@ -8,7 +8,7 @@ Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; faltam buff/cura, grupo, troca e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo aprovado; troca bloqueada até publicar o patch do servidor; faltam buff/cura e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
@@ -16,7 +16,7 @@ Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server
 ## Próxima ação
 
 1. Etapa 5:
-   - fatia 4: grupo (`037F/03AB/037D`) e troca (`0383/0384`, com offsets divergentes na [matriz](compatibility.md)), incluindo convite recusado, cancelamento e desconexão;
+   - fatia 4, troca: o operador publica `patches/server/0001-trade-forwarding.patch` no `tm-server` ([ADR 010](decisions/010-server-trade-forwarding.md)); depois, criar a fase `trade` no harness e rodá-la com A e B;
    - fatia 5: persistência após reinício controlado do servidor (exige combinar com o operador);
    - buff e cura (nível 11+ ou 16–20), teleporte pago por NPC e ouro guardado no banco entre sessões.
 
@@ -440,5 +440,27 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
 - **Limites:** medições locais não provam ganho de tempo em produção; Chromium warm foi mais lento que cold. Sem Safari, login, multiplayer ou deploy nesta fatia. Assets continuam ignorados pelo Git.
 - **Entrega solicitada:** commit e push do código e das evidências na branch `Jean1dev/shop-bank-chat`; pacote de assets e perfis de navegador permanecem locais.
 - **Próximo passo:** publicar loader/dados/manifesto juntos num prefixo novo, aplicar gateway atualizado e medir no domínio público. Instruções em `docs/deploy.md`; demais pendências de gameplay preservadas.
+
+### 30/09/2026 — etapa 5, fatia 4: grupo no Railway e troca no servidor
+
+- **Pedido do usuário:** executar o orquestrador. No plano aprovado: aprovar o grupo no Railway e fazer a troca como entrega separada no servidor. O usuário autorizou encerrar o Chrome para liberar memória.
+- **Arquivos:**
+  - servidor, no checkout `external/server` (branch local `webclient/trade-forwarding`, base `98286fdf`, sem commit porque o índice referencia um blob ausente): `handler/trade.go`, `trade_test.go`, `view_test.go`, `party.go`, `protocol/types.go`, `types_test.go` e `world/session.go`. Entrega em `patches/server/0001-trade-forwarding.patch` (SHA-256 `6a8f8c1d…`);
+  - cliente: `client/dialect/WydDialect.cpp` (`0383` 154↔156, `0384`/`0386`), `tools/protocol/{gen_fixtures.py,gen_vectors.py,gen_client_stream.py,dialect_test.cpp,overlay/zz_ext_dialect_test.go}`, `tools/verify_world.mjs` (pick do alvo do grupo), [ADR 010](decisions/010-server-trade-forwarding.md), ADR 009, `docs/compatibility.md`, [evidência](evidence/05-gameplay/2026-09-30-party.md) e checklist da etapa 5.
+- **Confirmado em fonte:** fluxo legado de `_MSG_Trade.cpp` (`w2pp-OpenWYD` `8f65f35a`): encaminhamento, `CNFCheck`, `SendCarry`, `SaveUser` e `RemoveTrade`. O runtime já consome `0383/0384/0386/0185`. Divergência registrada: o `MSG_Trade` legado tem alinhamento natural (156), mas o servidor Go usa 154 empacotados. O layout do servidor foi mantido e o dialeto traduz.
+- **Confirmado em teste:**
+  - servidor: testes de troca 19/0 (8 novos ou reescritos), `go vet` limpo. No `go test ./...` completo, só falham 13 testes que dependem de `Release/` ausente no checkout;
+  - cliente: `protocol:dialect` 800/0; `protocol:vectors` com 97 vetores e 34 fluxos, e o overlay com o encoder real do servidor alterado; `world:checks` 27/0; `scene` e `client:stream` verdes;
+  - WASM `tmproject_startup.1790802394708885000` (115 objetos certificados, 0 indefinidos).
+- **Online (Railway):**
+  - execução 4 do grupo reprovou no harness: o hover pegou um NPC que cobria B. A correção foi feita, mas não foi validada online;
+  - execução 5 foi interrompida pelo Claude Code por falta de memória e não foi reiniciada;
+  - nenhuma troca online.
+- **Bloqueios:**
+  - publicar o patch do servidor (operador);
+  - memória do host para duas sessões (issue #6);
+  - não há stack local com persistência (Docker indisponível).
+- **Execução 6 (pedida pelo usuário, 21:49–22:11 UTC):** fase `party` **aprovada** no Railway, validando online a correção do pick. Recusa, aceite, clique repetido, saída, expulsão, desconexão de membro e de líder, e relogin com inventário preservado. Zero descartes do dialeto, zero erros de página e nenhum `crack`. Log do servidor: 6 `0x037F`, 5 `0x03AB` e 4 `0x037E` roteados.
+- **Próximo passo:** publicação do patch de troca pelo operador; depois, fase `trade` no harness.
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

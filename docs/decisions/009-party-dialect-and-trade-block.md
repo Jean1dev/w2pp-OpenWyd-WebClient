@@ -1,6 +1,6 @@
 # ADR 009 — Dialeto de grupo e bloqueio da troca (etapa 5, fatia 4)
 
-Data: 30/09/2026. Estado: grupo implementado e **confirmado em teste** local (dialeto 616/0, vetores, harness 27/0, `scene`, `client:stream`); **ainda não aprovado no Railway**. Execução 1: alvo não clicado (harness corrigido). Execução 2: convite descartado pelo dialeto (classe −1, corrigido abaixo). Execução 3: interrompida por falta de memória no host antes do convite. Troca **bloqueada** por dependência de backend.
+Data: 30/09/2026. Estado: grupo implementado e **confirmado em teste** local (dialeto 616/0, vetores, harness 27/0, `scene`, `client:stream`); **aprovado no Railway na execução 6** ([evidência](../evidence/05-gameplay/2026-09-30-party.md)). Execução 1: alvo não clicado (harness corrigido). Execução 2: convite descartado pelo dialeto (classe −1, corrigido abaixo). Execução 3: interrompida por falta de memória no host antes do convite. Troca **bloqueada** por dependência de backend.
 
 ## Grupo — problema confirmado em fonte
 
@@ -25,7 +25,7 @@ Servidor `98286fdf`, upstream `beb9f69b`. Os quatro opcodes de grupo eram descar
 - O patch `0019-party-probes-and-confirmation.patch` remove a marcação antecipada de membro: só a confirmação `0x037D` do servidor forma o grupo. Também expõe probes somente leitura (linhas, líder, menu do jogador, coordenadas dos controles 641 e 475139). Nenhum probe envia pacote.
 - Tamanho errado, truncado ou fora de faixa descarta e conta como `DROP_SIZE`/`DROP_RANGE`, o que reprova a saúde de protocolo do harness.
 
-## Troca — bloqueio confirmado em fonte
+## Troca — bloqueio confirmado em fonte (substituído pela [ADR 010](010-server-trade-forwarding.md) em 30/09)
 
 `tmserver/internal/handler/trade.go` (`98286fdf`):
 

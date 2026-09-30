@@ -40,12 +40,24 @@ func TestExtDialectPartyTrade(t *testing.T) {
 	}
 	remove := MsgRemovePartyBody{LeaderConn: 8}
 	if !bytes.Equal(remove.Encode(), body(d.Inbound, "party_remove")) { t.Fatal("remove differs") }
+	// Trade: the server's real encoder must produce the forwarded offer byte for
+	// byte, and its decoder must read the dialect's outbound offer field by field.
+	want := MsgTradeBody{TradeMoney: 50, MyCheck: 1, OpponentID: 7}
+	want.Item[0] = WireItem{Index: 1100, Effects: [3]WireEffect{{Effect: 43, Value: 5}}}
+	for i := range want.InvenPos { want.InvenPos[i] = 0xFF }
+	want.InvenPos[0] = 3
+	if !bytes.Equal(want.Encode(), body(d.Inbound, "trade_offer")) { t.Fatal("forwarded trade encoder differs") }
 	var trade MsgTradeBody
-	offer := body(d.Outbound, "trade_offer_blocked")
-	if trade.Decode(offer) != nil || trade.Item[0].Index != 1100 || trade.InvenPos[0] != 3 || trade.TradeMoney != 50 || trade.MyCheck != 1 || trade.OpponentID != 8 || !bytes.Equal(trade.Encode(), offer) { t.Fatal("blocked trade offer differs") }
-	for _, name := range []string{"trade_ack_blocked", "trade_result_blocked"} {
+	offer := body(d.Outbound, "trade_offer")
+	want.OpponentID = 8
+	if trade.Decode(offer) != nil || trade != want || !bytes.Equal(trade.Encode(), offer) { t.Fatal("trade offer decoder differs") }
+	for _, name := range []string{"trade_ack_placeholder", "trade_result_placeholder"} {
 		if trade.Decode(body(d.Inbound, name)) == nil { t.Fatal("placeholder unexpectedly fits classic offer", name) }
 	}
+	for _, name := range []string{"quit_trade", "cnf_check"} {
+		if len(body(d.Inbound, name)) != 0 { t.Fatal("trade signal carries a body", name) }
+	}
+	if MsgQuitTrade != 0x0384 || MsgCNFCheck != 0x0386 { t.Fatal("trade signal opcodes differ") }
 }
 
 type fxItem struct {

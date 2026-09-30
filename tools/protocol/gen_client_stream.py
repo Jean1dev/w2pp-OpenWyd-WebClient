@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / ".cache/client-stream"
 FIXTURES = ROOT / "docs/evidence/03-protocolo/fixtures/dialect.json"
 BULK_FRAMES = 1000        # 1000 x 152 B = 152,000 B > RECV_BUFFER_SIZE (131,072)
-BULK_OPCODE = 0x0383      # Trade: layout not mapped yet (chat is, since etapa 5 slice 3)
+BULK_OPCODE = 0x03A6      # CombineItem: not mapped (trade is, since etapa 5 slice 4)
 CHUNK = 1000              # never a multiple of 152: chunks end mid-frame
 
 

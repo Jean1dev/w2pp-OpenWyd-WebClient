@@ -39,7 +39,9 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 | Sussurro com o nome do remetente | lacuna do servidor (confirmada em fonte, não observada) | `chat.go:71` repassa `MobName` = destinatário ([ADR 008](../../decisions/008-shop-cargo-chat-dialect.md)) |
 | Teleporte: portal (etapa 4) e comandos `/azran` e `/armia` | **confirmado em execução** | `chat command` + `teleport` no log; B deixa de ver A e volta a vê-la |
 | Teleporte pago por NPC, chat de grupo/guilda | pendente | não exercitados |
-| Grupo, troca e persistência após reinício | pendente | fatias 4 e 5 |
+| Grupo | aprovado | recusa, aceite, clique repetido, saída, expulsão, desconexão de membro e de líder, e relogin com inventário preservado; execução 6 no Railway ([fatia 4](2026-09-30-party.md)) |
+| Troca | bloqueada | servidor corrigido e testado localmente, dialeto mapeado; falta publicar o patch do servidor ([ADR 010](../../decisions/010-server-trade-forwarding.md)) |
+| Persistência após reinício | pendente | fatia 5 |
 
 ## Execuções de 29/09/2026 (cenário `login,enter,second,attack`)
 

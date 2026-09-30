@@ -1,0 +1,727 @@
+diff --git a/tmserver/internal/handler/party.go b/tmserver/internal/handler/party.go
+index 7a6c18f..9c80106 100644
+--- a/tmserver/internal/handler/party.go
++++ b/tmserver/internal/handler/party.go
+@@ -130,6 +130,11 @@ func (d *Dispatcher) removeParty(w *world.World, s *world.Session, _ protocol.He
+ // inherited the rows. Registered with world.SetSessionEndHandler and also called
+ // from characterLogout. Idempotent — the second run finds an empty party.
+ func (d *Dispatcher) SessionEnd(w *world.World, s *world.Session) {
++	// A P2P trade dies with either side (CloseUser → RemoveTrade in the legacy):
++	// the opponent gets _MSG_QuitTrade instead of a window bound to a ghost.
++	if s.Trade.Active {
++		d.removeTrade(w, s)
++	}
+ 	e := w.Entity(s.Conn)
+ 	if e == nil || !isInParty(e) {
+ 		return // nothing to unlink; don't push a party packet at a partyless client
+diff --git a/tmserver/internal/handler/trade.go b/tmserver/internal/handler/trade.go
+index 8bb5f9c..c81d477 100644
+--- a/tmserver/internal/handler/trade.go
++++ b/tmserver/internal/handler/trade.go
+@@ -1,8 +1,6 @@
+ package handler
+ 
+ import (
+-	"encoding/binary"
+-
+ 	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/protocol"
+ 	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/world"
+ )
+@@ -11,70 +9,199 @@ import (
+ // per-character active limit may be lower when Bolsa do Andarilho is inactive.
+ const maxTradeSlot = maxUnlockedCarry
+ 
+-// trade handles _MSG_Trade (0x0383): validate the offer and confirm; when BOTH
+-// sides have confirmed a matching trade, perform the atomic swap. Any validation
+-// failure cancels the trade on both sides (anti-dup). The offer is checked by
+-// memcmp against the real inventory (anti item-swap during confirm).
++// tradeEmptyPos marks an unused offer entry (the legacy char InvenPos = -1).
++const tradeEmptyPos = 0xFF
++
++// maxTradeCoin is the legacy 2G ceiling on a trade amount and on either side's
++// resulting gold (_MSG_Trade.cpp: TradeMoney > 2000000000, _NN_Cant_get_more_than_2G).
++const maxTradeCoin = 2_000_000_000
++
++// trade handles _MSG_Trade (0x0383), porting the legacy flow in
++// TMSrv/_MSG_Trade.cpp:
++//
++//   - every accepted offer is forwarded to the opponent with ID = opponent and
++//     OpponentID = sender, which is what opens/updates the opponent's window;
++//   - an offer change resets MyCheck on both sides; an already-offered item or a
++//     non-zero amount cannot change (append-only, anti item-swap);
++//   - the first MyCheck answers the sender with _MSG_CNFCheck and forwards the
++//     checked offer; the second performs the atomic swap, re-sends both carries
++//     (_MSG_UpdateCarry carries Coin too), persists both and closes the trade.
++//
++// Any validation failure cancels the trade (_MSG_QuitTrade to both linked sides).
++// Divergences from the legacy: the PK-mode/whisper-block gates and the guild-item
++// rules are not ported (the server did not have them before either), and a
++// failed swap (space/gold) cancels the trade instead of leaving both windows
++// checked.
+ func (d *Dispatcher) trade(w *world.World, s *world.Session, _ protocol.Header, payload []byte) {
+ 	e := w.Entity(s.Conn)
+ 	if e == nil || e.HP == 0 || s.Mode != world.UserPlay {
+ 		w.AddCrackError(s, 5, 18)
+-		d.removeTrade(w, s)
++		d.rejectTrade(w, s)
+ 		return
+ 	}
+ 	var body protocol.MsgTradeBody
+ 	if err := body.Decode(payload); err != nil {
+-		d.removeTrade(w, s)
++		d.rejectTrade(w, s)
+ 		return
+ 	}
+ 	opp := int(body.OpponentID)
+ 	other := w.Session(opp)
+-	if opp <= 0 || opp >= world.MaxUser || other == nil || other.Mode != world.UserPlay {
+-		d.removeTrade(w, s)
++	oe := w.Entity(opp)
++	if opp <= 0 || opp >= world.MaxUser || opp == s.Conn || other == nil || oe == nil || other.Mode != world.UserPlay {
++		d.rejectTrade(w, s)
++		return
++	}
++	if body.TradeMoney < 0 || body.TradeMoney > maxTradeCoin || body.TradeMoney > e.Coin {
++		d.rejectTrade(w, s)
++		return
++	}
++	offer, ok := d.tradeOffer(e, &body)
++	if !ok {
++		d.rejectTrade(w, s)
+ 		return
+ 	}
+-	if body.TradeMoney < 0 || body.TradeMoney > e.Coin {
+-		d.removeTrade(w, s)
++	linked := other.Trade.Active && other.Trade.OpponentID == s.Conn
++	if linked && !tradeOfferHeld(oe, &other.Trade) {
++		d.rejectTrade(w, s) // the opponent's offered item moved or changed
+ 		return
+ 	}
+ 
+-	var slots []int
+-	for i := 0; i < protocol.MaxTrade; i++ {
+-		if body.Item[i].Index == 0 {
+-			continue
++	if s.Trade.Active {
++		if s.Trade.OpponentID != opp {
++			d.rejectTrade(w, s) // _NN_Already_Trading
++			return
+ 		}
+-		pos := int(body.InvenPos[i])
+-		if pos < 0 || pos >= maxTradeSlot || !carrySlotAccessible(e, pos) || !sameItem(body.Item[i], e.Carry[pos]) {
+-			d.removeTrade(w, s) // bounds or item changed during confirm
++		for i := range s.Trade.Items {
++			if s.Trade.Items[i].Index != 0 && (s.Trade.Items[i] != offer.Items[i] || s.Trade.InvenPos[i] != offer.InvenPos[i]) {
++				d.rejectTrade(w, s)
++				return
++			}
++		}
++		if s.Trade.Money != 0 && s.Trade.Money != offer.Money {
++			d.rejectTrade(w, s)
+ 			return
+ 		}
+-		slots = append(slots, pos)
+ 	}
+ 
+-	s.Trade.Active = true
+-	s.Trade.OpponentID = opp
+-	s.Trade.Money = body.TradeMoney
+-	s.Trade.Slots = slots
+-	s.Trade.Confirmed = body.MyCheck != 0
++	if other.Trade.Active && !linked {
++		d.rejectTrade(w, s) // the opponent is trading with someone else
++		return
++	}
+ 
+-	if s.Trade.Confirmed && other.Trade.Active && other.Trade.OpponentID == s.Conn && other.Trade.Confirmed {
++	if body.MyCheck == 1 {
++		// Checking is only valid on the exact offer the opponent already saw.
++		if !linked || !s.Trade.Active || s.Trade.Items != offer.Items || s.Trade.InvenPos != offer.InvenPos || s.Trade.Money != offer.Money {
++			d.rejectTrade(w, s)
++			return
++		}
++		s.Trade.Confirmed = true
++		if !other.Trade.Confirmed {
++			w.Send(s, protocol.MsgCNFCheck, nil)
++			d.forwardTrade(w, s, other)
++			return
++		}
+ 		d.executeSwap(w, s, other)
+ 		return
+ 	}
+-	// First confirm: acknowledge (empty result); the swap fires on the second.
+-	w.Send(s, protocol.MsgTrade, tradeResultPayload(nil))
++
++	offer.Active = true
++	offer.OpponentID = opp
++	s.Trade = offer
++	other.Trade.Confirmed = false
++	d.forwardTrade(w, s, other)
++}
++
++// rejectTrade cancels s's trade after a refused _MSG_Trade. Unlike removeTrade it
++// also answers a sender that had no trade recorded yet, so a refused first offer
++// still closes the window the client opened locally (the legacy RemoveTrade
++// always signals _MSG_QuitTrade to conn).
++func (d *Dispatcher) rejectTrade(w *world.World, s *world.Session) {
++	silent := !s.Trade.Active && s.AutoTrade == nil && s.TradeMode == 0
++	d.removeTrade(w, s)
++	if silent {
++		w.Send(s, protocol.MsgQuitTrade, nil)
++	}
++}
++
++// tradeOffer normalises and validates the offer in body against e's carry. An
++// entry is used when its InvenPos is a slot and its item is set; the item must
++// match the carry item exactly (the legacy memcmp) and not be EF_NOTRADE, and no
++// slot may repeat.
++func (d *Dispatcher) tradeOffer(e *world.Entity, body *protocol.MsgTradeBody) (world.TradeState, bool) {
++	t := world.TradeState{Money: body.TradeMoney}
++	var used [world.MaxCarry]bool
++	for i := 0; i < protocol.MaxTrade; i++ {
++		pos := int(body.InvenPos[i])
++		if pos == tradeEmptyPos || body.Item[i].Index == 0 {
++			t.InvenPos[i] = tradeEmptyPos
++			continue
++		}
++		if pos >= maxTradeSlot || !carrySlotAccessible(e, pos) || used[pos] || e.Carry[pos].Empty() || !sameItem(body.Item[i], e.Carry[pos]) {
++			return world.TradeState{}, false
++		}
++		if d.itemAbility(e.Carry[pos], efNoTrade) != 0 {
++			return world.TradeState{}, false
++		}
++		used[pos] = true
++		t.Items[i] = e.Carry[pos]
++		t.InvenPos[i] = uint8(pos)
++		t.Slots = append(t.Slots, pos)
++	}
++	return t, true
++}
++
++// tradeOfferHeld reports whether every item of a recorded offer is still in the
++// carry slot it was offered from (anti item-swap during confirmation).
++func tradeOfferHeld(e *world.Entity, t *world.TradeState) bool {
++	for i := range t.Items {
++		if t.Items[i].Index == 0 {
++			continue
++		}
++		pos := int(t.InvenPos[i])
++		if pos >= maxTradeSlot || !carrySlotAccessible(e, pos) || e.Carry[pos] != t.Items[i] {
++			return false
++		}
++	}
++	return true
+ }
+ 
+-// executeSwap transfers both offers atomically (validate-all-then-apply-all):
+-// items are taken from both sides, room is checked, then handed over with money.
+-// Any shortfall rolls back and cancels the trade.
++// forwardTrade sends from's recorded offer to its opponent in the classic
++// MSG_Trade layout, with OpponentID = from (legacy: m->ID = OpponentID;
++// m->OpponentID = conn; AddMessage).
++func (d *Dispatcher) forwardTrade(w *world.World, from, to *world.Session) {
++	var body protocol.MsgTradeBody
++	for i := range from.Trade.Items {
++		body.Item[i] = wireFromItem(from.Trade.Items[i])
++		body.InvenPos[i] = from.Trade.InvenPos[i]
++	}
++	body.TradeMoney = from.Trade.Money
++	if from.Trade.Confirmed {
++		body.MyCheck = 1
++	}
++	body.OpponentID = uint16(from.Conn)
++	w.Send(to, protocol.MsgTrade, body.Encode())
++}
++
++// executeSwap transfers both confirmed offers atomically (validate-all-then-
++// apply-all, legacy BASE_CanTrade): each side's offered slots are emptied, the
++// incoming items fill the first free accessible slots, and gold moves both ways.
++// Any shortfall rolls back and cancels the trade. On success both carries are
++// re-sent (_MSG_UpdateCarry, with Coin), both characters are persisted, and the
++// trade is closed on both sides (_MSG_QuitTrade), as SendCarry + SaveUser +
++// RemoveTrade in the legacy.
+ func (d *Dispatcher) executeSwap(w *world.World, a, b *world.Session) {
+ 	ea, eb := w.Entity(a.Conn), w.Entity(b.Conn)
+-	if ea == nil || eb == nil {
++	if ea == nil || eb == nil || !tradeOfferHeld(ea, &a.Trade) || !tradeOfferHeld(eb, &b.Trade) {
++		d.removeTrade(w, a)
++		return
++	}
++	if a.Trade.Money > ea.Coin || b.Trade.Money > eb.Coin {
+ 		d.removeTrade(w, a)
+ 		return
+ 	}
+-	if !tradeSlotsAccessible(ea, a.Trade.Slots) || !tradeSlotsAccessible(eb, b.Trade.Slots) {
++	coinA := int64(ea.Coin) - int64(a.Trade.Money) + int64(b.Trade.Money)
++	coinB := int64(eb.Coin) - int64(b.Trade.Money) + int64(a.Trade.Money)
++	if coinA > maxTradeCoin || coinB > maxTradeCoin {
+ 		d.removeTrade(w, a)
+ 		return
+ 	}
+@@ -82,8 +209,15 @@ func (d *Dispatcher) executeSwap(w *world.World, a, b *world.Session) {
+ 	aItems := takeItems(ea, a.Trade.Slots)
+ 	bItems := takeItems(eb, b.Trade.Slots)
+ 	if freeCarry(eb) < len(aItems) || freeCarry(ea) < len(bItems) {
++		noRoomA, noRoomB := freeCarry(ea) < len(bItems), freeCarry(eb) < len(aItems)
+ 		putBack(ea, a.Trade.Slots, aItems) // not enough room → rollback
+ 		putBack(eb, b.Trade.Slots, bItems)
++		if noRoomA {
++			d.notify(w, a, NoticeNoEmptySlot)
++		}
++		if noRoomB {
++			d.notify(w, b, NoticeNoEmptySlot)
++		}
+ 		d.removeTrade(w, a)
+ 		return
+ 	}
+@@ -97,31 +231,16 @@ func (d *Dispatcher) executeSwap(w *world.World, a, b *world.Session) {
+ 			ea.Carry[dst] = it
+ 		}
+ 	}
+-	ea.Coin += b.Trade.Money - a.Trade.Money
+-	eb.Coin += a.Trade.Money - b.Trade.Money
+-
+-	a.Trade = world.TradeState{}
+-	b.Trade = world.TradeState{}
+-	// Result to each side carries the items they received (UNVERIFIED layout;
+-	// the real handler re-sends inventory slots via _MSG_SendItem).
+-	w.Send(a, protocol.MsgTrade, tradeResultPayload(bItems))
+-	w.Send(b, protocol.MsgTrade, tradeResultPayload(aItems))
+-}
++	ea.Coin = int32(coinA)
++	eb.Coin = int32(coinB)
++	d.log.Info("trade completed", "conn", a.Conn, "opponent", b.Conn,
++		"items", len(aItems), "opponentItems", len(bItems), "coin", a.Trade.Money, "opponentCoin", b.Trade.Money)
+ 
+-// tradeResultPayload encodes the received items as count + WireItems (placeholder
+-// result body for testing/observability; UNVERIFIED real layout).
+-func tradeResultPayload(items []world.Item) []byte {
+-	b := make([]byte, 1+len(items)*protocol.ItemSize)
+-	b[0] = byte(len(items))
+-	for i, it := range items {
+-		off := 1 + i*protocol.ItemSize
+-		binary.LittleEndian.PutUint16(b[off:off+2], uint16(it.Index))
+-		for e := 0; e < 3; e++ {
+-			b[off+2+e*2] = it.Effects[e].Effect
+-			b[off+3+e*2] = it.Effects[e].Value
+-		}
+-	}
+-	return b
++	d.sendCarry(w, a, ea)
++	d.sendCarry(w, b, eb)
++	w.SaveCharacterAsync(a)
++	w.SaveCharacterAsync(b)
++	d.removeTrade(w, a)
+ }
+ 
+ // quitTrade handles _MSG_QuitTrade (0x0384): cancel the trade.
+diff --git a/tmserver/internal/handler/trade_test.go b/tmserver/internal/handler/trade_test.go
+index f1a99e2..e79315e 100644
+--- a/tmserver/internal/handler/trade_test.go
++++ b/tmserver/internal/handler/trade_test.go
+@@ -4,6 +4,7 @@ import (
+ 	"encoding/binary"
+ 	"net"
+ 	"testing"
++	"time"
+ 
+ 	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/protocol"
+ 	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/world"
+@@ -38,38 +39,79 @@ func enterWorldAs(t *testing.T, addr, account string) net.Conn {
+ 	return c
+ }
+ 
+-func tradeConfirm(t *testing.T, c net.Conn, opponent int, item world.Item, slot int, money int32) {
+-	t.Helper()
++// tradeBody builds an MSG_Trade body offering item (from carry slot) and money to
++// opponent; a zero item leaves every entry empty (InvenPos 0xFF, the legacy -1).
++func tradeBody(opponent int, item world.Item, slot int, money int32, check bool) protocol.MsgTradeBody {
+ 	var body protocol.MsgTradeBody
+-	body.Item[0] = protocol.WireItem{Index: item.Index}
+-	body.InvenPos[0] = byte(slot)
++	for i := range body.InvenPos {
++		body.InvenPos[i] = tradeEmptyPos
++	}
++	if item.Index != 0 {
++		body.Item[0] = protocol.WireItem{Index: item.Index}
++		body.InvenPos[0] = byte(slot)
++	}
+ 	body.TradeMoney = money
+-	body.MyCheck = 1
++	if check {
++		body.MyCheck = 1
++	}
+ 	body.OpponentID = uint16(opponent)
++	return body
++}
++
++func sendTrade(t *testing.T, c net.Conn, body protocol.MsgTradeBody) {
++	t.Helper()
+ 	send(t, c, protocol.MsgTrade, body.Encode())
+ }
+ 
+-// linkTrade establishes the P2P trade link with opponent via an unconfirmed
+-// _MSG_Trade offer (no items, MyCheck=0); the handler acks with an empty MsgTrade.
+-// The trade window is established purely by 0x0383 — _MSG_TradingItem (0x0376) is
+-// the item-slot swap, not a trade-open message.
+-func linkTrade(t *testing.T, c net.Conn, opponent int) {
++// readForwarded reads the next frame on c and requires it to be a forwarded
++// MSG_Trade in the classic layout.
++func readForwarded(t *testing.T, c net.Conn) protocol.MsgTradeBody {
+ 	t.Helper()
++	ty, p, ok := readMaybe(t, c)
++	if !ok || ty != protocol.MsgTrade {
++		t.Fatalf("got %#x ok=%v, want forwarded MsgTrade", ty, ok)
++	}
++	if len(p) != protocol.MsgTradeBodySize {
++		t.Fatalf("forwarded body = %d bytes, want %d", len(p), protocol.MsgTradeBodySize)
++	}
+ 	var body protocol.MsgTradeBody
+-	body.OpponentID = uint16(opponent)
+-	send(t, c, protocol.MsgTrade, body.Encode())
+-	if ty, _, ok := readMaybe(t, c); !ok || ty != protocol.MsgTrade {
+-		t.Fatalf("linkTrade ack = %#x ok=%v, want MsgTrade", ty, ok)
++	if err := body.Decode(p); err != nil {
++		t.Fatal(err)
+ 	}
++	return body
+ }
+ 
+-// firstResultIndex decodes the leading item index from a trade-result payload.
+-func firstResultIndex(t *testing.T, payload []byte) int16 {
++func expectType(t *testing.T, c net.Conn, want protocol.Type) []byte {
+ 	t.Helper()
+-	if len(payload) < 1 || payload[0] == 0 {
+-		return 0
++	ty, p, ok := readMaybe(t, c)
++	if !ok || ty != want {
++		t.Fatalf("got %#x ok=%v, want %#x", ty, ok, want)
+ 	}
+-	return int16(binary.LittleEndian.Uint16(payload[1:3]))
++	return p
++}
++
++func expectSilence(t *testing.T, c net.Conn) {
++	t.Helper()
++	if ty, _, ok := readMaybe(t, c); ok {
++		t.Fatalf("unexpected frame %#x", ty)
++	}
++}
++
++// openTrade makes a and b exchange their initial offers: a (conn 1) offers
++// aItem/aMoney, b (conn 2) answers with bItem/bMoney; each offer reaches the
++// other side only.
++func openTrade(t *testing.T, a, b net.Conn, aItem, bItem world.Item, aMoney, bMoney int32) {
++	t.Helper()
++	sendTrade(t, a, tradeBody(2, aItem, 0, aMoney, false))
++	readForwarded(t, b)
++	sendTrade(t, b, tradeBody(1, bItem, 0, bMoney, false))
++	readForwarded(t, a)
++	expectSilence(t, a)
++	expectSilence(t, b)
++}
++
++func carryCoin(payload []byte) int32 {
++	return int32(binary.LittleEndian.Uint32(payload[64*protocol.ItemSize:]))
+ }
+ 
+ func TestTradeSlotsAccessibleRequiresUnlockedCarry(t *testing.T) {
+@@ -98,7 +140,10 @@ func TestTradeSlotsAccessibleRequiresUnlockedCarry(t *testing.T) {
+ 	}
+ }
+ 
+-func TestTradeAtomicSwap(t *testing.T) {
++// TestTradeForwardsOffer: the first offer opens the opponent's window — it is
++// forwarded in the classic layout with OpponentID = sender and the server's copy
++// of the item; the sender gets nothing back.
++func TestTradeForwardsOffer(t *testing.T) {
+ 	addr, stop, _ := startServerClock(t, tradeDB())
+ 	defer stop()
+ 	a := enterWorldAs(t, addr, "tester") // conn 1, item 1100
+@@ -106,26 +151,162 @@ func TestTradeAtomicSwap(t *testing.T) {
+ 	b := enterWorldAs(t, addr, "tradeb") // conn 2, item 2200
+ 	defer b.Close()
+ 
+-	// A confirms first → ack (empty result). This also serializes A before B.
+-	tradeConfirm(t, a, 2, world.Item{Index: 1100}, 0, 100)
+-	if ty, p, ok := readMaybe(t, a); !ok || ty != protocol.MsgTrade || firstResultIndex(t, p) != 0 {
+-		t.Fatalf("A ack = %#x idx=%d ok=%v, want empty MsgTrade ack", ty, firstResultIndex(t, p), ok)
++	sendTrade(t, a, tradeBody(2, world.Item{Index: 1100}, 0, 100, false))
++	got := readForwarded(t, b)
++	if got.OpponentID != 1 || got.Item[0].Index != 1100 || got.InvenPos[0] != 0 || got.TradeMoney != 100 || got.MyCheck != 0 {
++		t.Fatalf("forwarded offer = opp %d item %d pos %d money %d check %d", got.OpponentID, got.Item[0].Index, got.InvenPos[0], got.TradeMoney, got.MyCheck)
+ 	}
++	for i := 1; i < protocol.MaxTrade; i++ {
++		if got.Item[i].Index != 0 || got.InvenPos[i] != tradeEmptyPos {
++			t.Fatalf("entry %d = item %d pos %d, want empty", i, got.Item[i].Index, got.InvenPos[i])
++		}
++	}
++	expectSilence(t, a)
++}
++
++// TestTradeAtomicSwap: offers exchanged, A checks (CNFCheck to A, checked offer
++// to B), B checks → both carries re-sent with the swapped items and gold, both
++// characters saved, and the trade closed on both sides.
++func TestTradeAtomicSwap(t *testing.T) {
++	db := tradeDB()
++	addr, stop, _ := startServerClock(t, db)
++	defer stop()
++	a := enterWorldAs(t, addr, "tester")
++	defer a.Close()
++	b := enterWorldAs(t, addr, "tradeb")
++	defer b.Close()
++
++	openTrade(t, a, b, world.Item{Index: 1100}, world.Item{Index: 2200}, 100, 50)
++	_, savesBefore := db.lastSavedChar()
++
++	sendTrade(t, a, tradeBody(2, world.Item{Index: 1100}, 0, 100, true))
++	expectType(t, a, protocol.MsgCNFCheck)
++	if got := readForwarded(t, b); got.MyCheck != 1 || got.OpponentID != 1 {
++		t.Fatalf("checked offer to B: check %d opp %d", got.MyCheck, got.OpponentID)
++	}
++	expectSilence(t, a)
++
++	sendTrade(t, b, tradeBody(1, world.Item{Index: 2200}, 0, 50, true))
++	ca := expectType(t, a, protocol.MsgUpdateCarry)
++	cb := expectType(t, b, protocol.MsgUpdateCarry)
++	if updateCarryIndex(ca, 0) != 2200 || updateCarryIndex(cb, 0) != 1100 {
++		t.Fatalf("carry slot 0 after swap: A=%d B=%d, want 2200/1100", updateCarryIndex(ca, 0), updateCarryIndex(cb, 0))
++	}
++	if carryCoin(ca) != 950 || carryCoin(cb) != 1050 {
++		t.Fatalf("coin after swap: A=%d B=%d, want 950/1050", carryCoin(ca), carryCoin(cb))
++	}
++	expectType(t, a, protocol.MsgQuitTrade)
++	expectType(t, b, protocol.MsgQuitTrade)
++	expectSilence(t, a)
++	expectSilence(t, b)
++
++	deadline := time.Now().Add(2 * time.Second)
++	for {
++		if _, n := db.lastSavedChar(); n >= savesBefore+2 {
++			break
++		}
++		if time.Now().After(deadline) {
++			t.Fatal("both characters were not saved after the trade")
++		}
++		time.Sleep(10 * time.Millisecond)
++	}
++}
++
++// TestTradeChangeResetsCheck: after A checks, B changing its offer re-forwards
++// it unchecked and clears A's check, so B's check alone cannot complete the swap.
++func TestTradeChangeResetsCheck(t *testing.T) {
++	addr, stop, _ := startServerClock(t, tradeDB())
++	defer stop()
++	a := enterWorldAs(t, addr, "tester")
++	defer a.Close()
++	b := enterWorldAs(t, addr, "tradeb")
++	defer b.Close()
+ 
+-	// B confirms → atomic swap → both get a result with the item they received.
+-	tradeConfirm(t, b, 1, world.Item{Index: 2200}, 0, 50)
++	openTrade(t, a, b, world.Item{Index: 1100}, world.Item{}, 0, 0)
++	sendTrade(t, a, tradeBody(2, world.Item{Index: 1100}, 0, 0, true))
++	expectType(t, a, protocol.MsgCNFCheck)
++	readForwarded(t, b)
+ 
+-	_, pa, oka := readMaybe(t, a)
+-	_, pb, okb := readMaybe(t, b)
+-	if !oka || !okb {
+-		t.Fatalf("missing swap results: a=%v b=%v", oka, okb)
++	sendTrade(t, b, tradeBody(1, world.Item{Index: 2200}, 0, 0, false))
++	if got := readForwarded(t, a); got.MyCheck != 0 || got.Item[0].Index != 2200 {
++		t.Fatalf("changed offer to A: check %d item %d", got.MyCheck, got.Item[0].Index)
+ 	}
+-	if got := firstResultIndex(t, pa); got != 2200 {
+-		t.Errorf("A received item %d, want 2200 (B's item)", got)
++
++	sendTrade(t, b, tradeBody(1, world.Item{Index: 2200}, 0, 0, true))
++	expectType(t, b, protocol.MsgCNFCheck) // A's check was reset: no swap yet
++	if got := readForwarded(t, a); got.MyCheck != 1 {
++		t.Fatalf("B's checked offer to A: check %d", got.MyCheck)
+ 	}
+-	if got := firstResultIndex(t, pb); got != 1100 {
+-		t.Errorf("B received item %d, want 1100 (A's item)", got)
++	expectSilence(t, a)
++	expectSilence(t, b)
++}
++
++// TestTradeRejectsTamperedOffers: an item the sender does not hold, a check on
++// data the opponent never saw, and replacing an offered item all cancel.
++func TestTradeRejectsTamperedOffers(t *testing.T) {
++	addr, stop, _ := startServerClock(t, tradeDB())
++	defer stop()
++	a := enterWorldAs(t, addr, "tester")
++	defer a.Close()
++	b := enterWorldAs(t, addr, "tradeb")
++	defer b.Close()
++
++	// Not held: refused before anything reaches B.
++	sendTrade(t, a, tradeBody(2, world.Item{Index: 2200}, 0, 0, false))
++	expectType(t, a, protocol.MsgQuitTrade)
++	expectSilence(t, b)
++
++	// Checking a different amount than the forwarded offer cancels both.
++	openTrade(t, a, b, world.Item{Index: 1100}, world.Item{}, 0, 0)
++	sendTrade(t, a, tradeBody(2, world.Item{Index: 1100}, 0, 5, true))
++	expectType(t, a, protocol.MsgQuitTrade)
++	expectType(t, b, protocol.MsgQuitTrade)
++
++	// Removing an already-offered item cancels both.
++	openTrade(t, a, b, world.Item{Index: 1100}, world.Item{}, 0, 0)
++	sendTrade(t, a, tradeBody(2, world.Item{}, 0, 0, false))
++	expectType(t, a, protocol.MsgQuitTrade)
++	expectType(t, b, protocol.MsgQuitTrade)
++
++	// A gold offer above the purse is refused.
++	sendTrade(t, a, tradeBody(2, world.Item{}, 0, 5000, false))
++	expectType(t, a, protocol.MsgQuitTrade)
++	expectSilence(t, b)
++}
++
++// TestTradeNoRoomRollsBack: B's accessible carry is full, so A's item cannot
++// land; the swap rolls back, B is told why, and both windows close.
++func TestTradeNoRoomRollsBack(t *testing.T) {
++	db := tradeDB()
++	full := db.loads[11]
++	for i := 0; i < baseCarrySlots; i++ {
++		full.Carry[i] = world.Item{Index: 2200}
+ 	}
++	db.loads[11] = full
++	addr, stop, _ := startServerClock(t, db)
++	defer stop()
++	a := enterWorldAs(t, addr, "tester")
++	defer a.Close()
++	b := enterWorldAs(t, addr, "tradeb")
++	defer b.Close()
++
++	openTrade(t, a, b, world.Item{Index: 1100}, world.Item{}, 0, 0)
++	sendTrade(t, a, tradeBody(2, world.Item{Index: 1100}, 0, 0, true))
++	expectType(t, a, protocol.MsgCNFCheck)
++	readForwarded(t, b)
++	sendTrade(t, b, tradeBody(1, world.Item{}, 0, 0, true))
++
++	if n := noticeCode(t, expectType(t, b, protocol.MsgMessageBoxOk)); n != NoticeNoEmptySlot {
++		t.Fatalf("B notice = %d, want NoticeNoEmptySlot", n)
++	}
++	expectType(t, b, protocol.MsgQuitTrade)
++	expectType(t, a, protocol.MsgQuitTrade)
++	expectSilence(t, a)
++	expectSilence(t, b)
++
++	// A still holds its item: offering it again is accepted and forwarded.
++	sendTrade(t, a, tradeBody(2, world.Item{Index: 1100}, 0, 0, false))
++	readForwarded(t, b)
+ }
+ 
+ func TestTradeCancel(t *testing.T) {
+@@ -136,18 +317,26 @@ func TestTradeCancel(t *testing.T) {
+ 	b := enterWorldAs(t, addr, "tradeb")
+ 	defer b.Close()
+ 
+-	// Establish the trade link from both sides (each gets its own ack).
+-	linkTrade(t, a, 2)
+-	linkTrade(t, b, 1)
++	openTrade(t, a, b, world.Item{}, world.Item{}, 0, 0)
+ 
+ 	// A cancels → both get QuitTrade.
+ 	send(t, a, protocol.MsgQuitTrade, nil)
+-	if ty, _, ok := readMaybe(t, a); !ok || ty != protocol.MsgQuitTrade {
+-		t.Errorf("A got %#x ok=%v, want QuitTrade", ty, ok)
+-	}
+-	if ty, _, ok := readMaybe(t, b); !ok || ty != protocol.MsgQuitTrade {
+-		t.Errorf("B got %#x ok=%v, want QuitTrade", ty, ok)
+-	}
++	expectType(t, a, protocol.MsgQuitTrade)
++	expectType(t, b, protocol.MsgQuitTrade)
++}
++
++// TestTradeDisconnectCancels: the opponent's window closes when the other side
++// disconnects mid-trade.
++func TestTradeDisconnectCancels(t *testing.T) {
++	addr, stop, _ := startServerClock(t, tradeDB())
++	defer stop()
++	a := enterWorldAs(t, addr, "tester")
++	defer a.Close()
++	b := enterWorldAs(t, addr, "tradeb")
++
++	openTrade(t, a, b, world.Item{Index: 1100}, world.Item{}, 0, 0)
++	_ = b.Close()
++	_, _ = readUntil(t, a, protocol.MsgQuitTrade)
+ }
+ 
+ // TestTradeDupCancelsOnDrop: dropping an item mid-trade cancels the trade on both
+@@ -160,8 +349,7 @@ func TestTradeDupCancelsOnDrop(t *testing.T) {
+ 	b := enterWorldAs(t, addr, "tradeb")
+ 	defer b.Close()
+ 
+-	linkTrade(t, a, 2)
+-	linkTrade(t, b, 1)
++	openTrade(t, a, b, world.Item{}, world.Item{}, 0, 0)
+ 
+ 	// A drops an item while trading → trade cancelled for both.
+ 	dropFrame(t, a, 0, 5, 5)
+diff --git a/tmserver/internal/handler/view_test.go b/tmserver/internal/handler/view_test.go
+index 2716095..a53a876 100644
+--- a/tmserver/internal/handler/view_test.go
++++ b/tmserver/internal/handler/view_test.go
+@@ -437,8 +437,7 @@ func TestMoveCancelsTrade(t *testing.T) {
+ 	defer a.Close()
+ 	b := enterWorldAs(t, addr, "tradeb")
+ 	defer b.Close()
+-	linkTrade(t, a, 2)
+-	linkTrade(t, b, 1)
++	openTrade(t, a, b, world.Item{}, world.Item{}, 0, 0)
+ 
+ 	actionFrameXY(t, a, protocol.MsgAction, serverTime, 5, 5, 7, 7)
+ 
+diff --git a/tmserver/internal/protocol/types.go b/tmserver/internal/protocol/types.go
+index 699df51..beb44f8 100644
+--- a/tmserver/internal/protocol/types.go
++++ b/tmserver/internal/protocol/types.go
+@@ -97,6 +97,7 @@ const (
+ 	MsgTradingItem         Type = 0x0376 // 886
+ 	MsgTrade               Type = 0x0383 // 899
+ 	MsgQuitTrade           Type = 0x0384 // 900
++	MsgCNFCheck            Type = 0x0386 // 902  S→C trade: own check accepted (MSG_STANDARD)
+ 	MsgCombineItem         Type = 0x03A6 // 934  refino base (Anct)
+ 	MsgCombineItemEhre     Type = 0x02D3 // 723
+ 	MsgCombineItemTiny     Type = 0x03C0 // 960
+diff --git a/tmserver/internal/protocol/types_test.go b/tmserver/internal/protocol/types_test.go
+index e05a5f0..e1aa435 100644
+--- a/tmserver/internal/protocol/types_test.go
++++ b/tmserver/internal/protocol/types_test.go
+@@ -84,6 +84,7 @@ func TestMessageTypeValues(t *testing.T) {
+ 		{"_MSG_TradingItem (Basedef.h:2102)", MsgTradingItem, 118 | flagClient2Game | flagGame2Client},
+ 		{"_MSG_Trade (Basedef.h:2434)", MsgTrade, 131 | flagGame2Client | flagClient2Game},
+ 		{"_MSG_QuitTrade (Basedef.h:2447)", MsgQuitTrade, 132 | flagGame2Client | flagClient2Game},
++		{"_MSG_CNFCheck (Basedef.h:2448)", MsgCNFCheck, 134 | flagGame2Client | flagClient2Game},
+ 		{"_MSG_CombineItem (Basedef.h:2328)", MsgCombineItem, 166 | flagGame2Client | flagClient2Game},
+ 		{"_MSG_CombineItemEhre (Basedef.h:2339)", MsgCombineItemEhre, 211 | flagClient2Game},
+ 		{"_MSG_CombineItemTiny (Basedef.h:2329)", MsgCombineItemTiny, 192 | flagGame2Client | flagClient2Game},
+diff --git a/tmserver/internal/world/session.go b/tmserver/internal/world/session.go
+index a441ed7..2e180b6 100644
+--- a/tmserver/internal/world/session.go
++++ b/tmserver/internal/world/session.go
+@@ -120,14 +120,18 @@ func (s *Session) close() {
+ }
+ 
+ // TradeState is a player's direct (P2P) trade with another player
+-// (lote2-trade-autotrade.md). Active is set when the trade window opens; Slots
+-// and Money are the finalized offer recorded at confirmation.
++// (lote2-trade-autotrade.md). Active is set when this side first sends an offer;
++// Items/InvenPos/Money are the last offer the server forwarded to the opponent,
++// and Slots lists the carry slots it references. Confirmed is the MyCheck flag,
++// reset on both sides whenever either offer changes.
+ type TradeState struct {
+ 	Active     bool
+ 	OpponentID int
+ 	Confirmed  bool
+ 	Money      int32
+-	Slots      []int // offered carry slots
++	Items      [protocol.MaxTrade]Item
++	InvenPos   [protocol.MaxTrade]uint8 // 0xFF = empty entry (the legacy char -1)
++	Slots      []int                    // offered carry slots
+ }
+ 
+ // AutoTradeState is an open personal shop (the legacy pUser[conn].AutoTrade, issue

@@ -488,15 +488,20 @@ def party_frame(kind: str) -> bytearray:
     return b
 
 
-def trade_frame(result=False) -> bytearray:
-    b = header(21 if result else 154, 0x383, 7)
+def trade_frame(sender=7, opponent=8, result=False) -> bytearray:
+    """Classic packed MSG_Trade (154 bytes, the server's MsgTradeBody): one item
+    from carry slot 3, 50 gold, checked; unused entries carry InvenPos 0xFF.
+    result=True builds the pre-fix server's 1-byte-count placeholder instead."""
+    b = header(21 if result else 154, 0x383, sender)
     if result:
         b[12] = 1
         put_item(b, 13, {"index": 1100})
-    else:
-        put_item(b, 12, {"index": 1100})
-        b[132] = 3
-        struct.pack_into("<iBH", b, 147, 50, 1, 8)
+        return b
+    put_item(b, 12, {"index": 1100, "eff": [[43, 5]]})
+    for i in range(15):
+        b[132 + i] = 0xFF
+    b[132] = 3
+    struct.pack_into("<iBH", b, 147, 50, 1, opponent)
     return b
 
 
@@ -566,9 +571,14 @@ def main() -> int:
         inbound["party_" + kind] = (party_frame(kind), {"kind": kind})
     for kind in ("request", "accept"):
         outbound["party_" + kind] = (party_frame(kind), {"kind": kind})
-    outbound["trade_offer_blocked"] = (trade_frame(), {"blocked": True})
-    inbound["trade_result_blocked"] = (trade_frame(True), {"blocked": True})
-    inbound["trade_ack_blocked"] = (header(13, 0x383, 7), {"blocked": True})
+    trade = {"item": 1100, "eff": [[43, 5]], "pos": 3, "money": 50, "check": 1}
+    outbound["trade_offer"] = (trade_frame(7, 8), dict(trade, opponent=8))
+    inbound["trade_offer"] = (trade_frame(8, 7), dict(trade, opponent=7))
+    inbound["trade_result_placeholder"] = (trade_frame(result=True), {"dropped": True})
+    inbound["trade_ack_placeholder"] = (header(13, 0x383, 7), {"dropped": True})
+    inbound["quit_trade"] = (header(12, 0x384, 7), {"signal": True})
+    inbound["cnf_check"] = (header(12, 0x386, 7), {"signal": True})
+    outbound["quit_trade"] = (header(12, 0x384, 7), {"signal": True})
     doc = {
         "generator": "tools/protocol/gen_fixtures.py",
         "note": "synthetic; no real account data. wire_hex is the full plaintext frame (header included).",

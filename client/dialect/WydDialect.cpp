@@ -22,7 +22,8 @@ static_assert(sizeof(MSG_STANDARD) == 12, "header");
 static_assert(sizeof(MSG_REQParty) == 44 && offsetof(MSG_REQParty, TargetID) == 40, "REQParty");
 static_assert(sizeof(MSG_AddParty) == 40 && sizeof(PARTY) == 26, "AddParty");
 static_assert(sizeof(MSG_CNFParty2) == 32 && offsetof(MSG_CNFParty2, LeaderName) == 14, "AcceptParty");
-static_assert(sizeof(MSG_Trade) == 156 && offsetof(MSG_Trade, TradeMoney) == 148, "Trade remains blocked");
+static_assert(sizeof(MSG_Trade) == 156 && offsetof(MSG_Trade, CarryPos) == 132 && offsetof(MSG_Trade, TradeMoney) == 148 &&
+	offsetof(MSG_Trade, MyCheck) == 152 && offsetof(MSG_Trade, OpponentID) == 154, "Trade");
 static_assert(sizeof(STRUCT_ITEM) == 8, "STRUCT_ITEM");
 static_assert(sizeof(STRUCT_SCORE) == 48, "STRUCT_SCORE");
 static_assert(MAX_CARGO >= 128, "cargo must hold the server's 128 slots (patch 0003)");
@@ -221,6 +222,9 @@ enum : unsigned short
 	OpAcceptParty = 0x3AB,
 	OpAddParty = 0x37D,
 	OpRemoveParty = 0x37E,
+	OpTrade = 0x383,
+	OpQuitTrade = 0x384,
+	OpCNFCheck = 0x386,
 };
 
 int g_clientVersion = 0;
@@ -865,6 +869,41 @@ int InParty(const char* w, int size, char* out, int cap, int* outSize, unsigned 
 	return WYD_DIALECT_TRANSLATED;
 }
 
+// MSG_Trade: the server packs it (154 bytes: money @147, MyCheck @151, opponent
+// @152); the runtime's MSVC-aligned struct has 156 (@148, @152, @154). Items
+// (@12, 15 x 8) and CarryPos (@132, 15 x char, -1 = empty) sit at the same offsets.
+constexpr int kTradeWire = 154;
+constexpr int kTradeMaxMoney = 2000000000;
+
+bool TradeFieldsValid(const char* p, int money, int check, int opponent)
+{
+	if (money < 0 || money > kTradeMaxMoney || (check != 0 && check != 1) || opponent <= 0 || opponent >= 1000)
+		return false;
+	for (int i = 0; i < 15; ++i)
+	{
+		const int pos = static_cast<signed char>(p[132 + i]);
+		const int index = I16(p, 12 + i * 8);
+		if (pos < -1 || pos >= MAX_CARRY || index < 0 || (pos == -1 && index != 0))
+			return false;
+	}
+	return true;
+}
+
+int InTrade(const char* w, int size, char* out, int cap, int* outSize)
+{
+	if (size != kTradeWire) return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpTrade);
+	if (!TradeFieldsValid(w, I32(w, 147), U8(w, 151), U16(w, 152)))
+		return Fail(WYD_STAT_IN_DROP_RANGE, 0, OpTrade);
+	auto* m = Begin<MSG_Trade>(w, out, cap, outSize);
+	if (!m) return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpTrade);
+	std::memcpy(m->Item, w + 12, sizeof(m->Item));
+	std::memcpy(m->CarryPos, w + 132, sizeof(m->CarryPos));
+	m->TradeMoney = I32(w, 147);
+	m->MyCheck = static_cast<char>(U8(w, 151));
+	m->OpponentID = U16(w, 152);
+	return WYD_DIALECT_TRANSLATED;
+}
+
 int PassIfSize(int wireSize, int want, unsigned short op)
 {
 	if (wireSize != want)
@@ -898,6 +937,11 @@ int WydDialectInbound(const char* wire, int wireSize, char* out, int outCap, int
 	case OpAddParty:
 	case OpRemoveParty:
 		return Translated(InParty(wire, wireSize, out, outCap, outSize, op));
+	case OpTrade:
+		return Translated(InTrade(wire, wireSize, out, outCap, outSize));
+	case OpQuitTrade: // MSG_STANDARD signals; consumers read only the header
+	case OpCNFCheck:
+		return PassIfSize(wireSize, kHeader, op);
 	case OpCNFAccountLogin:
 		return exact(kCNFAccountLogin) ? Translated(InCNFAccountLogin(wire, out, outCap, outSize))
 			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
@@ -1053,6 +1097,24 @@ int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int*
 		std::memcpy(out + 14, m->LeaderName, 16);
 		return OutDone(outSize, 32);
 	}
+	case OpTrade:
+	{
+		if (msgSize != sizeof(MSG_Trade) || outCap < kTradeWire) return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		const auto* m = reinterpret_cast<const MSG_Trade*>(msg);
+		if (!TradeFieldsValid(msg, m->TradeMoney, static_cast<unsigned char>(m->MyCheck), m->OpponentID))
+			return OutFail(WYD_STAT_OUT_DROP_RANGE, op);
+		std::memset(out, 0, kTradeWire);
+		std::memcpy(out, msg, 12);
+		Put16(out, 0, kTradeWire);
+		std::memcpy(out + 12, m->Item, sizeof(m->Item));
+		std::memcpy(out + 132, m->CarryPos, sizeof(m->CarryPos));
+		Put32(out, 147, static_cast<std::uint32_t>(m->TradeMoney));
+		out[151] = m->MyCheck;
+		Put16(out, 152, m->OpponentID);
+		return OutDone(outSize, kTradeWire);
+	}
+	case OpQuitTrade:
+		return OutPass(msgSize, kHeader, op);
 	case OpRemoveParty:
 		if (msgSize != 16) return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
 		if (I32(msg, 12) < 0 || I32(msg, 12) >= 1000) return OutFail(WYD_STAT_OUT_DROP_RANGE, op);
