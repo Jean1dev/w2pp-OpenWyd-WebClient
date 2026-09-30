@@ -59,11 +59,19 @@ export function validateOptions(opt) {
 // MSG_Attack echo (CurrentExp). Deferred, not rendered (ADR 004 revision).
 export const DEFERRED_INBOUND = new Set(['0x5000']);
 
-export function checkHealth(p, errors = [], deferredIn = DEFERRED_INBOUND) {
+// Outbound runtime messages the locked server has no route for: dispatch.go
+// logs them as routed=false and ignores them, so dropping them in the dialect
+// changes nothing on the server. Same rule as inbound: listed, counted, any
+// other outbound drop fails.
+// 0x02CB MoveStop: the runtime sends it before a plain melee hit while walking
+// (TMFieldScene.cpp, SkillIndex -1); the server has no handler at 98286fdf.
+export const DEFERRED_OUTBOUND = new Set(['0x02cb']);
+
+export function checkHealth(p, errors = [], deferredIn = DEFERRED_INBOUND, deferredOut = DEFERRED_OUTBOUND) {
   assert.equal(errors.length, 0, 'page errors');
   assert.equal(p.glErrorTotal, 0, 'WebGL errors');
   assert.equal(p.placeholder, 0, 'placeholder scene');
-  for (const k of ['inDropSize', 'inDropRange', 'outDropUnknown',
+  for (const k of ['inDropSize', 'inDropRange',
     'outDropSize', 'outDropRange', 'outDropNoVersion'])
     assert.equal(p.dialect[k], 0, `protocol rejection: ${k}`);
   const droppedIn = p.dialect.droppedIn ?? [];
@@ -71,6 +79,12 @@ export function checkHealth(p, errors = [], deferredIn = DEFERRED_INBOUND) {
   assert.deepEqual(unexpected, [], 'protocol rejection: inbound opcode outside the deferred list');
   const deferred = droppedIn.reduce((n, d) => n + d.times, 0);
   assert(p.dialect.inDropUnknown <= deferred, `protocol rejection: inDropUnknown ${p.dialect.inDropUnknown} > deferred ${deferred}`);
+  const droppedOut = p.dialect.droppedOut ?? [];
+  assert.deepEqual(droppedOut.filter(d => !deferredOut.has(d.opcode.toLowerCase())), [],
+    'protocol rejection: outbound opcode outside the deferred list');
+  const deferredSent = droppedOut.reduce((n, d) => n + d.times, 0);
+  assert(p.dialect.outDropUnknown <= deferredSent,
+    `protocol rejection: outDropUnknown ${p.dialect.outDropUnknown} > deferred ${deferredSent}`);
   if (p.state === 0) assert.equal(p.field.fixture, 0, 'offline fixture');
 }
 
@@ -189,4 +203,10 @@ export function checkCast(c) {
   assert(c.mpTrail.length >= 2 && Math.min(...c.mpTrail) < c.mpTrail[0], 'server charged no MP');
   assert(c.hpTrail.length >= 2 && c.hpTrail.at(-1) < c.hpTrail[0], 'target took no damage');
   assert(!c.died, 'caster died');
+  // Area (TargetType 3): the target is always among the mobs the server hit;
+  // more than one only when another mob stood inside the range (recorded).
+  if (c.area) {
+    assert(Array.isArray(c.hitMobs) && c.hitMobs.includes(c.target?.id), 'area cast: target not among the hit mobs');
+    assert(c.hitMobs.length <= c.nearby, 'area cast: more hits than mobs in range');
+  }
 }

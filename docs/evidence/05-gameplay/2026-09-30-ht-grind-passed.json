@@ -1,0 +1,541 @@
+{
+ "when": "2026-09-30T01:01:24.819Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "grind"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 3
+    },
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 0
+    }
+   ],
+   "ms": 26797,
+   "at": "2026-09-30T01:02:05.381Z"
+  },
+  "grind": {
+   "ok": true,
+   "class": 3,
+   "slot": 3,
+   "want": 6,
+   "start": {
+    "level": 1,
+    "exp": 0
+   },
+   "kills": [
+    {
+     "id": 1037,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 0,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 274,
+     "level": 1
+    },
+    {
+     "id": 1036,
+     "hpTrail": [
+      16,
+      0
+     ],
+     "exp0": 274,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 548,
+     "level": 1
+    },
+    {
+     "id": 1030,
+     "hpTrail": [
+      70,
+      32,
+      0
+     ],
+     "exp0": 548,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 822,
+     "level": 1
+    },
+    {
+     "id": 1031,
+     "hpTrail": [
+      70,
+      33,
+      0
+     ],
+     "exp0": 822,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 1096,
+     "level": 1
+    },
+    {
+     "id": 1044,
+     "hpTrail": [
+      70,
+      33,
+      0
+     ],
+     "exp0": 1096,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 1370,
+     "level": 2
+    },
+    {
+     "id": 1035,
+     "hpTrail": [
+      70,
+      30,
+      0
+     ],
+     "exp0": 1370,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 1597,
+     "level": 2
+    },
+    {
+     "id": 1043,
+     "hpTrail": [
+      70,
+      32,
+      0
+     ],
+     "exp0": 1597,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 1824,
+     "level": 2
+    },
+    {
+     "id": 1030,
+     "hpTrail": [
+      70,
+      28,
+      0
+     ],
+     "exp0": 1824,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 2222,
+     "level": 3
+    },
+    {
+     "id": 1031,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 2222,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 2393,
+     "level": 3
+    },
+    {
+     "id": 1035,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 2393,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 2564,
+     "level": 3
+    },
+    {
+     "id": 1036,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 2564,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 2735,
+     "level": 4
+    },
+    {
+     "id": 1035,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 2735,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 2872,
+     "level": 4
+    },
+    {
+     "id": 1038,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 2872,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 3009,
+     "level": 4
+    },
+    {
+     "id": 1037,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 3009,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 3146,
+     "level": 4
+    },
+    {
+     "id": 1036,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 3146,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 3283,
+     "level": 4
+    },
+    {
+     "id": 1045,
+     "hpTrail": [
+      70,
+      28,
+      0
+     ],
+     "exp0": 3283,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 3420,
+     "level": 4
+    },
+    {
+     "id": 1044,
+     "hpTrail": [
+      70,
+      27,
+      0
+     ],
+     "exp0": 3420,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 3557,
+     "level": 5
+    },
+    {
+     "id": 1035,
+     "hpTrail": [
+      70,
+      27,
+      0
+     ],
+     "exp0": 3557,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 3671,
+     "level": 5
+    },
+    {
+     "id": 1038,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 3671,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 3785,
+     "level": 5
+    },
+    {
+     "id": 1045,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 3785,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 3899,
+     "level": 5
+    },
+    {
+     "id": 1044,
+     "hpTrail": [
+      70,
+      5,
+      70,
+      0
+     ],
+     "exp0": 3899,
+     "clicks": 4,
+     "gone": false,
+     "exp1": 4127,
+     "level": 5
+    },
+    {
+     "id": 1035,
+     "hpTrail": [
+      70,
+      28,
+      0
+     ],
+     "exp0": 4127,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 4241,
+     "level": 5
+    },
+    {
+     "id": 1043,
+     "hpTrail": [
+      70,
+      26,
+      0
+     ],
+     "exp0": 4241,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 4355,
+     "level": 5
+    },
+    {
+     "id": 1031,
+     "hpTrail": [
+      70,
+      0
+     ],
+     "exp0": 4355,
+     "clicks": 1,
+     "gone": false,
+     "exp1": 4469,
+     "level": 6
+    }
+   ],
+   "rests": 0,
+   "died": false,
+   "trip": {
+    "route": "Armia east / generators 27..30",
+    "clicks": 26,
+    "at": {
+     "id": 1,
+     "name": "<redacted>",
+     "x": 2184.5,
+     "y": 2106.5,
+     "hp": 105,
+     "maxHp": 105,
+     "cls": 8,
+     "characterClass": 3,
+     "equip": [
+      31,
+      1553,
+      1556,
+      1559,
+      1562,
+      1565,
+      816,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "look": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      815
+     ]
+    }
+   },
+   "end": {
+    "level": 6,
+    "exp": 4469,
+    "hp": 115,
+    "maxHp": 115
+   },
+   "reached": true,
+   "skillPoints": 18,
+   "ms": 768425,
+   "at": "2026-09-30T01:15:02.454Z"
+  }
+ },
+ "ok": true,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "e3098d41f392bd1e632e44218bcb920e77d42637",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-09-30T01:02:05.849Z",
+   "freeMiB": 1125,
+   "totalMiB": 8014,
+   "browserMiB": 871,
+   "pages": {
+    "A": {
+     "wasmMiB": 150,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end grind",
+   "at": "2026-09-30T01:15:03.086Z",
+   "freeMiB": 1198,
+   "totalMiB": 8014,
+   "browserMiB": 906,
+   "pages": {
+    "A": {
+     "wasmMiB": 259,
+     "jsMiB": 497
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "grind-end",
+   "file": ".cache/world/2026-09-30T01-01-24-807Z/A-grind-end.png",
+   "sha256": "46ae73c1458fc1cae007110b794d469cff0347493d96657c7c954770a824cb6e"
+  }
+ ],
+ "final_A": {
+  "inTranslated": 374,
+  "inPass": 1979,
+  "inDropUnknown": 26,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 55,
+  "outPass": 75,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 2379,
+  "droppedIn": [
+   {
+    "opcode": "0x5000",
+    "times": 26
+   }
+  ],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-09-29T22:01:38.1625873-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-09-29T22:01:55.8516283-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-29T22:15:15.9380719-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 10796,
+   "bytes_down": 170608
+  }
+ ]
+}
