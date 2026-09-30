@@ -2,7 +2,8 @@
 // Cliente WYD conectado: o runtime original fala CPSock pelo gateway do operador.
 // A página só entrega o endpoint e a versão de protocolo lidos de /config.json.
 // Conta, senha e PIN são digitados na interface do jogo; nada é gravado no
-// navegador, na URL ou no console por esta página.
+// navegador, na URL ou no console por esta página. Apenas assets do jogo
+// podem ser persistidos pelo carregador em IndexedDB.
 const canvas = document.getElementById("canvas");
 const statusEl = document.getElementById("status");
 const identityEl = document.getElementById("identity");
@@ -188,6 +189,9 @@ async function start() {
     onRuntimeInitialized() {
       try {
         clientEvidence.ready = true;
+        clientEvidence.assetPreload = {
+          fromCache: Module.preloadResults?.["openwyd_assets.data"]?.fromCache ?? null
+        };
         call("_wyd_net_set_client_version", cfg.clientVersion | 0);
         call("_wyd_renderer_set_backend", 0);
         call("_wyd_set_field_mode", 1);

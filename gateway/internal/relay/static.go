@@ -34,10 +34,17 @@ func staticHandler(dir string, assets http.Handler) http.Handler {
 		if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, ".html") {
 			w.Header().Set("Cache-Control", "no-store")
 		}
+		// The loader carries the package's content hash. Revalidate even when
+		// it lives in the site directory, so IndexedDB sees asset updates.
+		if r.URL.Path == "/openwyd_assets.js" {
+			w.Header().Set("Cache-Control", "private, no-cache")
+		}
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if assets != nil && r.URL.Path != "/" && !exists(dir, r.URL.Path) {
 			// Same origin, same headers; the data is revalidated, not pinned.
-			w.Header().Set("Cache-Control", "no-cache")
+			if w.Header().Get("Cache-Control") == "" {
+				w.Header().Set("Cache-Control", "no-cache")
+			}
 			assets.ServeHTTP(w, r)
 			return
 		}

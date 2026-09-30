@@ -56,6 +56,38 @@ python tools/upload_assets_s3.py --railway-bucket arranged-orb   # PUT + verific
 
 Depois aponte `WYD_ASSET_S3_PREFIX`/`WYD_ASSET_MANIFEST` para a nova versão. O upload de 29/09 levou cerca de 10 minutos. O script pula objetos já presentes com o mesmo tamanho.
 
+### Cache local do pacote principal
+
+O empacotamento habilita o cache nativo do Emscripten 6.0.0 em IndexedDB
+(`WYD_PRELOAD_CACHE`). A primeira abertura baixa `openwyd_assets.data`; as próximas
+reutilizam a cópia local, inclusive após fechar o navegador. O carregador contém
+o SHA-256 do conteúdo: recompilar sem mudar o pacote mantém o cache; alterar o
+conteúdo exige baixar o pacote inteiro novamente. O cache é por origem, perfil e
+diretório da página. WASM e músicas não entram nesse cache.
+
+`openwyd_assets.js` usa `Cache-Control: private, no-cache`, inclusive quando servido
+do diretório local: o navegador revalida o carregador antes de escolher o pacote.
+`config.json` e HTML continuam sem armazenamento HTTP. Credenciais não são
+gravadas no IndexedDB. O jogo continua online e precisa montar os assets em memória.
+
+Para ativar no deploy, regenere os assets com os dois comandos Python acima,
+publique **o par `.js`/`.data` e seu manifesto no mesmo prefixo novo**, e só então
+troque a configuração. Não substitua arquivos individualmente no prefixo ativo.
+Publique também a imagem com o gateway atualizado. `--page-only` não regenera um
+carregador antigo; atualizar apenas a imagem não ativa o cache do pacote no bucket.
+
+Se IndexedDB estiver indisponível ou a gravação falhar por quota, o carregador
+continua pelo download normal. Limpar os dados do site ou a remoção automática pelo
+navegador exige novo download; não há promessa de armazenamento permanente.
+Para diagnóstico, `clientEvidence.assetPreload.fromCache` expõe o resultado do
+carregador, sem dados de conta. Confirme também as requisições de rede.
+
+Validação local, serial, sem login: `npm run assets:cache` testa fixtures pequenas
+com o carregador real em Chromium e Firefox; `npm run assets:cache -- --real`
+também abre `client.html` com o pacote local e o runtime real. Instale os browsers
+do Playwright fixado antes (`npx playwright install chromium firefox`). Relatórios
+e perfis exclusivos ficam em `.cache/asset-cache/`; não publique esses perfis ou assets.
+
 ## Verificação
 
 ```text

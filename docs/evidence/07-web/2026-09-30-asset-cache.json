@@ -1,0 +1,206 @@
+[
+  {
+    "browser": "chromium",
+    "version": "139.0.7258.5",
+    "cases": [
+      {
+        "name": "cold",
+        "ms": 249,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "warm",
+        "ms": 25,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "restart",
+        "ms": 149,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unchanged-rebuild",
+        "ms": 24,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "changed",
+        "ms": 162,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "updated-warm",
+        "ms": 22,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unavailable",
+        "ms": 21,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-failure",
+        "ms": 160,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-recovery",
+        "ms": 134,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "real-cold",
+        "ms": 14091,
+        "dataRequests": 1,
+        "dataBytes": 319802941,
+        "totalBytes": 323669621,
+        "fromCache": false
+      },
+      {
+        "name": "real-warm",
+        "ms": 22801,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3866680,
+        "fromCache": true
+      },
+      {
+        "name": "real-restart",
+        "ms": 14879,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3866680,
+        "fromCache": true
+      }
+    ]
+  },
+  {
+    "browser": "firefox",
+    "version": "140.0.2",
+    "cases": [
+      {
+        "name": "cold",
+        "ms": 316,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "warm",
+        "ms": 215,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "restart",
+        "ms": 332,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unchanged-rebuild",
+        "ms": 208,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "changed",
+        "ms": 212,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "updated-warm",
+        "ms": 184,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unavailable",
+        "ms": 64,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-failure",
+        "ms": 210,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-recovery",
+        "ms": 197,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "real-cold",
+        "ms": 33052,
+        "dataRequests": 1,
+        "dataBytes": 319802941,
+        "totalBytes": 323669621,
+        "fromCache": false
+      },
+      {
+        "name": "real-warm",
+        "ms": 19065,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3866680,
+        "fromCache": true
+      },
+      {
+        "name": "real-restart",
+        "ms": 22558,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3866680,
+        "fromCache": true
+      }
+    ]
+  }
+]

@@ -10,7 +10,7 @@ Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
 | 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; faltam buff/cura, grupo, troca e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
-| 7 Experiência web | Pendente | — |
+| 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
 
 ## Próxima ação
@@ -429,5 +429,16 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
   - teleporte pago, chat de grupo/guilda e interrupção no meio de uma transação não foram exercitados;
   - sem commit nem deploy nesta sessão.
 - **Próximo passo:** fatia 4 (grupo e troca).
+
+### 30/09/2026 — etapa 7: cache local do pacote principal
+
+- **Pedido do usuário:** implementar cache automático do pacote principal (~320 MB), com atualização por conteúdo.
+- **Arquivos:** `tools/build_local_scene.py`, `web/client.js`, gateway `static.go`, `deploy_test.go` e `s3_test.go`, `tools/verify_asset_cache.mjs`, `package.json`, `docs/deploy.md` e [evidências](evidence/07-web/2026-09-30-asset-cache.md).
+- **Decisão:** cache nativo do Emscripten 6.0.0 em `WYD_PRELOAD_CACHE` (IndexedDB); hash do conteúdo invalida o pacote; loader `.js` revalidado também no diretório local. WASM e músicas fora deste cache.
+- **Confirmado em execução:** gateway vet/test verde; 24 cenários aprovados no harness Chromium/Firefox, incluindo atualização, falhas de armazenamento, cena real de `client.html` e reinício do navegador. Reaberturas reais: zero requisições e zero bytes do `.data`; primeiro acesso: 319.802.941 bytes.
+- **Preparação:** restaurados 7.093 arquivos da cópia local existente, todos conferidos com o manifesto; pacote regenerado sem alterar hash do `.data`; novo manifesto local `a457267b6cd82874` em `.cache/deploy-assets`.
+- **Limites:** medições locais não provam ganho de tempo em produção; Chromium warm foi mais lento que cold. Sem Safari, login, multiplayer ou deploy nesta fatia. Assets continuam ignorados pelo Git.
+- **Entrega solicitada:** commit e push do código e das evidências na branch `Jean1dev/shop-bank-chat`; pacote de assets e perfis de navegador permanecem locais.
+- **Próximo passo:** publicar loader/dados/manifesto juntos num prefixo novo, aplicar gateway atualizado e medir no domínio público. Instruções em `docs/deploy.md`; demais pendências de gameplay preservadas.
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

@@ -54,6 +54,13 @@ func TestS3AssetsStreamThroughGateway(t *testing.T) {
 			return
 		}
 		switch r.URL.Path {
+		case "/bucket-x/v1/openwyd_assets.js":
+			w.Header().Set("ETag", `"loader-v1"`)
+			if r.Header.Get("If-None-Match") == `"loader-v1"` {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+			io.WriteString(w, "loader")
 		case "/bucket-x/v1/openwyd_assets.data":
 			w.Header().Set("ETag", `"abc"`)
 			w.Header().Set("Content-Type", "binary/octet-stream")
@@ -85,6 +92,21 @@ func TestS3AssetsStreamThroughGateway(t *testing.T) {
 	if resp.StatusCode != http.StatusOK || body != "0123456789" ||
 		resp.Header.Get("Content-Type") != "application/octet-stream" || resp.Header.Get("ETag") != `"abc"` {
 		t.Fatalf("object: %d %q %v", resp.StatusCode, body, resp.Header)
+	}
+	loader, loaderBody := get(t, h.srv.URL+"/openwyd_assets.js", cred)
+	if loader.StatusCode != http.StatusOK || loaderBody != "loader" || loader.Header.Get("Cache-Control") != "private, no-cache" {
+		t.Fatalf("loader: %d %v", loader.StatusCode, loader.Header)
+	}
+	conditional, _ := http.NewRequest(http.MethodGet, h.srv.URL+"/openwyd_assets.js", nil)
+	conditional.SetBasicAuth(cred.User, cred.Password)
+	conditional.Header.Set("If-None-Match", loader.Header.Get("ETag"))
+	unchanged, err := http.DefaultClient.Do(conditional)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unchanged.Body.Close()
+	if unchanged.StatusCode != http.StatusNotModified || unchanged.Header.Get("Cache-Control") != "private, no-cache" {
+		t.Fatalf("loader revalidation: %d %v", unchanged.StatusCode, unchanged.Header)
 	}
 	req, _ := http.NewRequest(http.MethodGet, h.srv.URL+"/openwyd_assets.data", nil)
 	req.SetBasicAuth(cred.User, cred.Password)
