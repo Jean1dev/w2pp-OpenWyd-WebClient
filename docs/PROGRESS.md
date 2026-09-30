@@ -1,6 +1,6 @@
 # Progresso
 
-Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. A morte para os Trolls e a volta à cidade (caixa 11, `0x03AE`/`0x0289`, HP 2 no spawn) também foram aprovadas ([morte e respawn](evidence/05-gameplay/2026-09-29-death-respawn.md)). O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. Cliente Windows e o restante do gameplay ainda não foram provados.
+Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. A morte para os Trolls e a volta à cidade (caixa 11, `0x03AE`/`0x0289`, HP 2 no spawn) também foram aprovadas ([morte e respawn](evidence/05-gameplay/2026-09-29-death-respawn.md)). O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. Cliente Windows e o restante do gameplay ainda não foram provados.
 
 | Etapa | Estado | Evidência |
 |---|---|---|
@@ -8,14 +8,18 @@ Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (combate básico, morte/respawn, aprender e usar skill aprovados) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (combate básico, morte/respawn, uma skill de cada uma das quatro classes e dano do Giro da Fúria em dois alvos no mesmo golpe aprovados) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Pendente | — |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
 
 ## Próxima ação
 
-1. Etapa 5 — próximas fatias de gameplay: skills das outras classes (nível 6–8) e de área, buff e cura; depois chat `0333/0334`, itens, loja, banco, grupo, troca e persistência. Combate básico com relogin e morte/respawn já aprovados. Rodar os cenários online como processo separado (`Start-Process`), por causa da memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
+1. Etapa 5:
+   - buff e cura exigem nível 11+ ou 16–20;
+   - depois chat `0333/0334`, itens, loja, banco, grupo, troca e persistência.
+
+   Rodar os cenários online em processos separados, por causa da memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar:
    - repetir `npm run world` completo com o trajeto novo até o portal (a execução de 29/09 falhou só na caminhada da `mapchange`);
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
@@ -306,5 +310,48 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
   - logs: `recv 0x0378` e `recv 0x039d len=56`.
 - **Limites:** outras classes; skills de área, buff e cura; comparação visual da barra com o cliente Windows.
 - **Próximo passo:** skills das outras classes, ou as fatias seguintes (chat, itens, loja, banco, grupo, troca).
+
+### 29–30/09/2026 — etapa 5: skills das outras classes
+
+- **Pedido do usuário:** executar o orquestrador. No plano aprovado, o usuário escolheu seguir com as skills das três classes restantes, subindo de nível de forma permanente os personagens da conta A, e o Giro da Fúria (área) para a TK.
+- **Arquivos:**
+  - alterados: `tools/verify_world.mjs` (mestres e planos por classe, descoberta, cancelamento de caixas com Esc, aproximação e área no `cast`), `tools/world_checks{,.test}.mjs` (`checkCast` com área, `DEFERRED_OUTBOUND = {0x02cb}`), ADR 004 (revisão de 30/09) e checklist da etapa 5;
+  - novos: `tools/route_armia.py` e evidências `docs/evidence/05-gameplay/2026-09-30-*`.
+  - dialeto, patches e WASM sem mudança; runtime `…1790719644704247800` reutilizado.
+- **Confirmado em fonte:** mestres pelos NPCs do servidor (Cap.Cavaleiros → TK, Mestre_Archi → BM, ForeLearner → HT; Mestre_Haby é Merchant 31). A hipótese inicial do plano estava errada e foi corrigida.
+- **Confirmado em teste:** `world:checks` 12/0. `route_armia.py` reproduz a rota provada dos Gremlins.
+- **Confirmado em execução (Railway):**
+  - HT: grind 1→6 (24 abates), Golpe Felino aprendido no ForeLearner (`skill learned skill=80 cost=18`, preservado no relogin), usado com MP 110→100 e HP 70→0;
+  - TK: grind 1→8 (49 abates), Giro da Fúria aprendido no Cap.Cavaleiros (`skill=0 cost=24`), usado: `0x0367` de 152 bytes (N=13) roteado, MP 112→97, HP 70→30.
+- **Falhas registradas e corrigidas:**
+  - Mestre_Haby abre uma caixa de confirmação que bloqueava os cliques;
+  - defeito de contabilidade do harness: a fase `learn` da HT passou, mas o veredito geral saiu `false`;
+  - `0x02CB` MoveStop descartado, agora diferido;
+  - TK presa num canteiro elevado.
+- **BeastMaster:** a primeira tentativa foi interrompida pelo Claude Code por falta de memória antes do primeiro abate. A pedido do usuário, rodou de novo em 30/09 com 1,7 GB livres:
+  - grind 1→8 (51 abates);
+  - Fera Flamejante aprendida no Mestre_Archi (`skill=48 cost=24`, preservada no relogin);
+  - usada com MP 119→111 e HP 70→1.
+
+  As três execuções foram aprovadas, com protocolo limpo.
+- **Limites:**
+  - o dano do Giro da Fúria em vários mobs no mesmo golpe não foi observado;
+  - buff e cura não foram exercitados;
+  - uma loja comum foi aberta por engano durante uma caminhada, sem efeito;
+  - não houve comparação com o cliente Windows.
+- **Próximo passo:** dano em vários alvos da skill de área e buff/cura (exigem níveis mais altos), ou a fatia 2 (inventário, equipamento, drop).
+
+### 30/09/2026 — etapa 5: Giro da Fúria em vários alvos
+
+- **Pedido do usuário:** executar o plano "Giro da Fúria com múltiplos alvos" ([ADR 006](decisions/006-area-combat-evidence.md)); o usuário autorizou criar contas de teste no portal do operador.
+- **Arquivos:**
+  - alterados: `client/dialect/WydDialect.{h,cpp}` (diagnóstico de combate opt-in, 2×64 eventos), `tools/protocol/dialect_test.cpp`, `tools/verify_world.mjs` (fase `castarea`), `tools/world_checks.mjs`, `package.json`;
+  - novos: `tools/area_checks{,.test}.mjs`, ADR 006, evidência [`2026-09-30-area-multiple`](evidence/05-gameplay/2026-09-30-area-multiple.md) com JSON e log do servidor sanitizados.
+- **Confirmado em teste:** `world:checks` 15/0; `protocol:dialect` 469/0; `protocol:vectors` 97 vetores e 28 fluxos; `scene`; `client:stream`. WASM `9479750f…`.
+- **Confirmado em execução (Railway, contas novas):** personagens criados; TK nível 1→8 em duas execuções de grind (51 abates, a primeira encerrada pelo prazo em nível 7); Giro da Fúria aprendido e preservado no relogin; `castarea` aprovado na primeira tentativa de lançamento: um `0x0367` e uma resposta com dano 40 em cada um dos Gremlins 1037 e 1035, recebida igual por A e B, com HP 70→30 nas duas sessões, MP 112→97, e relogin preservando equipamento, nível, EXP e skill.
+- **Falhas registradas:** senhas de 12 caracteres truncadas para 11 pela cena de login (`AccountPass[12]`), com contas substituídas; a primeira execução de `castarea` parou na proteção de 1 GiB livre antes de abrir B, sem combate.
+- **Hipótese aberta:** o snapshot local de MP após o golpe (112) diverge do MP autoritativo (97); pode ser regeneração, não foi verificado.
+- **Limites:** um par e um lançamento; buff/cura não exercitados; sem comparação com o cliente Windows. Nenhum commit ou deploy nesta fatia.
+- **Próximo passo:** investigar a divergência de MP local ou seguir para buff/cura (níveis 11+) e a fatia 2 (inventário, equipamento, drop).
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

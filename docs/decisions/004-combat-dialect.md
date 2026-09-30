@@ -74,3 +74,11 @@ Na execução 5, o dano e a morte foram confirmados por A e B. Surgiram dois opc
 
 - `0x0378` `SetShortSkill` (C→S): layout idêntico (`Skill[20]`), passa com tamanho exato 32.
 - `0x5000` `Exp_Msg_Panel_` (S→C): customizado do servidor, sem handler no runtime. Fica diferido em `checkHealth`, e a experiência continua vindo do eco de ataque.
+
+## Revisão de 30/09/2026 — MoveStop `0x02CB` diferido na saída
+
+No grind da Transknight, o runtime enviou um `0x02CB` (MoveStop), que o dialeto descartou como `outDropUnknown`. **Confirmado em fonte:** o `TMFieldScene.cpp` o envia antes de um golpe comum (`SkillIndex -1`) dado com o personagem em movimento. O servidor `98286fdf` não tem rota para esse opcode: `dispatch.go` registra `routed=false` e retorna. Descartar no dialeto tem o mesmo efeito no servidor, e os logs confirmam que nenhum `0x02CB` chegou.
+
+Decisão: não traduzir nem repassar. `checkHealth` ganha `DEFERRED_OUTBOUND = {0x02cb}` (`tools/world_checks.mjs`), com o mesmo critério do `0x5000` de entrada: o descarte fica listado e contado, e qualquer outro descarte de saída reprova. Se o servidor implementar MoveStop, o layout precisa ser traduzido e testado como os demais. Detalhes em [skills das outras classes](../evidence/05-gameplay/2026-09-30-skills-classes.md).
+
+Na mesma sessão, o Giro da Fúria (TargetType 3) saiu como `0x0367` de 152 bytes (N = 13) e foi roteado. O caminho de área já estava coberto pela decisão de "tamanho, não opcode", sem mudança no dialeto.

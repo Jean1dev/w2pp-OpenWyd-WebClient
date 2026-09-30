@@ -16,7 +16,12 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 | Morte e respawn (`03AE` → `0289`) | **confirmado em execução** | [morte e respawn](2026-09-29-death-respawn.md): A morre para os Trolls (HP 105→0), caixa 11, `0x03AE`/`0x0289`, revive com HP 2 no spawn de Armia, EXP intacta, B vê A voltar |
 | Skills: subir de nível e aprender | **confirmado em execução** (Foema) | [skills](2026-09-29-skills.md): 12 Gremlins até o nível 4; Flecha Mágica aprendida no mestre com cliques reais, pontos 12→0, preservada no relogin |
 | Skills: usar em combate | **confirmado em execução** (Foema) | [skills](2026-09-29-skills.md#uso-da-skill-em-combate): Flecha Mágica na barra (Shift+1, `0x0378`), clique direito no Gremlin, MP 110→105 cobrado pelo servidor, HP 70→16 |
-| Skills das outras classes, área, buff e cura | pendente | Huntress, Transknight e BeastMaster exigem nível 6–8 |
+| Skills: Huntress (Golpe Felino) | **confirmado em execução** | [outras classes](2026-09-30-skills-classes.md): grind 1→6, aprendida no ForeLearner, usada: MP 110→100, HP 70→0 |
+| Skills: Transknight, área (Giro da Fúria) | **confirmado em execução** (um alvo atingido) | [outras classes](2026-09-30-skills-classes.md): grind 1→8, aprendida no Cap.Cavaleiros, `0x0367` de 152 bytes (N=13) roteado, MP 112→97, HP 70→30. O dano em vários mobs no mesmo golpe não foi observado |
+| Skills: Transknight, área em dois alvos no mesmo golpe | **confirmado em execução** | [área múltipla](2026-09-30-area-multiple.md#prova-de-área--aprovada): um `0x0367` com alvos 1037/1035, resposta autoritativa com dano 40 em ambos recebida igual por A e B, HP 70→30 nas duas sessões, MP 112→97, relogin preservado |
+| Skills: BeastMaster (Fera Flamejante) | **confirmado em execução** | [outras classes](2026-09-30-skills-classes.md#beastmaster): grind 1→8, aprendida no Mestre_Archi, usada: MP 119→111, HP 70→1 |
+| `0x02CB` MoveStop (saída) | diferido | sem rota no servidor (`routed=false`); `DEFERRED_OUTBOUND` na ADR 004 |
+| Skills de buff e cura | pendente | exigem nível 11+ (BM) ou 16–20 (Foema) |
 | Inventário, drop, loja, banco, teleporte, chat, grupo, troca e persistência | pendente | fatias seguintes |
 
 ## Execuções de 29/09/2026 (cenário `login,enter,second,attack`)
@@ -54,10 +59,16 @@ Detalhes em [2026-09-29-basic-combat.md](2026-09-29-basic-combat.md). Critérios
 ```powershell
 npm run protocol:dialect      # 447 verificações
 npm run protocol:vectors      # inclui TestExtDialect{Inbound,Outbound}/attack_*
-npm run world:checks          # 12 testes (checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, DEFERRED_INBOUND = {0x5000})
+npm run world:checks          # 12 testes (checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast com área, DEFERRED_INBOUND = {0x5000}, DEFERRED_OUTBOUND = {0x02cb})
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,attack
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,death
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,grind --class 1 --grind-level 4
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,learn --class 1
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,cast --class 1
+# outras classes: --class 3 --grind-level 6 (HT), --class 0 --grind-level 8 (TK), --class 2 --grind-level 8 (BM)
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,grind --class 2 --grind-level 8
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,learn --class 2
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,cast --class 2
+# rotas pelos mapas do servidor na revisão fixada (clone parcial que traz os blobs):
+python tools/route_armia.py --git-dir ../start/external/server --from 2096,2097 --to 2077,2123
 ```

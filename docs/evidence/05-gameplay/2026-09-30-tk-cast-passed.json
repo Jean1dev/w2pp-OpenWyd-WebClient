@@ -1,0 +1,251 @@
+{
+ "when": "2026-09-30T03:18:13.193Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "cast"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 7
+    },
+    {
+     "filled": true,
+     "level": 3
+    },
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "level": 5
+    }
+   ],
+   "ms": 19659,
+   "at": "2026-09-30T03:18:33.501Z"
+  },
+  "cast": {
+   "ok": true,
+   "cls": 0,
+   "pos": 0,
+   "skill": 0,
+   "name": "Giro_da_Furia",
+   "slot": 0,
+   "trip": {
+    "route": "Armia east / generators 27..30",
+    "clicks": 29,
+    "at": {
+     "id": 1,
+     "name": "<redacted>",
+     "x": 2185.5,
+     "y": 2106.5,
+     "hp": 127,
+     "maxHp": 127,
+     "cls": 1,
+     "characterClass": 0,
+     "equip": [
+      1,
+      1103,
+      1115,
+      1127,
+      1139,
+      1151,
+      861,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "look": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      863
+     ]
+    }
+   },
+   "attempts": 1,
+   "area": true,
+   "cell": 5000,
+   "belt": 0,
+   "lastSentAfterAssign": 888,
+   "selected": 0,
+   "target": {
+    "id": 1035,
+    "distance": 1
+   },
+   "mpTrail": [
+    112,
+    97
+   ],
+   "hpTrail": [
+    70,
+    30
+   ],
+   "died": false,
+   "nearby": 2,
+   "hitMobs": [
+    1035
+   ],
+   "attacksSent": 1,
+   "echoes": 6,
+   "ms": 454807,
+   "at": "2026-09-30T03:26:13.875Z"
+  }
+ },
+ "ok": true,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "e3098d41f392bd1e632e44218bcb920e77d42637",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-09-30T03:18:34.129Z",
+   "freeMiB": 1062,
+   "totalMiB": 8014,
+   "browserMiB": 863,
+   "pages": {
+    "A": {
+     "wasmMiB": 125,
+     "jsMiB": 441
+    }
+   }
+  },
+  {
+   "point": "end cast",
+   "at": "2026-09-30T03:26:13.877Z",
+   "freeMiB": 1184,
+   "totalMiB": 8014,
+   "browserMiB": 892,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 441
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "skill-assigned",
+   "file": ".cache/world/2026-09-30T03-18-13-144Z/A-skill-assigned.png",
+   "sha256": "813e6d6f6cd608028dda8c6f28896f8ffd7caa3c9168a21edf5e812466c3ef95"
+  },
+  {
+   "name": "cast",
+   "file": ".cache/world/2026-09-30T03-18-13-144Z/A-cast.png",
+   "sha256": "ce7c497e08769b1106e618df7fe24785b769f860f32f1ac63418dfafbafb0418"
+  }
+ ],
+ "final_A": {
+  "inTranslated": 165,
+  "inPass": 275,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 4,
+  "outPass": 48,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 440,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-09-30T00:18:13.6679778-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-09-30T00:18:24.3436219-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-30T00:26:20.898036-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 2736,
+   "bytes_down": 46208
+  }
+ ]
+}

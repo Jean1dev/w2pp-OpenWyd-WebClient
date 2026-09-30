@@ -13,7 +13,7 @@
     "protocol:dialect": "python tools/apply_openwyd_patches.py && python tools/protocol/run_dialect_test.py",
     "client:stream": "python tools/build_local_scene.py --page-only && node tools/verify_client_stream.mjs",
     "dev": "node tools/dev_railway.mjs",
-    "world:checks": "node --test tools/world_checks.test.mjs",
+    "world:checks": "node --test tools/world_checks.test.mjs tools/area_checks.test.mjs",
     "world": "node tools/verify_world_suite.mjs"
   }
 }

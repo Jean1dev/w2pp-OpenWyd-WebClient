@@ -607,6 +607,44 @@ static void TestAttack()
 	CHECK(WydDialectOutbound(delay, 12, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
 }
 
+static void TestCombatDiagnostics()
+{
+	int size = 0;
+	WydCombatEnable(0);
+	CHECK(In(k_in_attack_multi, &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(WydCombatCount(0) == 0);
+	WydCombatEnable(1);
+	CHECK(In(k_in_attack_multi, &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(WydCombatCount(0) == 1 && WydCombatLost(0) == 0);
+	CHECK(WydCombatValue(0, 0, 1) == 5 && WydCombatValue(0, 0, 2) == 33);
+	CHECK(WydCombatValue(0, 0, 3) == 3 && WydCombatValue(0, 0, 4) == 320);
+	CHECK(WydCombatValue(0, 0, 5) == 45 && WydCombatValue(0, 0, 6) == 7 && WydCombatValue(0, 0, 7) == 2);
+	CHECK(WydCombatValue(0, 0, 10) == 13 && WydCombatValue(0, 0, 11) == 1000);
+	CHECK(WydCombatValue(0, 0, 20) == -3 && WydCombatValue(0, 0, 36) == 120);
+	CHECK(In(k_in_attack_multi, &size, 61) == WYD_DIALECT_DROP);
+	CHECK(WydDialectInbound(reinterpret_cast<const char*>(k_in_attack_multi), sizeof(k_in_attack_multi), g_out, 1, &size) == WYD_DIALECT_DROP);
+	CHECK(WydCombatCount(0) == 1);
+	CHECK(WydCombatValue(0, -1, 0) == 0 && WydCombatValue(0, 0, 37) == 0);
+	for (int i = 0; i < 65; ++i) In(k_in_attack_multi, &size);
+	CHECK(WydCombatCount(0) == 64 && WydCombatLost(0) == 2);
+	CHECK(WydCombatValue(0, 0, 0) == 3 && WydCombatValue(0, 63, 0) == 66);
+	MSG_Attack out{};
+	out.Header.Type = 0x367; out.AttackerID = 5; out.SkillIndex = 0;
+	out.Dam[0].TargetID = 1500; out.Dam[0].Damage = -1;
+	char wire[8192];
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&out), sizeof(out), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(WydCombatCount(1) == 1 && WydCombatValue(1, 0, 11) == 1500 && WydCombatValue(1, 0, 12) == -1);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&out), 61, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	CHECK(WydCombatCount(1) == 1);
+	WydCombatClear();
+	CHECK(WydCombatCount(0) == 0 && WydCombatCount(1) == 0 && WydCombatLost(0) == 0);
+	In(k_in_attack_multi, &size);
+	CHECK(WydCombatCount(0) == 1);
+	WydCombatEnable(0);
+	In(k_in_attack_multi, &size);
+	CHECK(WydCombatCount(0) == 0 && WydCombatValue(0, 0, 1) == 0);
+}
+
 int main()
 {
 	TestAccountLogin();
@@ -617,6 +655,7 @@ int main()
 	TestInWorld();
 	TestOutbound();
 	TestAttack();
+	TestCombatDiagnostics();
 	std::printf("%d checks, %d failures\n", g_checks, g_failures);
 	return g_failures == 0 ? 0 : 1;
 }

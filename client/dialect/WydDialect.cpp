@@ -555,6 +555,31 @@ int AttackCapacity(unsigned short op)
 // The runtime subtracts ReqMp from its own MP when a player hits it
 // (TMFieldScene::OnPacketAttack), so passing @16 through would drain MP by
 // the attacker's HP.
+struct CombatRing
+{
+	int values[64][37]{};
+	unsigned int total = 0;
+};
+CombatRing g_combat[2];
+bool g_combatEnabled = false;
+
+void RecordCombat(int outbound, const char* w, int n)
+{
+	if (!g_combatEnabled) return;
+	auto& ring = g_combat[outbound];
+	int* v = ring.values[ring.total % 64];
+	std::memset(v, 0, sizeof(ring.values[0]));
+	v[0] = static_cast<int>(++ring.total);
+	v[1] = U16(w, 42); v[2] = I16(w, 56); v[3] = U16(w, 44);
+	v[4] = I32(w, 16); v[5] = I32(w, 52);
+	v[6] = I32(w, 24); v[7] = I32(w, 28);
+	v[8] = U16(w, 38); v[9] = U16(w, 40); v[10] = n;
+	for (int i = 0; i < n; ++i) {
+		v[11 + 2*i] = I32(w, kAttackFixed + i*kAttackDam);
+		v[12 + 2*i] = I32(w, kAttackFixed + i*kAttackDam + 4);
+	}
+}
+
 template <typename T>
 int InAttackAs(const char* w, int n, char* out, int outCap, int* outSize, unsigned short op)
 {
@@ -583,6 +608,7 @@ int InAttackAs(const char* w, int n, char* out, int outCap, int* outSize, unsign
 		m->Dam[i].TargetID = NarrowUShort(I32(w, kAttackFixed + i * kAttackDam));
 		m->Dam[i].Damage = I32(w, kAttackFixed + i * kAttackDam + 4);
 	}
+	RecordCombat(0, w, n);
 	return WYD_DIALECT_TRANSLATED;
 }
 
@@ -881,6 +907,7 @@ int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int*
 			Put32(out, kAttackFixed + i * kAttackDam + 4, static_cast<std::uint32_t>(in->Dam[i].Damage));
 		}
 		Count(WYD_STAT_OUT_ATTACK);
+		RecordCombat(1, out, n);
 		return OutDone(outSize, wireSize);
 	}
 	case OpRestart: // header only (TMFieldScene recall after death / town)
@@ -984,12 +1011,34 @@ unsigned int WydDialectDroppedTimes(int outbound, int index)
 	return (index >= 0 && index < d.count) ? d.times[index] : 0;
 }
 
+void WydCombatClear() { for (auto& r : g_combat) r = CombatRing{}; }
+void WydCombatEnable(int enabled) { WydCombatClear(); g_combatEnabled = enabled != 0; }
+int WydCombatCount(int outbound) {
+	const auto n = g_combat[outbound ? 1 : 0].total;
+	return n < 64 ? static_cast<int>(n) : 64;
+}
+unsigned int WydCombatLost(int outbound) {
+	const auto n = g_combat[outbound ? 1 : 0].total;
+	return n > 64 ? n - 64 : 0;
+}
+int WydCombatValue(int outbound, int index, int field) {
+	if (index < 0 || index >= WydCombatCount(outbound) || field < 0 || field >= 37) return 0;
+	const auto& r = g_combat[outbound ? 1 : 0];
+	const unsigned int start = r.total > 64 ? r.total % 64 : 0;
+	return r.values[(start + index) % 64][field];
+}
+
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
 
 // Page-facing controls and read-only diagnostics. None of them return payload.
 extern "C"
 {
+EMSCRIPTEN_KEEPALIVE void wyd_combat_enable(int enabled) { WydCombatEnable(enabled); }
+EMSCRIPTEN_KEEPALIVE void wyd_combat_clear() { WydCombatClear(); }
+EMSCRIPTEN_KEEPALIVE int wyd_combat_count(int outbound) { return WydCombatCount(outbound); }
+EMSCRIPTEN_KEEPALIVE unsigned int wyd_combat_lost(int outbound) { return WydCombatLost(outbound); }
+EMSCRIPTEN_KEEPALIVE int wyd_combat_value(int outbound, int index, int field) { return WydCombatValue(outbound, index, field); }
 EMSCRIPTEN_KEEPALIVE void wyd_net_set_client_version(int version) { WydDialectSetClientVersion(version); }
 EMSCRIPTEN_KEEPALIVE int wyd_net_client_version() { return WydDialectClientVersion(); }
 EMSCRIPTEN_KEEPALIVE unsigned int wyd_net_stat(int stat) { return WydDialectStatValue(stat); }

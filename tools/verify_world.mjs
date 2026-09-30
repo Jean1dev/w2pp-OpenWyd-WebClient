@@ -18,6 +18,7 @@
 //   attack    A and B walk to Armia's Gremlins; A attacks, B watches, then A relogs
 //   grind     the --class character of A kills Gremlins until --grind-level (server EXP)
 //   learn     the --class character learns its cheapest skill from the class master
+//   castarea  TK hits two Gremlins in one result, B observes, then A relogs
 //   cast      the --class character assigns its learned skill (hover + Shift+1) and casts it on a Gremlin
 //   death     A dies to the Armia Field Trolls, returns to town (box 11, 0x03AE/0x0289); B at the spawn sees it
 //   concurrent A's account logs in a second time while A is in the Field
@@ -34,6 +35,7 @@ import { resolve, join } from 'node:path';
 import { freemem, totalmem } from 'node:os';
 import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
+import { areaPair, checkAreaAttempt } from './area_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -515,7 +517,7 @@ class Session {
 
   // A real click on an entity: hover until the runtime's own pick reports it
   // under the cursor, then press. The scene builds and sends the attack.
-  async clickHuman(id, button = 'left') {
+  async clickHuman(id, button = 'left', beforePress) {
     await this.closePanels();
     const box = await this.page.locator('#canvas').boundingBox();
     for (let attempt = 0; attempt < 4; attempt++) {
@@ -529,6 +531,7 @@ class Session {
         await this.page.mouse.move(box.x + sx * box.width / cw, box.y + (sy + oy) * box.height / ch, { steps: 3 });
         await this.frames(2);
         if ((await this.eval(() => Module._wyd_field_hover_human_id())) !== id) continue;
+        if (beforePress && !(await beforePress())) return false;
         await this.page.mouse.down({ button });
         try { await this.frames(2); } finally { await this.page.mouse.up({ button }); }
         await this.frames(1);
@@ -536,6 +539,50 @@ class Session {
       }
     }
     return false;
+  }
+
+  async assignSkill(plan) {
+    const res = {};
+    // Assign: open the skill window with the real "s" key, hover the cell.
+    await this.closePanels();
+    await this.page.focus('#canvas');
+    await this.page.keyboard.press('s');
+    await this.until('skill window', () => Module._wyd_field_skill_panel_visible() === 1, 10000);
+    await this.frames(3);
+    const [cx, cy, cw, ch, cell] = await this.eval(i => {
+      const c = document.getElementById('canvas');
+      return [Module._wyd_field_skill_cell_screen(i, 0), Module._wyd_field_skill_cell_screen(i, 1), c.width, c.height,
+        Module._wyd_field_skill_cell_item(i)];
+    }, plan.pos);
+    res.cell = cell;
+    assert(cx >= 0 && cy >= 0, 'skill cell not laid out');
+    const cb = await this.page.locator('#canvas').boundingBox();
+    await this.page.mouse.move(cb.x + cx * cb.width / cw, cb.y + cy * cb.height / ch, { steps: 3 });
+    await this.frames(2);
+    await this.page.keyboard.press('Shift+Digit1');
+    await this.frames(3);
+    res.belt = await this.eval(() => Module._wyd_field_short_skill(0));
+    res.lastSentAfterAssign = await this.eval(() => window.clientProbe().socket.lastSentOpcode);
+    await this.shot('skill-assigned');
+    await this.page.keyboard.press('s');
+    await this.frames(2);
+    await this.page.keyboard.press('Digit1');
+    await this.frames(2);
+    res.selected = await this.eval(() => Module._wyd_field_selected_short_skill());
+    console.log(`    cell ${cell}, belt[0] ${res.belt}, selected ${res.selected}, last sent 0x${res.lastSentAfterAssign.toString(16)}`);
+    return res;
+  }
+
+  combatLog() {
+    return this.eval(() => {
+      const read = dir => Array.from({ length: Module._wyd_combat_count(dir) }, (_, i) => {
+        const v = f => Module._wyd_combat_value(dir, i, f);
+        return { sequence: v(0), attacker: v(1), skill: v(2), progress: v(3), hp: v(4), mp: v(5),
+          exp: ((BigInt(v(7) >>> 0) << 32n) + BigInt(v(6) >>> 0)).toString(), x: v(8), y: v(9),
+          targets: Array.from({ length: v(10) }, (_, j) => ({ id: v(11 + 2*j), damage: v(12 + 2*j) })) };
+      });
+      return { in: read(0), out: read(1), lost: Module._wyd_combat_lost(0) + Module._wyd_combat_lost(1) };
+    });
   }
 
   combat(id) {
@@ -606,7 +653,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast'].some(x => phases.has(x)) ? 25 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea'].some(x => phases.has(x)) ? 25 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -824,13 +871,15 @@ async function main() {
     });
 
     await step('second', async () => {
+      if (phases.has('castarea'))
+        assert(freemem() >= 1024 * 1024 * 1024, 'less than 1 GiB free before opening observer');
       b = await newSession('B', B);
       await b.loginToSelect();
       const pin = await b.pin();
       if (!pin.already && pin.result !== 'lock1') throw new Error(`PIN rejected (${pin.result})`);
       let slots = await b.slots();
       if (!slots[0].name) {
-        assert(!phases.has('attack'), 'combat requires an existing B character');
+        assert(!phases.has('attack') && !phases.has('castarea'), 'combat requires an existing B character');
         await b.create(B.char, cls); slots = await b.slots();
       }
       const me = await b.enter(0);
@@ -1006,10 +1055,32 @@ async function main() {
     await step('learn', async () => {
       // route: HeightMap + AttributeMap of the locked revision (same search as
       // the east gate); the straight line north of the spawn is blocked.
-      const PLANS = { 1: { skill: 5024, name: 'Flecha_Magica', cost: 12, master: [2094, 2126], npcName: /foema|ancia/i,
-        route: [[2088.5, 2111.5], [2088.5, 2116.5], [2090.5, 2122.5]] } };
+      // Cheapest skill per class (SkillData.csv SkillPoint; level*3 points).
+      // Masters confirmed in source at the locked revision: the NPC files in
+      // Release/TMsrv/run/npc with Merchant 19 and a class's 24 skills
+      // (Foema_Ancian 1, Cap.Cavaleiros 0, Mestre_Archi 2, ForeLearner 3),
+      // placed in Armia by NPCGener.txt. Routes from tools/route_armia.py
+      // (HeightMap + AttributeMap baked like route.Bake) from the city spawn.
+      // The ShopList the NPC actually sends is still what the check trusts.
+      const MASTERS = {
+        foema: { npcName: /foema|ancia/i, at: [2094, 2126], route: [[2088.5, 2111.5], [2088.5, 2116.5], [2090.5, 2122.5]] },
+        archi: { npcName: /archi/i, at: [2077, 2123], route: [[2088.5, 2105.5], [2080.5, 2113.5], [2074.5, 2119.5]] },
+        // South of the raised planter at x 2115..2120, y 2099..2104: the
+        // shortest map path clips its rim and the runtime could not leave it.
+        cavaleiros: { npcName: /cavaleiros/i, at: [2144, 2120], route: [[2106.5, 2093.5], [2112.5, 2098.5],
+          [2112.5, 2106.5], [2122.5, 2108.5], [2131.5, 2114.5], [2139.5, 2119.5]] },
+        forelearner: { npcName: /forelearner/i, at: [2130, 2125], route: [[2107.5, 2102.5], [2115.5, 2110.5],
+          [2123.5, 2118.5], [2128.5, 2123.5]] },
+      };
+      const PLANS = {
+        0: { skill: 5000, name: 'Giro_da_Furia', cost: 24, masters: ['cavaleiros'] },
+        1: { skill: 5024, name: 'Flecha_Magica', cost: 12, masters: ['foema'] },
+        2: { skill: 5048, name: 'Fera_Flamejante', cost: 24, masters: ['archi'] },
+        3: { skill: 5080, name: 'Golpe_Felino', cost: 18, masters: ['forelearner'] },
+      };
       const plan = PLANS[cls];
       assert(plan, `no learn plan for class ${cls}`);
+      const inClass = i => i >= 5000 + cls * 24 && i < 5024 + cls * 24;
       const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
       privateValues.push(name);
       const enterOwn = async s => {
@@ -1024,31 +1095,77 @@ async function main() {
       console.log(`    level ${before.level}, ${before.bonus} skill points, learned 0x${before.learned.toString(16)}`);
       assert(before.bonus >= plan.cost, `${before.bonus} skill points at level ${before.level}; ${plan.name} costs ${plan.cost}`);
       const walk = [];
-      for (const [x, y] of plan.route) walk.push(...await a.walkTo(x, y, { near: 2, stallOk: true }));
-      const at = await a.me();
-      // By name: a plain merchant stands next to the master (first run clicked
-      // it and got ShopType 1). The generator name is Foema_Ancian.
-      const near = (await a.mobs()).filter(m => Math.hypot(m.x - at.x, m.y - at.y) <= 15);
-      const npc = near.find(m => plan.npcName.test(m.name));
-      assert(npc, `class master not in view from ${at.x},${at.y}: ${near.map(m => `${m.id} ${m.name.trim()} ${m.x},${m.y}`).join('; ')}`);
-      let visible = false;
-      const clicks = [];
-      for (let i = 0; i < 3 && !visible; i++) {
-        const hit = await a.clickHuman(npc.id);
-        clicks.push({ hit, lastSent: await a.eval(() => window.clientProbe().socket.lastSentOpcode) });
-        if (!hit) continue;
-        try { visible = await a.until('skill master window', () => Module._wyd_field_skillmaster_visible() === 1, 15000); }
-        catch { visible = false; }
+      const discovery = [];
+      // Cancel the portal confirmation with ESC, as a player would; never OK.
+      const portalBoxes = [];
+      const noPortal = async () => {
+        if ((await a.eval(() => Module._wyd_scene_msgbox_message())) !== 16) return;
+        portalBoxes.push(await a.me());
+        await a.page.locator('#canvas').press('Escape');
+        await a.frames(2);
+        assert.notEqual(await a.eval(() => Module._wyd_scene_msgbox_message()), 16, 'portal box stays open after ESC');
+      };
+      let npc, at, offered = [], merchant = 0;
+      for (const key of plan.masters) {
+        const m = MASTERS[key];
+        for (const [x, y] of m.route) {
+          await noPortal();
+          walk.push(...await a.walkTo(x, y, { near: 2, stallOk: true, stopWhen: async () =>
+            (await a.eval(() => Module._wyd_scene_msgbox_message())) === 16 }));
+        }
+        await noPortal();
+        at = await a.me();
+        // By name: a plain merchant stands next to the Foema master (first run
+        // clicked it and got ShopType 1).
+        const near = (await a.mobs()).filter(q => Math.hypot(q.x - at.x, q.y - at.y) <= 20);
+        npc = near.find(q => m.npcName.test(q.name));
+        if (!npc) {
+          discovery.push({ master: key, at: [at.x, at.y], seen: near.map(q => `${q.name.trim()} ${q.x},${q.y}`) });
+          continue;
+        }
+        // Close enough for the NPC to be on screen and clickable.
+        if (npc.d > 5 || !npc.onScreen)
+          walk.push(...await a.walkTo(npc.x, npc.y, { near: 4, maxClicks: 6, stallOk: true }));
+        await noPortal();
+        at = await a.me();
+        let visible = false;
+        const clicks = [];
+        for (let i = 0; i < 3 && !visible; i++) {
+          const hit = await a.clickHuman(npc.id);
+          clicks.push({ hit, lastSent: await a.eval(() => window.clientProbe().socket.lastSentOpcode) });
+          if (!hit) continue;
+          try { visible = await a.until('skill master window', () => Module._wyd_field_skillmaster_visible() === 1, 15000); }
+          catch { visible = false; }
+        }
+        await a.shot(`master-click-${key}`);
+        if (!visible) {
+          // Not a skill master (e.g. Mestre Haby is Merchant 31 and opens a
+          // confirm box): cancel whatever box it opened with ESC, never OK.
+          const box = await a.eval(() => Module._wyd_scene_msgbox_message());
+          if (box) { await a.page.locator('#canvas').press('Escape'); await a.frames(2); }
+          discovery.push({ master: key, npc: npc.id, npcAt: [npc.x, npc.y], at: [at.x, at.y], clicks, window: false, box });
+          npc = undefined;
+          continue;
+        }
+        await a.frames(3);
+        offered = await a.eval(() => {
+          const o = [];
+          for (let k = 0; k < 128; k++) { const i = Module._wyd_field_skillmaster_item(k); if (i) o.push(i); }
+          return o;
+        });
+        merchant = await a.eval(() => Module._wyd_field_skillmaster_merchant());
+        discovery.push({ master: key, npc: npc.id, npcAt: [npc.x, npc.y], offered: [Math.min(...offered), Math.max(...offered)] });
+        console.log(`    master ${key} (${npc.id}) offers ${Math.min(...offered)}..${Math.max(...offered)}`);
+        if (offered.length && offered.every(inClass)) break;
+        // Another class's master: close its window and try the next candidate.
+        await a.page.locator('#canvas').press('Escape');
+        await a.frames(2);
+        npc = undefined;
+        offered = [];
       }
-      await a.shot('master-click');
-      assert(visible, `skill master window did not open (at ${at.x},${at.y}, npc ${npc.id} at ${npc.x},${npc.y}, clicks ${JSON.stringify(clicks)})`);
-      await a.frames(3);
-      const offered = await a.eval(() => {
-        const o = [];
-        for (let k = 0; k < 128; k++) { const i = Module._wyd_field_skillmaster_item(k); if (i) o.push(i); }
-        return o;
-      });
-      const merchant = await a.eval(() => Module._wyd_field_skillmaster_merchant());
+      // Partial state: step() keeps it next to the error if a later check fails.
+      r.learn = { discovery, portalBoxes };
+      assert(npc, `no master offered class ${cls} skills: ${JSON.stringify(discovery)}`);
       await a.shot('skill-master');
       const k = offered.length ? await a.eval(sk => {
         for (let k = 0; k < 128; k++) if (Module._wyd_field_skillmaster_item(k) === sk) return k;
@@ -1085,9 +1202,111 @@ async function main() {
       await enterOwn(a);
       const relogin = await read(a);
       const res = { skill: plan.skill, name: plan.name, cost: plan.cost, npc: npc.id, npcAt: [npc.x, npc.y],
-        walkClicks: walk.length, merchant, offered, box, before, after, relogin };
+        walkClicks: walk.length, merchant, offered, box, before, after, relogin, discovery, portalBoxes };
       r.learn = res;
       checkLearn(res);
+      return res;
+    });
+
+    await step('castarea', async () => {
+      const res = { attempts: [], relogin: null };
+      r.castarea = res;
+      assert.equal((await a.me()).characterClass, 0, 'castarea needs the existing TK');
+      assert((await a.combat(0)).learnedSkill & 1, 'Giro da Furia not learned');
+      res.aTrip = await a.toGremlinField();
+      res.bTrip = await b.toGremlinField();
+      await sample('castarea: both in Gremlin field');
+      res.assignment = await a.assignSkill({ pos: 0 });
+      assert.equal(res.assignment.cell, 5000);
+      assert.equal(res.assignment.belt, 0);
+      assert.equal(res.assignment.selected, 0);
+      for (const s of [a, b]) await s.eval(() => Module._wyd_combat_enable(1));
+      const end = Date.now() + 12 * 60 * 1000;
+      let searches = 0;
+      while (Date.now() < end && res.attempts.length < 6) {
+        const state = await a.combat(0);
+        assert(state.myHp > 0 && state.myDie !== 1, 'caster died while searching');
+        assert(state.myMp >= 15, 'insufficient MP for another Giro da Furia');
+        const mobs = await a.mobs();
+        res.lastSearch = mobs.filter(m => m.name.trim() === 'Gremlin').map(({ id, hp, x, y, onScreen }) => ({ id, hp, x, y, onScreen }));
+        let pair = areaPair(await a.me(), mobs);
+        if (!pair) {
+          // Search only the known Gremlin generators, via ordinary movement.
+          const y = [2102, 2110, 2118, 2094, 2086][searches++ % 5];
+          res.searches = searches;
+          await a.walkTo(2184.5, y + 0.5, { near: 3, maxClicks: 3, stallOk: true });
+          await sleep(2000);
+          continue;
+        }
+        const me = await a.me(), observer = await b.me();
+        if (Math.hypot(me.x - observer.x, me.y - observer.y) > 8)
+          await b.walkTo(me.x, me.y, { near: 5, maxClicks: 4, stallOk: true });
+        // Recheck after B's walk; mobs can wander while rendering input.
+        pair = areaPair(await a.me(), await a.mobs());
+        if (!pair) continue;
+        let before;
+        const attempt = { attacker: a.id, target: pair[0].id };
+        attempt.clicked = await a.clickHuman(pair[0].id, 'right', async () => {
+          before = (await a.mobs()).filter(m => m.name.trim() === 'Gremlin' && m.hp > 0);
+          const primary = before.find(m => m.id === attempt.target);
+          if (!primary) return false;
+          const fresh = areaPair(await a.me(), [primary, ...before.filter(m => m.id !== primary.id)]);
+          if (!fresh || fresh[0].id !== primary.id) return false;
+          const seen = await b.mobs();
+          if (!fresh.every(m => seen.some(o => o.id === m.id && o.hp === m.hp))) return false;
+          attempt.pair = fresh.map(({ id, x, y }) => ({ id, x, y }));
+          attempt.before = before.map(({ id, hp, x, y }) => ({ id, hp, x, y }));
+          attempt.beforeB = seen.map(({ id, hp }) => ({ id, hp }));
+          attempt.mpBefore = (await a.combat(0)).myMp;
+          for (const s of [a, b]) await s.eval(() => Module._wyd_combat_clear());
+          return true;
+        });
+        if (!attempt.clicked) { await sleep(1000); continue; }
+        res.attempts.push(attempt);
+        await sleep(2500);
+        attempt.logsA = await a.combatLog();
+        attempt.logsB = await b.combatLog();
+        const hp = async s => Promise.all(before.map(async m => ({ id: m.id, ...await s.combat(m.id) })));
+        attempt.afterA = await hp(a);
+        attempt.afterB = await hp(b);
+        const after = await a.combat(0);
+        attempt.died = after.myHp <= 0 || after.myDie === 1;
+        try {
+          attempt.result = checkAreaAttempt(attempt);
+          attempt.ok = true;
+        } catch (e) { attempt.ok = false; attempt.error = e.message; }
+        console.log(`    area attempt ${res.attempts.length}: ${attempt.ok ? 'two-target result confirmed by A/B' : attempt.error}`);
+        await a.shot(`area-${res.attempts.length}`);
+        await b.shot(`area-${res.attempts.length}`);
+        await a.healthy(); await b.healthy();
+        assert(!attempt.died, 'caster died');
+        assert(!attempt.logsA.lost && !attempt.logsB.lost, 'combat diagnostics lost');
+        assert(attempt.logsA.out.filter(e => e.attacker === a.id).length <= 1,
+          'multiple attacks during one click; observation window ambiguous');
+        if (attempt.ok) break;
+        // Cancel any ongoing attack before the next observation window.
+        await a.walk(0, 100);
+      }
+      assert(res.attempts.some(t => t.ok), 'no proven two-target cast within attempt/time budget');
+      await a.walk(0, 100);
+      const me = await a.me(), score = await a.combat(0);
+      assert(score.myHp > 0 && score.myDie !== 1, 'caster died before relogin');
+      const before = { ...me, level: score.myLevel, exp: score.exp, learnedSkill: score.learnedSkill };
+      await a.healthy(); await b.healthy();
+      ev.final_B = dialectSummary(await b.probe());
+      await a.close();
+      await b.until('B loses A after area cast', id => Module._wyd_field_human_present(id) === 0, 30000, a.id);
+      await b.close();
+      await sample('castarea: B closed, before relogin');
+      a = await newSession('A-area-relogin', A);
+      await a.loginToSelect();
+      assert.equal((await a.pin()).result, 'lock1', 'post-area PIN rejected');
+      const again = await a.enter(0), againScore = await a.combat(0);
+      const after = { ...again, level: againScore.myLevel, exp: againScore.exp, learnedSkill: againScore.learnedSkill };
+      checkCombatRelogin(before, after);
+      assert.equal(after.learnedSkill, before.learnedSkill, 'learned skill did not persist');
+      res.relogin = { before, after, persisted: true };
+      await a.shot('area-relogin');
       return res;
     });
 
@@ -1096,7 +1315,15 @@ async function main() {
     // is selected with the real "1" key and the cast is a real right click on a
     // Gremlin (TMFieldScene SkillUse). MP and damage are the server's.
     await step('cast', async () => {
-      const PLANS = { 1: { skill: 24, pos: 0, name: 'Flecha_Magica' } };
+      // SkillData.csv: Range in tiles (the server drops targets past it,
+      // combat.go validateSkillTarget); TargetType 3 gathers nearby targets
+      // into one MSG_Attack (TMFieldScene SkillUse).
+      const PLANS = {
+        0: { skill: 0, pos: 0, name: 'Giro_da_Furia', range: 5, area: true },
+        1: { skill: 24, pos: 0, name: 'Flecha_Magica', range: 6 },
+        2: { skill: 48, pos: 0, name: 'Fera_Flamejante', range: 6 },
+        3: { skill: 80, pos: 8, name: 'Golpe_Felino', range: 2 },
+      };
       const plan = PLANS[cls];
       assert(plan, `no cast plan for class ${cls}`);
       const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
@@ -1109,44 +1336,29 @@ async function main() {
       const learned = await a.eval(() => Module._wyd_field_my_score(6) >>> 0);
       assert(((learned >>> plan.pos) & 1) === 1, `skill ${plan.skill} not learned (run learn first)`);
       const trip = await a.toGremlinField();
-      const res = { cls, pos: plan.pos, skill: plan.skill, name: plan.name, slot: 0, trip, attempts: 0 };
+      const res = { cls, pos: plan.pos, skill: plan.skill, name: plan.name, slot: 0, trip, attempts: 0, area: !!plan.area };
       r.cast = res;
-      // Assign: open the skill window with the real "s" key, hover the cell.
-      await a.closePanels();
-      await a.page.focus('#canvas');
-      await a.page.keyboard.press('s');
-      await a.until('skill window', () => Module._wyd_field_skill_panel_visible() === 1, 10000);
-      await a.frames(3);
-      const [cx, cy, cw, ch, cell] = await a.eval(i => {
-        const c = document.getElementById('canvas');
-        return [Module._wyd_field_skill_cell_screen(i, 0), Module._wyd_field_skill_cell_screen(i, 1), c.width, c.height,
-          Module._wyd_field_skill_cell_item(i)];
-      }, plan.pos);
-      res.cell = cell;
-      assert(cx >= 0 && cy >= 0, 'skill cell not laid out');
-      const cb = await a.page.locator('#canvas').boundingBox();
-      await a.page.mouse.move(cb.x + cx * cb.width / cw, cb.y + cy * cb.height / ch, { steps: 3 });
-      await a.frames(2);
-      await a.page.keyboard.press('Shift+Digit1');
-      await a.frames(3);
-      res.belt = await a.eval(() => Module._wyd_field_short_skill(0));
-      res.lastSentAfterAssign = await a.eval(() => window.clientProbe().socket.lastSentOpcode);
-      await a.shot('skill-assigned');
-      await a.page.keyboard.press('s');
-      await a.frames(2);
-      await a.page.keyboard.press('Digit1');
-      await a.frames(2);
-      res.selected = await a.eval(() => Module._wyd_field_selected_short_skill());
-      console.log(`    cell ${cell}, belt[0] ${res.belt}, selected ${res.selected}, last sent 0x${res.lastSentAfterAssign.toString(16)}`);
+      Object.assign(res, await a.assignSkill(plan));
       // Cast on the nearest live Gremlin with real right clicks.
+      const gremlins = async () => (await a.mobs()).filter(m => m.name.trim() === 'Gremlin' && m.hp > 0);
       let mob;
-      for (let i = 0; i < 4 && !mob; i++) {
-        mob = (await a.mobs()).find(m => m.name.trim() === 'Gremlin' && m.onScreen && m.hp > 0);
+      for (let i = 0; i < 6 && !mob; i++) {
+        const live = (await gremlins()).filter(m => m.onScreen);
+        // Area: prefer a Gremlin with another one close by, so the packet can
+        // carry more than one target; a lone one is recorded as a limitation.
+        mob = plan.area ? live.find(m => live.some(o => o.id !== m.id && Math.hypot(o.x - m.x, o.y - m.y) <= 3))
+          ?? (i >= 3 ? live[0] : undefined) : live[0];
         if (!mob) await a.walk(i % 2 ? -160 : 160, 80);
       }
       assert(mob, 'no live Gremlin on screen');
+      // Within the skill range (the server drops farther targets silently).
+      if (mob.d > plan.range - 1) {
+        res.approach = await a.walkTo(mob.x, mob.y, { near: Math.max(1.5, plan.range - 1.5), maxClicks: 4, stallOk: true });
+        mob = (await gremlins()).find(m => m.id === mob.id) ?? mob;
+      }
       const c0 = await a.combat(mob.id);
       res.target = { id: mob.id, distance: Math.round(mob.d) };
+      const hp0 = new Map((await gremlins()).filter(m => m.d <= plan.range + 2).map(m => [m.id, m.hp]));
       res.mpTrail = [c0.myMp];
       res.hpTrail = [c0.hp];
       res.died = false;
@@ -1168,6 +1380,14 @@ async function main() {
       await sleep(2000);
       const c1 = await a.combat(mob.id);
       if (c1.myMp !== res.mpTrail.at(-1)) res.mpTrail.push(c1.myMp);
+      // Mobs near the target whose HP the server lowered (area fan-out).
+      // A mob that only walked out of view is not counted.
+      res.nearby = hp0.size;
+      res.hitMobs = [];
+      for (const [id, hp] of hp0) {
+        const m = await a.combat(id);
+        if (m.present && (m.die === 1 || m.hp < hp)) res.hitMobs.push(id);
+      }
       res.attacksSent = c1.outAttack - c0.outAttack;
       res.echoes = c1.inAttack - c0.inAttack;
       await a.shot('cast');

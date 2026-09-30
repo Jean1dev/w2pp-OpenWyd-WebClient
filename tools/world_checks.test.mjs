@@ -42,6 +42,12 @@ test('only listed deferred gameplay opcodes may be dropped, and only as unknown'
   assert.throws(() => checkHealth(p({ inDropUnknown: 2, droppedIn: [{ opcode: '0x0999', times: 1 }] }), [], deferred));
   assert.throws(() => checkHealth(p({ inDropSize: 1, droppedIn: [{ opcode: '0x0999', times: 2 }] }), [], deferred));
   assert.throws(() => checkHealth(p({ outDropUnknown: 1, droppedIn: [{ opcode: '0x0999', times: 1 }] }), [], deferred));
+  // Outbound: only the listed MoveStop (no server route) may be dropped.
+  const out = d => p({ inDropUnknown: 0, droppedIn: [], ...d });
+  checkHealth(out({ outDropUnknown: 1, droppedOut: [{ opcode: '0x02cb', times: 1 }] }));
+  assert.throws(() => checkHealth(out({ outDropUnknown: 1, droppedOut: [{ opcode: '0x0333', times: 1 }] })));
+  assert.throws(() => checkHealth(out({ outDropUnknown: 2, droppedOut: [{ opcode: '0x02cb', times: 1 }] })));
+  assert.throws(() => checkHealth(out({ outDropUnknown: 1, droppedOut: [] })));
   // Combat is translated now: a dropped 0x0367 is a failure by default.
   assert.throws(() => checkHealth(p({ droppedIn: [{ opcode: '0x0367', times: 1 }] })));
 });
@@ -132,6 +138,12 @@ test('learning needs the master list, box 4, the server bit and charged points t
     { before: { learned: 1, bonus: 12 } }, { after: { learned: 0, bonus: 0 } }, { after: { learned: 3, bonus: 0 } },
     { after: { learned: 1, bonus: 6 } }, { relogin: { learned: 0, bonus: 0 } }, { relogin: { learned: 1, bonus: 12 } }])
     assert.throws(() => checkLearn({ ...l, ...bad }));
+  // Huntress (class 3): bit 8 of the mask, list 5072..5095.
+  const ht = { ...l, skill: 5080, cost: 18, offered: [5072, 5080, 5095],
+    before: { learned: 0, bonus: 18 }, after: { learned: 1 << 8, bonus: 0 }, relogin: { learned: 1 << 8, bonus: 0 } };
+  checkLearn(ht);
+  for (const bad of [{ offered: [5024, 5080] }, { after: { learned: 1, bonus: 0 } }, { relogin: { learned: 1, bonus: 0 } }])
+    assert.throws(() => checkLearn({ ...ht, ...bad }));
   const opts = p => ({ ...options(p), class: '1', 'grind-level': '4' });
   assert.doesNotThrow(() => validateOptions(opts('login,learn')));
   assert.doesNotThrow(() => validateOptions(opts('login,grind,learn')));
@@ -145,6 +157,15 @@ test('casting needs the belt, the selected slot, server-charged MP and damage', 
   for (const bad of [{ cell: 5025 }, { belt: 255 }, { selected: 1 }, { attacksSent: 0 }, { echoes: 0 },
     { mpTrail: [110, 110] }, { mpTrail: [110] }, { hpTrail: [70, 70] }, { died: true }])
     assert.throws(() => checkCast({ ...c, ...bad }));
+  // Huntress: skill 80 sits in cell 8 of the class window.
+  checkCast({ ...c, cls: 3, pos: 8, skill: 80, cell: 5080, belt: 80 });
+  assert.throws(() => checkCast({ ...c, cls: 3, pos: 8, skill: 80, cell: 5072, belt: 80 }));
+  // Transknight area skill: the target must be among the mobs hit.
+  const area = { ...c, cls: 0, pos: 0, skill: 0, cell: 5000, belt: 0, area: true, target: { id: 1036 },
+    nearby: 3, hitMobs: [1036, 1040] };
+  checkCast(area);
+  for (const bad of [{ hitMobs: [] }, { hitMobs: [1040] }, { hitMobs: undefined }, { nearby: 1 }])
+    assert.throws(() => checkCast({ ...area, ...bad }));
   const opts = p => ({ ...options(p), class: '1', 'grind-level': '4' });
   assert.doesNotThrow(() => validateOptions(opts('login,cast')));
   assert.doesNotThrow(() => validateOptions(opts('login,learn,cast')));
