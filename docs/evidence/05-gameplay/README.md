@@ -2,7 +2,7 @@
 
 Estado: **Em andamento**. Primeira fatia: combate. Decisões na [ADR 004](../../decisions/004-combat-dialect.md).
 
-Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=12000`), com as contas A e B de `.env`. Upstream `beb9f69b…` com os patches 0001–0012.
+Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=12000`), com as contas A e B de `.env`. Upstream `beb9f69b…` com os patches 0001–0018 (0018 em 30/09: probes de loja, banco e chat).
 
 ## Checklist por funcionalidade
 
@@ -26,11 +26,20 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 | Equipar/desequipar com B observando, score recalculado, relogin | **confirmado em execução** | [inventário](2026-09-30-inventory.md#equipar-e-desequipar--aprovado-railway): arma 861 equip 6 ↔ carry 13 por cliques reais, B vê `look` 863→0→863, Damage do servidor 28→30 com a arma, relogin idêntico |
 | Movimento impossível (poção no slot da arma) | **confirmado em execução** | o runtime recusa localmente, sem pacote; o estado não muda |
 | Score do login = template BaseMob | divergência do servidor (confirmada em fonte) | [inventário](2026-09-30-inventory.md#primeira-execução-reprovada-pela-regra-não-pelo-cliente); proposta: `sendScore` depois do login |
-| Poção (uso, clique repetido, célula vazia, B vê a cura, relogin) | implementado; **não provado** | [inventário](2026-09-30-inventory.md#poção--não-provada): duas execuções interrompidas por falta de memória no login de B (issue #6); uma sem dano suficiente dos Gremlins. O dano agora vem da fase `death` (HP 2 no respawn) |
+| Poção (uso, clique repetido, célula vazia, B vê a cura, relogin) | **confirmado em execução** | [inventário](2026-09-30-inventory.md#poção--aprovada-railway-execução-8): respawn com HP 41, uso com HP 80 → 130, 117→116 pelo servidor, B vê 130, clique duplo consome 2 (→114), célula vazia não envia nada, relogin idêntico; três `0x0373` no log do servidor |
 | Loot dos Gremlins no carry, relogin | **confirmado em execução** | [inventário](2026-09-30-inventory.md#loot--aprovado-railway-sem-ouro-por-defeito-do-servidor): 25 abates, 8 itens nos slots 13–20 via `0x0182`, relogin idêntico |
 | Ouro dos mobs (`0x0337`) | **bloqueado pelo servidor** (confirmado em fonte e em execução) | `SpawnMobAt` não copia o `Coin` do template, então `GoldDrop` sempre dá 0; 0 de ouro em 25 abates |
 | Drop e coleta no chão | **bloqueado pelo servidor** | sem `0x026E`, CNF placeholder de 16 bytes, sem decay; proposta na ADR 007 |
-| Loja, banco, teleporte, chat, grupo, troca e persistência após reinício | pendente | fatias seguintes |
+| Dialeto `0379/037A/0387/0388/0339/0333/0334` | confirmado em teste e em execução | C++ com 545 verificações; overlay Go com os encoders reais ([ADR 008](../../decisions/008-shop-cargo-chat-dialect.md)); no Railway, corpo de 128 no `0x0333` e de 146 no `0x0334` (padding não enviado) |
+| Loja NPC: vender, comprar, recusa sem ouro, clique repetido, relogin | **confirmado em execução** | [fatia 3](2026-09-30-shop-bank-chat.md#loja-aki-merchant-1--aprovada-execução-2): `sell ok gain=75`, `buy ok price=300`, `buy denied` sem mudança, `buy resync` sem duplicar, relogin idêntico |
+| Clique segurado na loja | comportamento original (confirmado em fonte e em execução) | 513 por nível a cada quadro + trava de 500 ms: dois quadros segurados compram duas vezes, e as duas são cobradas |
+| Banco: item de ida e volta, depósito, saque, saque e depósito acima do saldo, relogin | **confirmado em execução** | [fatia 3](2026-09-30-shop-bank-chat.md#banco-guarda-carga-merchant-2--aprovado-execução-3): `0x0376` nos dois sentidos, `cargo deposit/withdraw` de 100 conferidos com o `0x0339` do cliente, recusas sem mudança |
+| `0x0339` ouro do banco @12 | hipótese sustentada | 0 → 100 → 0 bate com o log; ouro guardado entre sessões não exercitado |
+| Chat: fala vista por B, sussurro recebido, sussurro para offline | **confirmado em execução** | [fatia 3](2026-09-30-shop-bank-chat.md#chat-e-teleporte--aprovados-execução-2): B mostra a fala; o sussurro chega sem o 1º caractere (runtime); offline → `0x0102` |
+| Sussurro com o nome do remetente | lacuna do servidor (confirmada em fonte, não observada) | `chat.go:71` repassa `MobName` = destinatário ([ADR 008](../../decisions/008-shop-cargo-chat-dialect.md)) |
+| Teleporte: portal (etapa 4) e comandos `/azran` e `/armia` | **confirmado em execução** | `chat command` + `teleport` no log; B deixa de ver A e volta a vê-la |
+| Teleporte pago por NPC, chat de grupo/guilda | pendente | não exercitados |
+| Grupo, troca e persistência após reinício | pendente | fatias 4 e 5 |
 
 ## Execuções de 29/09/2026 (cenário `login,enter,second,attack`)
 

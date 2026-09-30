@@ -1,0 +1,572 @@
+{
+ "when": "2026-09-30T16:34:45.692Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "enter",
+  "second",
+  "death",
+  "potion"
+ ],
+ "accounts": {
+  "A": "wae*******",
+  "B": "wad*******"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 8
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 22098,
+   "at": "2026-09-30T16:35:08.492Z"
+  },
+  "enter": {
+   "ok": true,
+   "me": {
+    "id": 1,
+    "name": "Are*********",
+    "x": 2098.5,
+    "y": 2103.5,
+    "hp": 130,
+    "maxHp": 130,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 34,
+    "inPass": 2,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 36,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "glErrors": 0,
+   "ms": 16426,
+   "at": "2026-09-30T16:35:31.777Z"
+  },
+  "second": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "me": {
+    "id": 2,
+    "name": "Are*********",
+    "x": 2094.5,
+    "y": 2105.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 36,
+    "inPass": 3,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 39,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "ms": 128807,
+   "at": "2026-09-30T16:37:48.037Z"
+  },
+  "death": {
+   "ok": true,
+   "before": {
+    "level": 9,
+    "exp": 9218,
+    "hp": 130,
+    "maxHp": 130
+   },
+   "trip": {
+    "clicks": 14,
+    "at": {
+     "id": 1,
+     "name": "<redacted>",
+     "x": 2590.5,
+     "y": 2097.5,
+     "hp": 130,
+     "maxHp": 130,
+     "cls": 1,
+     "characterClass": 0,
+     "equip": [
+      1,
+      1103,
+      1115,
+      1127,
+      1139,
+      1151,
+      861,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "look": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      863
+     ]
+    },
+    "portalAttempts": [
+     {
+      "at": [
+       2141.5,
+       2068.5
+      ],
+      "teleported": true
+     }
+    ]
+   },
+   "hpTrail": [
+    130,
+    0
+   ],
+   "hpAtDeath": 0,
+   "mobHits": 1,
+   "approaches": 0,
+   "died": true,
+   "box": 11,
+   "sent": [
+    "0x03ae",
+    "0x0289"
+   ],
+   "firstHpAfterRecall": 41,
+   "after": {
+    "id": 1,
+    "name": "<redacted>",
+    "x": 2097.5,
+    "y": 2094.5,
+    "hp": 41,
+    "maxHp": 130,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ],
+    "die": 0,
+    "level": 9,
+    "exp": 9218
+   },
+   "observer": {
+    "sawRespawn": true,
+    "at": {
+     "id": 2,
+     "name": "<redacted>",
+     "x": 2094.5,
+     "y": 2105.5,
+     "hp": 105,
+     "maxHp": 105,
+     "cls": 1,
+     "characterClass": 0,
+     "equip": [
+      1,
+      1103,
+      1115,
+      1127,
+      1139,
+      1151,
+      861,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "look": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      863
+     ]
+    }
+   },
+   "ms": 404436,
+   "at": "2026-09-30T16:44:46.920Z"
+  },
+  "potion": {
+   "damage": "death phase: revived with HP 2 at the Armia spawn",
+   "slot": 0,
+   "amount0": 120,
+   "maxHp": 130,
+   "hpBefore": 130,
+   "ok": false,
+   "error": "no HP missing (130/130) after the respawn",
+   "ms": 17049,
+   "at": "2026-09-30T16:45:19.488Z"
+  }
+ },
+ "ok": false,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "9dfac7ad683dff0b2cb35219f6de16839d60fd7e",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-09-30T16:35:08.960Z",
+   "freeMiB": 1857,
+   "totalMiB": 8014,
+   "browserMiB": 864,
+   "pages": {
+    "A": {
+     "wasmMiB": 125,
+     "jsMiB": 441
+    }
+   }
+  },
+  {
+   "point": "end enter",
+   "at": "2026-09-30T16:35:32.264Z",
+   "freeMiB": 1695,
+   "totalMiB": 8014,
+   "browserMiB": 987,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 441
+    }
+   }
+  },
+  {
+   "point": "end second",
+   "at": "2026-09-30T16:37:48.967Z",
+   "freeMiB": 1019,
+   "totalMiB": 8014,
+   "browserMiB": 1753,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 441
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  },
+  {
+   "point": "death: A in Armia Field",
+   "at": "2026-09-30T16:43:47.465Z",
+   "freeMiB": 1085,
+   "totalMiB": 8014,
+   "browserMiB": 1750,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 441
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  },
+  {
+   "point": "end death",
+   "at": "2026-09-30T16:44:48.029Z",
+   "freeMiB": 1081,
+   "totalMiB": 8014,
+   "browserMiB": 1754,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 441
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  },
+  {
+   "point": "end potion",
+   "at": "2026-09-30T16:45:21.007Z",
+   "freeMiB": 1037,
+   "totalMiB": 8014,
+   "browserMiB": 1756,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 441
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "field",
+   "file": ".cache/world/2026-09-30T16-34-45-683Z/A-field.png",
+   "sha256": "39959ec7c2772cf21a9feff9df95dc44442666fa6cc0cf991604121e51025062"
+  },
+  {
+   "name": "dead",
+   "file": ".cache/world/2026-09-30T16-34-45-683Z/A-dead.png",
+   "sha256": "d5afb9506358f0103e971176c9a0ab0b9149a2371d338a48c58ab940b45aabd0"
+  },
+  {
+   "name": "return-box",
+   "file": ".cache/world/2026-09-30T16-34-45-683Z/A-return-box.png",
+   "sha256": "bc9c99bc39fefa05b948ad9fec2fa9e5b55f804f3fe73d8cb6c7edc56d0bfa9f"
+  },
+  {
+   "name": "field",
+   "file": ".cache/world/2026-09-30T16-34-45-683Z/B-field.png",
+   "sha256": "68b73c8a1c439becab510f57bd88ba193cd181ee50ffb45c25aecdda51400542"
+  }
+ ],
+ "error": "no HP missing (130/130) after the respawn",
+ "final_A": {
+  "inTranslated": 113,
+  "inPass": 303,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 27,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 416,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "final_B": {
+  "inTranslated": 41,
+  "inPass": 9,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 3,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 50,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "B": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-09-30T13:34:46.2214473-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-09-30T13:35:00.1109866-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-30T13:36:49.4744188-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-30T13:45:38.7218998-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 1352,
+   "bytes_down": 41900
+  },
+  {
+   "time": "2026-09-30T13:45:38.7312121-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 212,
+   "bytes_down": 12772
+  }
+ ]
+}

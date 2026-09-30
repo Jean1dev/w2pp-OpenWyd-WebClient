@@ -37,7 +37,7 @@ import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { areaPair, checkAreaAttempt } from './area_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  checkEquip, checkPotion, checkLoot, itemAmount } from './world_checks.mjs';
+  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkChat, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -467,16 +467,29 @@ class Session {
   async toArmiaField() {
     const [gx, gy] = await this.ground();
     if (gx === 20 && gy === 16) return { already: true, at: await this.me() };
-    const trail = await this.walkToPortal();
-    await this.until('portal confirm box', () => Module._wyd_scene_msgbox_message() === 16, 20000);
-    const before = await this.me();
-    if ((await this.eval(() => Module._wyd_debug_scene_msgbox_ok())) !== 1) throw new Error(`${this.label}: OK refused`);
-    await this.until('teleported', ([x, y]) => Math.hypot(Module._wyd_field_myhuman_x() - x,
-      Module._wyd_field_myhuman_y() - y) > 50, 60000, [before.x, before.y]);
+    // The server teleports from the tile A stands on when 0x0290 arrives
+    // (movement.go reqTeleport) and ignores the request silently elsewhere.
+    // A walk that overshoots the portal after the box opened is retried.
+    const trail = [];
+    this.portalAttempts = [];
+    for (let attempt = 0; ; attempt++) {
+      trail.push(...await this.walkToPortal());
+      await this.until('portal confirm box', () => Module._wyd_scene_msgbox_message() === 16, 20000);
+      const before = await this.me();
+      if ((await this.eval(() => Module._wyd_debug_scene_msgbox_ok())) !== 1) throw new Error(`${this.label}: OK refused`);
+      const moved = await this.until('teleported', ([x, y]) => Math.hypot(Module._wyd_field_myhuman_x() - x,
+        Module._wyd_field_myhuman_y() - y) > 50, attempt < 2 ? 20000 : 60000, [before.x, before.y]).catch(e => {
+        if (attempt >= 2) throw e;
+        return false;
+      });
+      this.portalAttempts.push({ at: [before.x, before.y], teleported: !!moved });
+      if (moved) break;
+      console.log(`    ${this.label}: no teleport from ${before.x},${before.y}; back to the portal`);
+    }
     await sleep(4000);
     const at = await this.me();
     checkTeleport({ ...at, ...Object.fromEntries((await this.ground()).map((v, i) => [i ? 'groundY' : 'groundX', v])) });
-    return { clicks: trail.length, at };
+    return { clicks: trail.length, at, portalAttempts: this.portalAttempts };
   }
 
   async toGremlinField() {
@@ -631,6 +644,7 @@ class Session {
     const [x, y, cw, ch] = await this.eval(([p, s]) => {
       const c = document.getElementById('canvas');
       const at = w => p === 0 ? Module._wyd_field_equip_cell_screen(s, w)
+        : p === 2 ? Module._wyd_field_cargo_cell_screen(Math.floor(s / 40), s % 40 % 5, Math.floor(s % 40 / 5), w)
         : Module._wyd_field_inv_cell_screen(Math.floor(s / 15), s % 15 % 5, Math.floor(s % 15 / 5), w);
       return [at(0), at(1), c.width, c.height];
     }, [place, slot]);
@@ -656,13 +670,148 @@ class Session {
   // nothing itself; OnPacketSwapItem applies the server's echo.
   async moveItem(from, to) {
     const bag = await this.bag();
-    const expect = bag[from.place === 0 ? 'equip' : 'carry'][from.slot].index;
+    const expect = from.place === 2 ? await this.eval(s => Module._wyd_debug_cargo_item(s), from.slot)
+      : bag[from.place === 0 ? 'equip' : 'carry'][from.slot].index;
     const sent0 = await this.outTranslated();
     await this.clickCell(from);
     const picked = await this.cursorItem();
     if (picked === expect) await this.clickCell(to);
     return { from, to, expect, picked, cursorAfter: await this.cursorItem(), swapsSent: (await this.outTranslated()) - sent0,
       lastSent: '0x' + (await this.eval(() => window.clientProbe().socket.lastSentOpcode)).toString(16) };
+  }
+  // A left click at a canvas point (canvas pixels), held across frames.
+  async clickCanvas(x, y, button = 'left') {
+    const box = await this.page.locator('#canvas').boundingBox();
+    const cw = await this.eval(() => [document.getElementById('canvas').width, document.getElementById('canvas').height]);
+    await this.page.mouse.move(box.x + x * box.width / cw[0], box.y + y * box.height / cw[1], { steps: 3 });
+    await this.frames(2);
+    await this.page.mouse.down({ button });
+    try { await this.frames(2); } finally { await this.page.mouse.up({ button }); }
+    await this.frames(2);
+  }
+
+  // A short press: down and up inside one rendered frame. EventTranslator
+  // raises 513 on every DirectInput poll while the button is held (level, not
+  // edge), and SGrid only spaces shop buys by 500 ms: at ~1 frame/s headless a
+  // button held across frames buys once per frame. A player's click at 60
+  // frames/s lasts less than the 500 ms guard.
+  async tapCanvas(x, y) {
+    const box = await this.page.locator('#canvas').boundingBox();
+    const cw = await this.eval(() => [document.getElementById('canvas').width, document.getElementById('canvas').height]);
+    await this.page.mouse.move(box.x + x * box.width / cw[0], box.y + y * box.height / cw[1], { steps: 3 });
+    await this.frames(2);
+    await this.page.mouse.down();
+    await this.page.mouse.up();
+    await this.frames(3);
+  }
+
+  lastSent() { return this.eval(() => window.clientProbe().socket.lastSentOpcode); }
+  outCount() { return this.eval(() => { const d = window.clientProbe().dialect; return d.outPass + d.outTranslated; }); }
+
+  // Walk a route, find a named NPC in view and click it until isOpen holds.
+  // A portal box opened on the way is cancelled with ESC, never confirmed.
+  async openNpc(name, route, what, isOpen) {
+    const walk = [];
+    const noPortal = async () => {
+      if ((await this.eval(() => Module._wyd_scene_msgbox_message())) !== 16) return;
+      await this.page.locator('#canvas').press('Escape');
+      await this.frames(2);
+    };
+    for (const [x, y] of route) {
+      await noPortal();
+      walk.push(...await this.walkTo(x, y, { near: 2, stallOk: true }));
+    }
+    await noPortal();
+    const at = await this.me();
+    const near = (await this.mobs()).filter(q => Math.hypot(q.x - at.x, q.y - at.y) <= 20);
+    const npc = near.find(q => name.test(q.name.trim()));
+    assert(npc, `${this.label}: ${what} NPC not in view at ${at.x},${at.y}: ${near.map(q => q.name.trim()).join(', ')}`);
+    if (npc.d > 4 || !npc.onScreen) walk.push(...await this.walkTo(npc.x, npc.y, { near: 3, maxClicks: 6, stallOk: true }));
+    await noPortal();
+    const clicks = [];
+    for (let i = 0; i < 4; i++) {
+      const hit = await this.clickHuman(npc.id);
+      clicks.push({ hit, lastSent: await this.lastSent() });
+      if (!hit) continue;
+      if (await this.until(what, isOpen, 15000).catch(() => false)) return { npc: npc.id, npcAt: [npc.x, npc.y], walk: walk.length, clicks };
+    }
+    await this.shot(`npc-${what.replace(/\W+/g, '-')}`);
+    throw new Error(`${this.label}: ${what} did not open after ${clicks.length} clicks: ${JSON.stringify(clicks)}`);
+  }
+
+  // The inventory next to a shop/cargo window: open it with "i" only when
+  // closed (openInventory's ESC would close the NPC window too).
+  async ensureInventory() {
+    if (((await this.eval(() => Module._wyd_field_open_panels())) & 128) === 0) {
+      await this.page.focus('#canvas');
+      await this.page.keyboard.press('i');
+      await this.until('inventory open', () => (Module._wyd_field_open_panels() & 128) !== 0, 10000);
+      await this.frames(3);
+    }
+    assert.equal(await this.eval(() => Module._wyd_field_inv_page()), 0, 'inventory not on page 0');
+  }
+
+  shopCells() {
+    return this.eval(() => {
+      const out = [];
+      const cols = Module._wyd_field_shop_grid_size(0), rows = Module._wyd_field_shop_grid_size(1);
+      for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+        const item = Module._wyd_field_shop_cell_item(x, y);
+        if (item > 0) out.push({ x, y, item, price: Module._wyd_item_price(item),
+          sx: Module._wyd_field_shop_cell_screen(x, y, 0), sy: Module._wyd_field_shop_cell_screen(x, y, 1) });
+      }
+      return out;
+    });
+  }
+
+  countItem(bag, index) { return bag.carry.filter(it => it.index === index).length; }
+
+  // Gold amount box (B_MONEY deposit / B_CARGO_MONEY withdraw): real click on
+  // the button, digits typed on the keyboard, real click on OK (B_IG_OK).
+  async goldBox(button, amount) {
+    const at = await this.eval(id => [Module._wyd_field_button_screen(id, 0), Module._wyd_field_button_screen(id, 1)], button);
+    assert(at[0] >= 0, `${this.label}: gold button ${button} not on screen`);
+    await this.clickCanvas(at[0], at[1]);
+    await this.until('gold amount box', () => Module._wyd_field_gold_input_visible() === 1, 10000);
+    await this.page.keyboard.type(String(amount), { delay: 120 });
+    await this.frames(2);
+    const ok = await this.eval(() => [Module._wyd_field_button_screen(65886, 0), Module._wyd_field_button_screen(65886, 1)]);
+    assert(ok[0] >= 0, 'gold OK button not on screen');
+    const sent0 = await this.outCount();
+    await this.clickCanvas(ok[0], ok[1]);
+    await sleep(3000);
+    const sent = (await this.outCount()) - sent0;
+    // A refusal by the client (message panel) leaves the box open: close it.
+    if ((await this.eval(() => Module._wyd_field_gold_input_visible())) === 1) {
+      await this.page.keyboard.press('Escape');
+      await this.frames(2);
+    }
+    return sent;
+  }
+
+  cargo() {
+    return this.eval(() => ({ coin: Module._wyd_field_my_score(5), cargo: Module._wyd_field_cargo_coin(),
+      items: Array.from({ length: 128 }, (_, s) => Module._wyd_debug_cargo_item(s)) }));
+  }
+
+  chatLines(n = 8) {
+    return this.eval(n => Array.from({ length: Math.min(n, Math.max(0, Module._wyd_field_chat_count())) },
+      (_, k) => Module.UTF8ToString(Module._wyd_field_chat_line(k))), n);
+  }
+
+  // The chat box as a player uses it: Enter opens it, the text is typed,
+  // Enter sends (TMFieldScene OnKeyDown / OnCharEvent).
+  async say(text) {
+    await this.closePanels();
+    await this.page.focus('#canvas');
+    await this.page.keyboard.press('Enter');
+    await this.until('chat box', () => Module._wyd_field_chat_editing() === 1, 10000);
+    await this.page.keyboard.type(text, { delay: 120 });
+    await this.frames(2);
+    const sent0 = await this.outCount();
+    await this.page.keyboard.press('Enter');
+    await this.frames(3);
+    return { sent: (await this.outCount()) > sent0, lastSent: '0x' + (await this.lastSent()).toString(16) };
   }
 }
 
@@ -720,7 +869,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'potion', 'loot'].some(x => phases.has(x)) ? 25 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat'].some(x => phases.has(x)) ? 25 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -1468,6 +1617,43 @@ async function main() {
     // through the runtime's own box 11 -> 0x03AE -> 0x0289. B waits at the
     // Armia spawn and must see A come back. Death, revival HP and the city
     // spawn are all decided by the server (mobai.go, character.go restart).
+    // First potion use, right after the death phase's recall: the server
+    // revives with 1..50% of MaxHp and regenerates Level+30 every 10 s, so the
+    // inventory is opened while A waits for the recall and the use follows it.
+    let potionPre;
+    const potionFirstUse = async () => {
+      const res = { damage: 'death phase: revived by the server with part of MaxHp at the Armia spawn' };
+      const bag0 = await a.bag();
+      res.slot = bag0.carry.slice(0, 15).findIndex(it => it.index === 401);
+      assert(res.slot >= 0, 'no HP potion (401) on carry page 0');
+      res.amount0 = itemAmount(bag0.carry[res.slot]);
+      await a.ensureInventory();
+      // Read HP only now, right before the use: regeneration keeps running.
+      const pre = await a.bag();
+      res.maxHp = pre.maxHp;
+      res.hpBefore = pre.hp;
+      assert(pre.hp < pre.maxHp, `no HP missing (${pre.hp}/${pre.maxHp}) after the respawn`);
+      res.startedAt = new Date().toISOString();
+      const sent0 = await a.outTranslated();
+      await a.clickCell({ place: 1, slot: res.slot }, 'right');
+      await a.until('server consumed one unit', ([s, n]) => {
+        const v = [0, 1, 2].map(k => [Module._wyd_debug_my_item_ef(1, s, k, 0), Module._wyd_debug_my_item_ef(1, s, k, 1)]);
+        return (v.find(([e]) => e === 61)?.[1] ?? 1) < n;
+      }, 15000, [res.slot, res.amount0]).catch(() => false);
+      await a.until('HP rises', h => Module._wyd_field_my_score(0) > h, 15000, pre.hp).catch(() => false);
+      // The server tick moves HP to the potion's ReqHp (up to 2000 per 1 s tick).
+      await a.until('HP full', () => Module._wyd_field_my_score(0) >= Module._wyd_field_my_score(1), 5000).catch(() => false);
+      const bagUse = await a.bag();
+      res.use = { usesSent: (await a.outTranslated()) - sent0, amount: itemAmount(bagUse.carry[res.slot]), hp: bagUse.hp };
+      // B, at the spawn, sees A's HP from the server's 0x0336 multicast.
+      const bHp1 = await b.until('B sees A healed', ([id, h]) => {
+        const v = Module._wyd_field_human_present(id) === 1 ? Module._wyd_field_human_hp(id) : 0;
+        return v > h && v;
+      }, 20000, [a.id, pre.hp]).catch(() => b.eval(id => Module._wyd_field_human_hp(id), a.id));
+      res.observer = { hpAfter: bHp1 };
+      return res;
+    };
+
     await step('death', async () => {
       const c0 = await a.combat(0);
       const before = { level: c0.myLevel, exp: c0.exp, hp: c0.myHp, maxHp: c0.myMaxHp };
@@ -1508,6 +1694,12 @@ async function main() {
       await a.shot('return-box');
       const at0 = await a.me();
       assert.equal(await a.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'OK refused');
+      const potionNext = phases.has('potion');
+      if (potionNext) {
+        // Open the inventory with the real "i" key while the recall is pending.
+        await a.page.focus('#canvas');
+        await a.page.keyboard.press('i');
+      }
       // The runtime sends 0x03AE now and 0x0289 about 5 s later; record the
       // sequence of last-sent opcodes until the server's recall moves A.
       const sent = [];
@@ -1521,13 +1713,25 @@ async function main() {
         await sleep(100);
       }
       assert(moved, `no recall within 30 s (sent ${sent.join(',')})`);
-      await sleep(3000);
-      const c1 = await a.combat(0);
-      const after = { ...(await a.me()), hp: c1.myHp, maxHp: c1.myMaxHp, die: c1.myDie, level: c1.myLevel, exp: c1.exp };
+      // The server revives with 1..50% of MaxHp and natural regeneration adds
+      // Level+30 every 10 s: with a potion phase next, the first use happens
+      // here, before HP fills, and the potion phase takes the screenshots.
+      let c1, after;
+      if (potionNext) {
+        c1 = await a.combat(0);
+        after = { ...(await a.me()), hp: c1.myHp, maxHp: c1.myMaxHp, die: c1.myDie, level: c1.myLevel, exp: c1.exp };
+        potionPre = await potionFirstUse();
+      } else {
+        await sleep(3000);
+        c1 = await a.combat(0);
+        after = { ...(await a.me()), hp: c1.myHp, maxHp: c1.myMaxHp, die: c1.myDie, level: c1.myLevel, exp: c1.exp };
+      }
       const sawRespawn = (await b.until('B sees A back in town', id => Module._wyd_field_human_present(id) === 1,
         30000, a.id)) === true;
-      await a.shot('respawned');
-      await b.shot('respawn-observer');
+      if (!potionNext) {
+        await a.shot('respawned');
+        await b.shot('respawn-observer');
+      }
       const res = { before, trip, hpTrail, hpAtDeath: dead.myHp, mobHits: dead.inAttack - hits0, approaches,
         died: true, box, sent, firstHpAfterRecall: moved.hp, after, observer: { sawRespawn, at: await b.me() } };
       r.death = res;
@@ -1745,44 +1949,16 @@ async function main() {
     // B. The server consumes and heals (item.go useHealPotion, hpmp.go tick);
     // the runtime's local stack decrement is overwritten by the server's 0x0182.
     await step('potion', async () => {
-      const res = { damage: 'death phase: revived with HP 2 at the Armia spawn' };
+      const res = potionPre ?? await potionFirstUse();
       r.potion = res;
-      const bag0 = await a.bag();
-      res.slot = bag0.carry.slice(0, 15).findIndex(it => it.index === 401);
-      assert(res.slot >= 0, 'no HP potion (401) on carry page 0');
-      res.amount0 = itemAmount(bag0.carry[res.slot]);
-      await b.until('B sees A', id => Module._wyd_field_human_present(id) === 1, 30000, a.id);
-      const pre = await a.bag();
-      res.maxHp = pre.maxHp;
-      res.hpBefore = pre.hp;
-      assert(pre.hp < pre.maxHp, `no HP missing (${pre.hp}/${pre.maxHp}) after the respawn`);
-      const bHp0 = await b.eval(id => Module._wyd_field_human_hp(id), a.id);
-      await a.openInventory();
       const amountAt = ([s]) => {
         const v = [0, 1, 2].map(k => [Module._wyd_debug_my_item_ef(1, s, k, 0), Module._wyd_debug_my_item_ef(1, s, k, 1)]);
         return v.find(([e]) => e === 61)?.[1] ?? (Module._wyd_debug_my_item(1, s) ? 1 : 0);
       };
-      // 1. One use.
-      let sent0 = await a.outTranslated();
-      await a.clickCell({ place: 1, slot: res.slot }, 'right');
-      await a.until('server consumed one unit', ([s, n]) => {
-        const v = [0, 1, 2].map(k => [Module._wyd_debug_my_item_ef(1, s, k, 0), Module._wyd_debug_my_item_ef(1, s, k, 1)]);
-        return (v.find(([e]) => e === 61)?.[1] ?? 1) < n;
-      }, 15000, [res.slot, res.amount0]).catch(() => false);
-      await a.until('HP rises', h => Module._wyd_field_my_score(0) > h, 15000, pre.hp).catch(() => false);
-      // The server tick moves HP to the potion's ReqHp (up to 2000 per 1 s tick).
-      await a.until('HP full', () => Module._wyd_field_my_score(0) >= Module._wyd_field_my_score(1), 5000).catch(() => false);
-      const bagUse = await a.bag();
-      res.use = { usesSent: (await a.outTranslated()) - sent0, amount: itemAmount(bagUse.carry[res.slot]), hp: bagUse.hp };
-      const bHp1 = await b.until('B sees A healed', ([id, h]) => {
-        const v = Module._wyd_field_human_hp(id);
-        return v > h && v;
-      }, 20000, [a.id, bHp0]).catch(() => b.eval(id => Module._wyd_field_human_hp(id), a.id));
-      res.observer = { hpBefore: bHp0, hpAfter: bHp1 };
       await a.shot('potion-used');
       await b.shot('potion-observed');
       // 2. Rapid double use: two right clicks inside one rendered frame.
-      sent0 = await a.outTranslated();
+      let sent0 = await a.outTranslated();
       const [px, py] = await a.cellPoint({ place: 1, slot: res.slot });
       await a.page.mouse.move(px, py, { steps: 3 });
       await a.frames(2);
@@ -1792,15 +1968,18 @@ async function main() {
       const bagDouble = await a.bag();
       res.double = { usesSent: (await a.outTranslated()) - sent0, amount: itemAmount(bagDouble.carry[res.slot]),
         clientAmount: await a.eval(amountAt, [res.slot]), bag: stripBag(bagDouble) };
-      // 3. Right click on an empty cell: nothing to use.
-      const emptyCell = bagDouble.carry.slice(0, 15).findIndex(it => it.index === 0);
-      assert(emptyCell >= 0, 'no empty cell on carry page 0');
+      // 3. Right click on an empty cell: nothing to use. Loot can fill carry
+      // page 0; an empty equip cell (1..15) is then the empty cell on screen.
+      const carryFree = bagDouble.carry.slice(0, 15).findIndex(it => it.index === 0);
+      const equipFree = bagDouble.equip.findIndex((it, k) => k >= 1 && it.index === 0);
+      const emptyCell = carryFree >= 0 ? { place: 1, slot: carryFree } : { place: 0, slot: equipFree };
+      assert(emptyCell.slot >= 0, 'no empty cell on screen');
       sent0 = await a.outTranslated();
-      await a.clickCell({ place: 1, slot: emptyCell }, 'right');
+      await a.clickCell(emptyCell, 'right');
       await sleep(3000);
       res.empty = { cell: emptyCell, usesSent: (await a.outTranslated()) - sent0, bag: stripBag(await a.bag()) };
       console.log(`    potion slot ${res.slot}: ${res.amount0}->${res.use.amount}->${res.double.amount}, ` +
-        `HP ${res.hpBefore}->${res.use.hp}, B saw ${bHp0}->${bHp1}, double sent ${res.double.usesSent}, empty sent ${res.empty.usesSent}`);
+        `HP ${res.hpBefore}->${res.use.hp}, B saw ${res.observer.hpAfter}, double sent ${res.double.usesSent}, empty sent ${res.empty.usesSent}`);
       await a.closePanels();
       await a.walk(0, 100);
       res.beforeRelogin = await a.bag();
@@ -1866,6 +2045,222 @@ async function main() {
       res.end = await a.bag();
       res.relogin = await reloginA('A-loot-relogin', slot);
       checkLoot(res);
+      return res;
+    });
+
+    // Stage 5, slice 3: the Armia merchant Aki (Merchant 1, NPCGener #3406 at
+    // 2144,2088) and the cargo guard (Guarda_Carga, Merchant 2, #3408 at
+    // 2144,2082) stand next to the proven portal route.
+    const ARMIA_EAST = [[2117.5, 2095.5], [2130.5, 2091.5], [2140.5, 2086.5]];
+    const inChat = (s, text) => s.until(`chat line "${text}"`, t => {
+      const n = Module._wyd_field_chat_count();
+      for (let k = 0; k < Math.min(n, 10); k++) if (Module.UTF8ToString(Module._wyd_field_chat_line(k)).includes(t)) return true;
+      return false;
+    }, 20000, text).catch(() => false);
+
+    await step('shop', async () => {
+      const res = {};
+      r.shop = res;
+      res.open = await a.openNpc(/^aki$/i, ARMIA_EAST, 'shop window', () => Module._wyd_field_shop_visible() === 1);
+      res.merchant = await a.eval(() => Module._wyd_field_shop_merchant());
+      await a.ensureInventory();
+      await a.frames(3);
+      res.cells = await a.shopCells();
+      await a.shot('shop');
+      console.log(`    shop ${res.merchant}: ${res.cells.map(c => `${c.item}@${c.price}`).join(' ')}`);
+      assert(res.cells.length > 0, 'the shop lists no item');
+      // 1. Sell a looted item from carry page 0 (not the potions): pick it
+      // up, drop it on the shop grid, confirm box 890 (SGrid SellItem).
+      const bag0 = await a.bag();
+      const candidates = bag0.carry.slice(0, 15).map((it, k) => ({ ...it, k })).filter(it => it.index > 0 && it.index !== 401);
+      assert(candidates.length > 0, 'nothing to sell on carry page 0');
+      const sold = candidates.at(-1);
+      res.sell = { slot: sold.k, item: sold.index, clientPrice: await a.eval(i => Module._wyd_item_price(i), sold.index),
+        coinBefore: bag0.coin };
+      let sent0 = await a.outCount();
+      await a.clickCell({ place: 1, slot: sold.k });
+      res.sell.cursor = await a.cursorItem();
+      const drop = res.cells[0];
+      await a.clickCanvas(drop.sx, drop.sy);
+      res.sell.box = await a.eval(() => Module._wyd_scene_msgbox_message());
+      if (res.sell.box === 890) assert.equal(await a.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'OK refused');
+      await a.until('sold slot cleared', s => Module._wyd_debug_my_item(1, s) === 0, 15000, sold.k).catch(() => false);
+      await sleep(2000);
+      const bag1 = await a.bag();
+      Object.assign(res.sell, { sent: (await a.outCount()) - sent0, after: bag1.carry[sold.k], coinAfter: bag1.coin,
+        lastSent: '0x' + (await a.lastSent()).toString(16) });
+      console.log(`    sell slot ${sold.k} item ${sold.index}: box ${res.sell.box}, gold ${res.sell.coinBefore}->${res.sell.coinAfter}`);
+      // 2. Buy the cheapest item the gold covers (left click on the cell).
+      const cheap = res.cells.filter(c => c.price > 0 && c.price <= bag1.coin).sort((p, q) => p.price - q.price)[0];
+      assert(cheap, `no shop item within ${bag1.coin} gold`);
+      const countIn = ([i]) => { let c = 0; for (let s = 0; s < 64; s++) if (Module._wyd_debug_my_item(1, s) === i) c++; return c; };
+      sent0 = await a.outCount();
+      await a.tapCanvas(cheap.sx, cheap.sy);
+      await a.until('bought item', ([i, n]) => {
+        let c = 0; for (let s = 0; s < 64; s++) if (Module._wyd_debug_my_item(1, s) === i) c++;
+        return c > n;
+      }, 15000, [cheap.item, a.countItem(bag1, cheap.item)]).catch(() => false);
+      await sleep(2000);
+      const bag2 = await a.bag();
+      res.buy = { item: cheap.item, clientPrice: cheap.price, sent: (await a.outCount()) - sent0, coinBefore: bag1.coin,
+        coinAfter: bag2.coin, gained: a.countItem(bag2, cheap.item) - a.countItem(bag1, cheap.item),
+        clientCount: await a.eval(countIn, [cheap.item]) };
+      console.log(`    buy ${cheap.item}: gold ${res.buy.coinBefore}->${res.buy.coinAfter}, gained ${res.buy.gained}`);
+      // 3. An item the gold does not cover: the server refuses in silence.
+      const dear = res.cells.filter(c => c.price > bag2.coin).sort((p, q) => q.price - p.price)[0];
+      if (dear) {
+        sent0 = await a.outCount();
+        await a.tapCanvas(dear.sx, dear.sy);
+        await sleep(4000);
+        const bag3 = await a.bag();
+        res.poor = { item: dear.item, clientPrice: dear.price, sent: (await a.outCount()) - sent0, coinBefore: bag2.coin,
+          coinAfter: bag3.coin, gained: a.countItem(bag3, dear.item) - a.countItem(bag2, dear.item) };
+      }
+      // 4. Two clicks inside one rendered frame on the cheap item.
+      const bag4 = await a.bag();
+      sent0 = await a.outCount();
+      const box = await a.page.locator('#canvas').boundingBox();
+      const cw = await a.eval(() => [document.getElementById('canvas').width, document.getElementById('canvas').height]);
+      await a.page.mouse.move(box.x + cheap.sx * box.width / cw[0], box.y + cheap.sy * box.height / cw[1], { steps: 3 });
+      await a.frames(2);
+      for (let i = 0; i < 2; i++) { await a.page.mouse.down(); await a.page.mouse.up(); }
+      await a.frames(3);
+      await sleep(4000);
+      const bag5 = await a.bag();
+      res.repeat = { sent: (await a.outCount()) - sent0, coinBefore: bag4.coin, coinAfter: bag5.coin,
+        gained: a.countItem(bag5, cheap.item) - a.countItem(bag4, cheap.item) };
+      console.log(`    repeat: sent ${res.repeat.sent}, gained ${res.repeat.gained}, gold ${bag4.coin}->${bag5.coin}`);
+      await a.shot('shop-done');
+      await a.page.locator('#canvas').press('Escape');
+      await a.frames(2);
+      res.beforeRelogin = await a.bag();
+      res.relogin = await reloginA('A-shop-relogin', 0);
+      checkShop(res);
+      return res;
+    });
+
+    await step('bank', async () => {
+      const res = {};
+      r.bank = res;
+      res.open = await a.openNpc(/^guarda[ _]carga$/i, ARMIA_EAST, 'cargo window', () => Module._wyd_field_cargo_visible() === 1);
+      await sleep(2000); // 0x0339 and the 0x0182 of each stored slot
+      res.opened = true;
+      await a.ensureInventory();
+      const c0 = await a.cargo();
+      res.atOpen = { coin: c0.coin, cargo: c0.cargo, stored: c0.items.filter(Boolean).length };
+      await a.shot('cargo');
+      console.log(`    cargo open: carry gold ${c0.coin}, cargo gold ${c0.cargo}, ${res.atOpen.stored} stored`);
+      // 1. An item into the first free cargo cell of page 0 and back (before the
+      // gold box: a refused amount keeps that modal box open, as in the original).
+      const bag = await a.bag();
+      const from = bag.carry.slice(0, 15).map((it, k) => ({ ...it, k })).filter(it => it.index > 0).at(-1);
+      assert(from, 'no item on carry page 0');
+      const free = c0.items.slice(0, 40).findIndex(i => i === 0);
+      assert(free >= 0, 'no free cargo cell on page 0');
+      res.store = { item: from.index, carrySlot: from.k, cargoSlot: free,
+        move: await a.moveItem({ place: 1, slot: from.k }, { place: 2, slot: free }) };
+      await a.until('stored', ([s, i]) => Module._wyd_debug_cargo_item(s) === i, 15000, [free, from.index]).catch(() => false);
+      await sleep(1500);
+      res.store.cargoItem = await a.eval(s => Module._wyd_debug_cargo_item(s), free);
+      res.store.carryItem = await a.eval(s => Module._wyd_debug_my_item(1, s), from.k);
+      res.fetch = { move: await a.moveItem({ place: 2, slot: free }, { place: 1, slot: from.k }) };
+      await a.until('fetched', ([s, i]) => Module._wyd_debug_my_item(1, s) === i, 15000, [from.k, from.index]).catch(() => false);
+      await sleep(1500);
+      res.fetch.carryItem = await a.eval(s => Module._wyd_debug_my_item(1, s), from.k);
+      res.fetch.cargoItem = await a.eval(s => Module._wyd_debug_cargo_item(s), free);
+      assert(c0.coin > 0, 'no gold to deposit (run the shop phase first)');
+      res.amount = Math.max(1, Math.min(100, Math.floor(c0.coin / 2)));
+      // 2. Deposit, 3. withdraw the same amount.
+      let sent = await a.goldBox(65563, res.amount);
+      await a.until('deposit applied', c => Module._wyd_field_my_score(5) !== c, 10000, c0.coin).catch(() => false);
+      await sleep(1500);
+      const c1 = await a.cargo();
+      res.deposit = { sent, coinBefore: c0.coin, cargoBefore: c0.cargo, coin: c1.coin, cargo: c1.cargo };
+      sent = await a.goldBox(65688, res.amount);
+      await a.until('withdraw applied', c => Module._wyd_field_my_score(5) !== c, 10000, c1.coin).catch(() => false);
+      await sleep(1500);
+      const c2 = await a.cargo();
+      res.withdraw = { sent, coin: c2.coin, cargo: c2.cargo };
+      console.log(`    gold ${c0.coin}/${c0.cargo} -> deposit ${c1.coin}/${c1.cargo} -> withdraw ${c2.coin}/${c2.cargo}`);
+      // 4. Withdraw more than the cargo holds: sent, refused by the server.
+      sent = await a.goldBox(65688, c2.cargo + 1000);
+      const c3 = await a.cargo();
+      res.overdraw = { sent, coin: c3.coin, cargo: c3.cargo };
+      // 5. Deposit more than the carry holds: the client refuses (message 34)
+      // and keeps the box open; the relogin below discards it.
+      sent = await a.goldBox(65563, c3.coin + 1000);
+      const c4 = await a.cargo();
+      res.overdeposit = { sent, coin: c4.coin, cargo: c4.cargo };
+      await a.shot('cargo-done');
+      await a.page.locator('#canvas').press('Escape');
+      await a.frames(2);
+      // Relogin, then open the cargo again: both gold pools as the server keeps them.
+      res.beforeRelogin = await a.bag();
+      await reloginA('A-bank-relogin', 0);
+      res.reopen = await a.openNpc(/^guarda[ _]carga$/i, ARMIA_EAST, 'cargo window', () => Module._wyd_field_cargo_visible() === 1);
+      await sleep(2000);
+      const c5 = await a.cargo();
+      res.relogin = { coin: c5.coin, cargo: c5.cargo, item: c5.items[free] };
+      checkBank(res);
+      return res;
+    });
+
+    await step('chat', async () => {
+      const res = {};
+      r.chat = res;
+      const tag = `wyd${Date.now() % 100000}`;
+      // 1. Public line: B shows it under A's name; the server does not echo it to A.
+      res.say = await a.say(`ola ${tag}`);
+      res.say.heard = await inChat(b, `ola ${tag}`);
+      res.say.bLines = await b.chatLines(4);
+      res.say.aLines = await a.chatLines(4);
+      await b.shot('chat-heard');
+      // 2. Whisper A -> B ("/name text"): record what B shows as the sender.
+      // The receiver's private memo shows &String[1] (OnPacketMessageWhisper):
+      // the first character is cut, so the check looks for the tag only.
+      const bCount0 = await b.eval(() => Module._wyd_field_chat_count());
+      res.whisper = await a.say(`/${B.char} psiu ${tag}`);
+      res.whisper.heard = await inChat(b, tag);
+      res.whisper.bLines = await b.chatLines(4);
+      // Which name B shows as the sender (names stay out of the evidence).
+      res.whisper.senderShown = await b.eval(([self, other, n0]) => {
+        const lines = [];
+        for (let k = 0; k < Module._wyd_field_chat_count() - n0; k++) lines.push(Module.UTF8ToString(Module._wyd_field_chat_line(k)));
+        return lines.some(l => l.includes(other)) ? 'sender' : lines.some(l => l.includes(self)) ? 'receiver' : 'none';
+      }, [B.char, A.char, bCount0]);
+      // 3. Whisper to nobody online: the server answers with a notice.
+      const in0 = await a.eval(() => window.clientProbe().dialect.inTranslated);
+      res.offline = await a.say(`/zz${tag} ninguem`);
+      await sleep(3000);
+      res.offline.inTranslated = (await a.eval(() => window.clientProbe().dialect.inTranslated)) - in0;
+      res.offline.lastRecv = '0x' + (await a.eval(() => window.clientProbe().socket.lastRecvOpcode)).toString(16);
+      // 4. Teleport command (/azran, handler/chat.go teleportCmds): the server
+      // moves A (0x036C Effect 1) and B, in Armia, loses it; /armia returns.
+      const p0 = await a.me();
+      res.teleport = await a.say('/azran');
+      await a.until('A teleported', ([x, y]) => Math.hypot(Module._wyd_field_myhuman_x() - x, Module._wyd_field_myhuman_y() - y) > 50,
+        30000, [p0.x, p0.y]).catch(() => false);
+      await sleep(3000);
+      const p1 = await a.me();
+      res.teleport.to = [p1.x, p1.y];
+      res.teleport.moved = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+      res.teleport.bLost = (await b.until('B loses A', id => Module._wyd_field_human_present(id) === 0, 30000, a.id)
+        .catch(() => false)) === true;
+      await a.shot('teleported');
+      res.back = await a.say('/armia');
+      await a.until('A back', ([x, y]) => Math.hypot(Module._wyd_field_myhuman_x() - x, Module._wyd_field_myhuman_y() - y) > 50,
+        30000, [p1.x, p1.y]).catch(() => false);
+      await sleep(3000);
+      const p2 = await a.me();
+      res.back.to = [p2.x, p2.y];
+      res.back.moved = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      res.back.bSees = (await b.until('B sees A again', id => Module._wyd_field_human_present(id) === 1, 30000, a.id)
+        .catch(() => false)) === true;
+      console.log(`    say heard ${res.say.heard}, whisper heard ${res.whisper.heard}, ` +
+        `teleport ${res.teleport.moved.toFixed(0)} tiles, back ${res.back.moved.toFixed(0)}`);
+      await a.healthy();
+      await b.healthy();
+      checkChat(res);
       return res;
     });
 

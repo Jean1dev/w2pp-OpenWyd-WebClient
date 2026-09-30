@@ -208,14 +208,14 @@ static void TestInboundPassAndDrop()
 	CHECK(In(action, &size) == WYD_DIALECT_PASS);
 	unsigned char fail[12] = {12, 0, 0, 0, 0x19, 0x01};
 	CHECK(In(fail, &size) == WYD_DIALECT_PASS);
-	// Chat (0x333) has no verified layout yet: not passed through.
-	unsigned char chat[108] = {108, 0, 0, 0, 0x33, 0x03};
+	// Trade (0x383) is not mapped yet (Go 154 vs runtime 156): not passed through.
+	unsigned char chat[154] = {154, 0, 0, 0, 0x83, 0x03};
 	CHECK(In(chat, &size) == WYD_DIALECT_DROP);
 	CHECK(In(chat, &size) == WYD_DIALECT_DROP);
 	CHECK(WydDialectStatValue(WYD_STAT_IN_PASS) == 3);
 	CHECK(WydDialectStatValue(WYD_STAT_IN_DROP_UNKNOWN) == 2);
 	CHECK(WydDialectDroppedCount(0) == 2);
-	CHECK(WydDialectDroppedOpcode(0, 1) == 0x333 && WydDialectDroppedTimes(0, 1) == 2);
+	CHECK(WydDialectDroppedOpcode(0, 1) == 0x383 && WydDialectDroppedTimes(0, 1) == 2);
 	CHECK(WydDialectInboundFrames() == 6);
 }
 
@@ -417,11 +417,11 @@ static void TestOutbound()
 		CHECK(WydDialectOutbound(parm, 16, wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
 		CHECK(WydDialectOutbound(parm, 12, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
 	}
-	// Chat (0x333) has a 96- vs 128-byte text divergence: not sent until mapped.
-	char chat[140] = {static_cast<char>(140), 0, 0, 0, 0x33, 0x03};
+	// Trade (0x383) has shifted money/check/opponent offsets: not sent until mapped.
+	char chat[156] = {static_cast<char>(156), 0, 0, 0, static_cast<char>(0x83), 0x03};
 	CHECK(WydDialectOutbound(chat, sizeof(chat), wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
 	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_UNKNOWN) == 1);
-	CHECK(WydDialectDroppedOpcode(1, WydDialectDroppedCount(1) - 1) == 0x333);
+	CHECK(WydDialectDroppedOpcode(1, WydDialectDroppedCount(1) - 1) == 0x383);
 }
 
 static void TestAttack()
@@ -714,6 +714,119 @@ static void TestItems()
 	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_SIZE) == 2);
 }
 
+static void TestShopCargoChat()
+{
+	WydDialectResetStats();
+	int size = 0;
+	{
+		// Cargo gold: 57 on the wire, StandardParm(coin) in the runtime.
+		const auto& m = Translate<MSG_STANDARDPARM>(k_in_update_cargo_coin);
+		CHECK(m.Header.Type == 0x339 && m.Header.ID == 5 && m.Header.Size == 16 && m.Parm == 1234567);
+	}
+	CHECK(In(k_in_update_cargo_coin, &size, 56) == WYD_DIALECT_DROP);
+	{
+		// Server notice: bare NUL-terminated text -> fixed 140-byte line.
+		const auto& m = Translate<MSG_MessageChat>(k_in_chat_notice);
+		CHECK(m.Header.Type == 0x333 && m.Header.ID == 5 && m.Header.Size == 140);
+		CHECK(std::strcmp(m.String, "Pontos Caos atual: 3 (+1)") == 0 && m.String[127] == 0);
+	}
+	{
+		const auto& m = Translate<MSG_MessageChat>(k_in_chat_player);
+		CHECK(m.Header.ID == 7 && std::strcmp(m.String, "ola B") == 0);
+	}
+	{
+		// A 140-byte line without terminator is cut at String[127].
+		unsigned char full[140];
+		std::memcpy(full, k_in_chat_player, sizeof(full));
+		std::memset(full + 12, 'x', 128);
+		CHECK(In(full, &size) == WYD_DIALECT_TRANSLATED);
+		const auto& m = *reinterpret_cast<const MSG_MessageChat*>(g_out);
+		CHECK(m.String[126] == 'x' && m.String[127] == 0);
+	}
+	CHECK(In(k_in_chat_player, &size, 11) == WYD_DIALECT_DROP);
+	{
+		unsigned char big[141] = {141, 0, 0, 0, 0x33, 0x03};
+		CHECK(In(big, &size) == WYD_DIALECT_DROP);
+	}
+	{
+		const auto& m = Translate<MSG_MessageWhisper>(k_in_whisper);
+		CHECK(m.Header.Type == 0x334 && m.Header.ID == 7 && m.Header.Size == 160);
+		CHECK(Name(m.MobName, "Destino") && std::strcmp(m.String, "oi") == 0 && m.Color == 0);
+	}
+	{
+		const auto& m = Translate<MSG_MessageWhisper>(k_in_whisper_short);
+		CHECK(Name(m.MobName, "Destino") && std::strcmp(m.String, "oi") == 0 && m.Color == 0);
+	}
+	CHECK(In(k_in_whisper, &size, 27) == WYD_DIALECT_DROP);
+	{
+		unsigned char big[159] = {159, 0, 0, 0, 0x34, 0x03};
+		CHECK(In(big, &size) == WYD_DIALECT_DROP);
+	}
+	Passes(k_in_buy_echo);
+	CHECK(reinterpret_cast<const MSG_Buy*>(k_in_buy_echo)->Coin == 2400);
+	Passes(k_in_sell_echo);
+	Passes(k_in_deposit_echo);
+	CHECK(WydDialectStatValue(WYD_STAT_IN_DROP_UNKNOWN) == 0);
+
+	char wire[256];
+	MSG_Buy b;
+	std::memset(&b, 0xAB, sizeof(b));
+	b.Header.Size = sizeof(b);
+	b.Header.KeyWord = 0;
+	b.Header.CheckSum = 0;
+	b.Header.Type = 0x379;
+	b.Header.ID = 5;
+	b.Header.Tick = 0x01020304;
+	b.TargetID = 12474;
+	b.TargetCarryPos = 3;
+	b.MyCarryPos = 17;
+	b.Coin = 0;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&b), sizeof(b), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 24 && std::memcmp(wire, k_out_buy, 24) == 0); // padding @18 zeroed
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&b), 23, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+
+	MSG_Sell sl;
+	std::memset(&sl, 0xAB, sizeof(sl));
+	sl.Header = b.Header;
+	sl.Header.Size = sizeof(sl);
+	sl.Header.Type = 0x37A;
+	sl.TargetID = 12474;
+	sl.MyType = 1;
+	sl.MyPos = 13;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&sl), sizeof(sl), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 18 && std::memcmp(wire + 4, k_in_sell_echo + 4, 2) == 0 && std::memcmp(wire + 12, k_in_sell_echo + 12, 6) == 0);
+	CHECK(static_cast<unsigned char>(wire[0]) == 18 && wire[1] == 0);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&sl), 18, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	for (unsigned short op : {0x387, 0x388})
+	{
+		MSG_STANDARDPARM p{};
+		p.Header.Size = sizeof(p);
+		p.Header.Type = op;
+		p.Parm = 500;
+		CHECK(WydDialectOutbound(reinterpret_cast<char*>(&p), 16, wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
+		CHECK(WydDialectOutbound(reinterpret_cast<char*>(&p), 12, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	}
+	MSG_MessageChat c{};
+	c.Header.Size = sizeof(c);
+	c.Header.Type = 0x333;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&c), sizeof(c), wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&c), 139, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	MSG_MessageWhisper w;
+	std::memset(&w, 0xAB, sizeof(w));
+	w.Header = b.Header;
+	w.Header.Size = sizeof(w);
+	w.Header.Type = 0x334;
+	std::memset(w.MobName, 0, sizeof(w.MobName));
+	std::memcpy(w.MobName, "Destino", 7);
+	std::memset(w.String, 0, sizeof(w.String));
+	std::memcpy(w.String, "oi", 2);
+	w.Color = 0;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&w), sizeof(w), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 158 && static_cast<unsigned char>(wire[0]) == 158 && std::memcmp(wire + 12, k_in_whisper + 12, 146) == 0);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&w), 158, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_UNKNOWN) == 0);
+}
+
 int main()
 {
 	TestAccountLogin();
@@ -726,6 +839,7 @@ int main()
 	TestAttack();
 	TestCombatDiagnostics();
 	TestItems();
+	TestShopCargoChat();
 	std::printf("%d checks, %d failures\n", g_checks, g_failures);
 	return g_failures == 0 ? 0 : 1;
 }

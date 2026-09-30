@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin } from './world_checks.mjs';
+  itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkBank, checkChat } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
   const value = { error: 'fixture-secret', nested: ['prefix fixture-secret suffix'], x: 123456 };
@@ -268,4 +268,68 @@ test('item phases run alone after both sessions entered; loot runs with login', 
   assert.doesNotThrow(() => validateOptions({ ...options('login,grind,loot'), 'grind-level': '4' }));
   assert.throws(() => validateOptions(options('login,enter,loot')));
   assert.throws(() => validateOptions(options('loot')));
+});
+
+test('slice 3 phases: shop and bank alone with login,enter; chat with B', () => {
+  assert.doesNotThrow(() => validateOptions(options('login,enter,shop')));
+  assert.doesNotThrow(() => validateOptions(options('login,enter,bank')));
+  assert.doesNotThrow(() => validateOptions(options('login,enter,second,chat')));
+  assert.throws(() => validateOptions(options('login,shop')));
+  assert.throws(() => validateOptions(options('login,enter,second,shop')));
+  assert.throws(() => validateOptions(options('login,enter,shop,bank')));
+  assert.throws(() => validateOptions(options('login,enter,chat')));
+  assert.throws(() => validateOptions(options('login,enter,second,move,chat')));
+});
+
+test('shop needs a server-confirmed sale and purchase, a silent refusal and paid repeats kept after relogin', () => {
+  const end = bagOf({}, { 0: it(401, [61, 120]), 1: it(400), 2: it(400) }, { coin: 20 });
+  const s = { merchant: 12474, cells: [{ item: 400, price: 10 }],
+    sell: { sent: 1, after: { index: 0 }, coinBefore: 0, coinAfter: 50 },
+    buy: { sent: 1, gained: 1, coinBefore: 50, coinAfter: 40 },
+    poor: { sent: 1, coinBefore: 40, coinAfter: 40, gained: 0 },
+    repeat: { sent: 2, coinBefore: 40, coinAfter: 20, gained: 2 },
+    beforeRelogin: end, relogin: structuredClone(end) };
+  checkShop(s);
+  checkShop({ ...s, poor: undefined, repeat: { sent: 1, coinBefore: 40, coinAfter: 30, gained: 1 } });
+  // Two units on one purchase (button held across frames), each paid.
+  checkShop({ ...s, buy: { sent: 2, gained: 2, coinBefore: 60, coinAfter: 40 } });
+  const bad = [
+    { cells: [] }, { sell: { ...s.sell, sent: 0 } }, { sell: { ...s.sell, after: { index: 7 } } },
+    { sell: { ...s.sell, coinAfter: 0 } }, { buy: { ...s.buy, gained: 0 } }, { buy: { ...s.buy, coinAfter: 50 } },
+    { poor: { ...s.poor, coinAfter: 30 } }, { poor: { ...s.poor, gained: 1 } },
+    { repeat: { sent: 2, coinBefore: 40, coinAfter: 30, gained: 2 } },
+    { buy: { sent: 2, gained: 2, coinBefore: 60, coinAfter: 45 } },
+    { relogin: bagOf({}, { 0: it(401, [61, 120]), 1: it(400) }, { coin: 20 }) },
+    { relogin: { ...structuredClone(end), coin: 30 } },
+  ];
+  for (const b of bad) assert.throws(() => checkShop({ ...s, ...b }), JSON.stringify(Object.keys(b)));
+});
+
+test('bank moves gold both ways by the amount, refuses overdraws and keeps both pools after relogin', () => {
+  const b = { opened: true, amount: 25,
+    deposit: { coinBefore: 50, cargoBefore: 0, coin: 25, cargo: 25 },
+    withdraw: { coin: 50, cargo: 0 },
+    overdraw: { sent: 1, coin: 50, cargo: 0 }, overdeposit: { sent: 0, coin: 50, cargo: 0 },
+    store: { item: 400, cargoItem: 400, carryItem: 0 }, fetch: { carryItem: 400 },
+    relogin: { coin: 50, cargo: 0 } };
+  checkBank(b);
+  const bad = [
+    { opened: false }, { deposit: { ...b.deposit, cargo: 0 } }, { deposit: { ...b.deposit, coin: 50 } },
+    { withdraw: { coin: 25, cargo: 25 } }, { overdraw: { sent: 0, coin: 50, cargo: 0 } },
+    { overdraw: { sent: 1, coin: 1050, cargo: -1000 } }, { overdeposit: { sent: 1, coin: 50, cargo: 0 } },
+    { store: { item: 400, cargoItem: 0, carryItem: 400 } }, { fetch: { carryItem: 0 } },
+    { relogin: { coin: 50, cargo: 25 } },
+  ];
+  for (const x of bad) assert.throws(() => checkBank({ ...b, ...x }), JSON.stringify(Object.keys(x)));
+});
+
+test('chat needs B to show the line and the whisper, and the /city commands to move A by the server', () => {
+  const c = { say: { sent: true, heard: true }, whisper: { sent: true, heard: true },
+    teleport: { moved: 400, bLost: true }, back: { moved: 400 } };
+  checkChat(c);
+  const bad = [
+    { say: { sent: true, heard: false } }, { whisper: { sent: false, heard: true } },
+    { teleport: { moved: 3, bLost: true } }, { teleport: { moved: 400, bLost: false } }, { back: { moved: 0 } },
+  ];
+  for (const x of bad) assert.throws(() => checkChat({ ...c, ...x }), JSON.stringify(Object.keys(x)));
 });

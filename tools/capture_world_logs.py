@@ -42,7 +42,7 @@ def main():
         row = json.loads(line)
         message = row.get('message', '')
         # Do not publish incidental world events from other players.
-        if not re.search(r'connection|recv packet|send packet|account login|account secure|create char|char(?:acter)? login|first action|teleport|disconnect|shop opened|skill learned|crack', message):
+        if not re.search(r'connection|recv packet|send packet|account login|account secure|create char|char(?:acter)? login|first action|teleport|disconnect|shop opened|skill learned|crack|buy ok|buy denied|buy resync|sell ok|cargo opened|cargo deposit|cargo withdraw|chat command', message):
             continue
         for key, value in sorted(secrets.items(), key=lambda kv: len(kv[1]), reverse=True):
             if value:

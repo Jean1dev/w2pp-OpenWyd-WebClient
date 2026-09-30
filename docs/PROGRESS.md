@@ -1,6 +1,6 @@
 # Progresso
 
-Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. A morte para os Trolls e a volta à cidade (caixa 11, `0x03AE`/`0x0289`, HP 2 no spawn) também foram aprovadas ([morte e respawn](evidence/05-gameplay/2026-09-29-death-respawn.md)). O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. Cliente Windows e o restante do gameplay ainda não foram provados.
+Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. A morte para os Trolls e a volta à cidade (caixa 11, `0x03AE`/`0x0289`, HP 2 no spawn) também foram aprovadas ([morte e respawn](evidence/05-gameplay/2026-09-29-death-respawn.md)). Também foram aprovados no Railway a poção (fatia 2) e a fatia 3: loja NPC (venda, compra, recusa, clique repetido), banco (item e ouro nos dois sentidos, recusas), chat (fala, sussurro, aviso de offline) e teleporte por comando `/cidade` ([fatia 3](evidence/05-gameplay/2026-09-30-shop-bank-chat.md)). O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. Cliente Windows, grupo, troca e reinício do servidor ainda não foram provados.
 
 | Etapa | Estado | Evidência |
 |---|---|---|
@@ -8,7 +8,7 @@ Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (combate básico, morte/respawn, uma skill de cada uma das quatro classes, Giro da Fúria em dois alvos e equipar/desequipar com observador aprovados; poção e loot implementados, sem execução online; drop no chão bloqueado pelo servidor) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; faltam buff/cura, grupo, troca e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Pendente | — |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
@@ -16,11 +16,11 @@ Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server
 ## Próxima ação
 
 1. Etapa 5:
-   - fatia 2: rodar `login,enter,second,death,potion` (duas páginas; precisa de mais memória livre que a disponível nesta sessão, issue #6);
-   - buff e cura exigem nível 11+ ou 16–20;
-   - depois loja, banco, teleporte, chat `0333/0334`, grupo, troca e persistência após reinício.
+   - fatia 4: grupo (`037F/03AB/037D`) e troca (`0383/0384`, com offsets divergentes na [matriz](compatibility.md)), incluindo convite recusado, cancelamento e desconexão;
+   - fatia 5: persistência após reinício controlado do servidor (exige combinar com o operador);
+   - buff e cura (nível 11+ ou 16–20), teleporte pago por NPC e ouro guardado no banco entre sessões.
 
-   Rodar os cenários online em processos separados, por causa da memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
+   Rodar os cenários online em processos separados. Antes de abrir A e B, confirmar ≥ 2 GB livres: órfãos `tail`/`grep`, Docker e Chrome em segundo plano custaram ~1,3 GB nesta sessão ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar:
    - repetir `npm run world` completo com o trajeto novo até o portal (a execução de 29/09 falhou só na caminhada da `mapchange`);
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
@@ -30,7 +30,8 @@ Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server
 5. Servidor, entregas separadas (não feitas):
    - itens no chão: `0x026E`, CNF de 28 bytes, decay e dono ([ADR 007](decisions/007-inventory-dialect.md));
    - enviar `0x0336` depois do login, porque o CurrentScore do snapshot é o template da classe;
-   - copiar o `Coin` do template para o mob em `SpawnMobAt`, porque hoje nenhum mob dá ouro.
+   - copiar o `Coin` do template para o mob em `SpawnMobAt`, porque hoje nenhum mob dá ouro;
+   - sussurro: gravar o nome de quem envia e reproduzir a reescrita legada; enviar aviso nas recusas de compra, venda, banco e teleporte; confirmar o layout de 57 bytes do `0x0339` ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
 6. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
@@ -394,5 +395,39 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
   - comparação com o cliente Windows.
 - **Limitações:** drop no chão bloqueado pelo servidor; cargo, split e delete fora desta fatia; a recusa por requisito no servidor (`NoticeReqNotMet`) não foi alcançada, porque o runtime bloqueia antes.
 - **Próximo passo:** rodar `potion` e `loot` com memória livre; depois buff/cura ou a fatia 3.
+
+### 30/09/2026 — etapa 5: poção (fatia 2) e fatia 3 (loja, banco, teleporte, chat)
+
+- **Pedido do usuário:** executar o orquestrador. No plano aprovado: poção primeiro, depois a fatia 3.
+- **Memória:** o usuário autorizou encerrar 61 processos `tail`/`grep` órfãos de monitores antigos e o Docker Desktop, fechou o Chrome (o processo em segundo plano foi encerrado) e fechou as outras sessões do Claude Code. O Node passou a ver 2,3–3,5 GB livres; nenhuma execução foi interrompida por memória.
+- **Arquivos:**
+  - alterados: `client/dialect/WydDialect.cpp`, `tools/protocol/{gen_fixtures.py,dialect_test.cpp,overlay/zz_ext_dialect_test.go,gen_client_stream.py}`, `tools/verify_world.mjs` (portal com nova tentativa, poção dentro da `death`, fases `shop`/`bank`/`chat` e auxiliares de sessão), `tools/world_checks{,.test}.mjs`, `tools/capture_world_logs.py`, `docs/compatibility.md`, checklist e inventário da etapa 5;
+  - novos: `patches/openwyd/0018-shop-cargo-chat-probes.patch`, [ADR 008](decisions/008-shop-cargo-chat-dialect.md), [evidências da fatia 3](evidence/05-gameplay/2026-09-30-shop-bank-chat.md), JSONs e logs do servidor sanitizados.
+- **Confirmado em teste:**
+  - `protocol:dialect` 545/0;
+  - `protocol:vectors` com 97 vetores e 28 fluxos, e overlay com os encoders reais;
+  - `world:checks` 25/0;
+  - `scene` e `client:stream` verdes;
+  - WASM `tmproject_startup.1790788748589055200` (SHA-256 `1433ef27…`), 115 objetos certificados, 0 indefinidos.
+- **Confirmado em execução (Railway):**
+  - poção aprovada na execução 8: uso com HP 80 → 130, uma unidade consumida pelo servidor, B vê a cura, clique duplo consome 2, relogin idêntico;
+  - loja, banco, chat e teleporte por `/azran`/`/armia` aprovados, com os valores do cliente iguais aos do log do servidor.
+- **Falhas registradas e corrigidas (harness):**
+  - regeneração enchendo o HP antes da poção (respawn de 1–50%, não HP 2);
+  - A passando do tile do portal;
+  - página 0 da bolsa cheia;
+  - clique segurado comprando duas vezes (comportamento original: 513 por nível + trava de 500 ms);
+  - nome "Guarda Carga";
+  - caixa de valor modal depois da recusa;
+  - corte do primeiro caractere no memo de sussurro.
+
+  O dialeto também teve de descartar o padding de `MSG_Sell` (20→18) e de `MSG_MessageWhisper` (160→158), detectado pelos `static_assert`.
+- **Limites:**
+  - só Chromium headless, sem cliente Windows;
+  - o nome do remetente do sussurro não foi observado (lacuna confirmada só em fonte);
+  - o `0x0339` @12 continua hipótese para ouro guardado entre sessões;
+  - teleporte pago, chat de grupo/guilda e interrupção no meio de uma transação não foram exercitados;
+  - sem commit nem deploy nesta sessão.
+- **Próximo passo:** fatia 4 (grupo e troca).
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

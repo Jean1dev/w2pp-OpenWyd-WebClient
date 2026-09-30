@@ -430,6 +430,46 @@ func TestExtDialectInbound(t *testing.T) {
 		}
 		same(t, EncodeUpdateCarryBody(carry, l.Coin), body(t, "update_carry"))
 	})
+	// Shop, cargo gold and chat (ADR 008).
+	t.Run("update_cargo_coin", func(t *testing.T) {
+		same(t, EncodeUpdateCargoCoin(1234567), body(t, "update_cargo_coin"))
+	})
+	t.Run("chat_notice", func(t *testing.T) {
+		// handler.sendChatText: append([]byte(text), 0), no fixed layout.
+		same(t, append([]byte("Pontos Caos atual: 3 (+1)"), 0), body(t, "chat_notice"))
+	})
+	t.Run("whisper_short", func(t *testing.T) {
+		var m MsgWhisperBody
+		copy(m.MobName[:], "Destino")
+		m.String = []byte("oi")
+		same(t, m.Encode(), body(t, "whisper_short"))
+	})
+	t.Run("whisper", func(t *testing.T) {
+		var m MsgWhisperBody
+		if err := m.Decode(body(t, "whisper")); err != nil || string(m.MobName[:7]) != "Destino" ||
+			len(m.String) != 130 || string(m.String[:3]) != "oi\x00" {
+			t.Fatalf("decode %v %q", err, m.MobName)
+		}
+	})
+	t.Run("deposit_echo", func(t *testing.T) {
+		if v, ok := StandardParm(body(t, "deposit_echo")); !ok || v != 500 {
+			t.Fatalf("parm %d %v", v, ok)
+		}
+	})
+	t.Run("buy_echo", func(t *testing.T) {
+		// handler/shop.go buy reads u16 @body0/2/4 and writes the new gold at body8.
+		b := body(t, "buy_echo")
+		if len(b) != 12 || le.Uint16(b[0:2]) != 12474 || int16(le.Uint16(b[2:4])) != 3 ||
+			int16(le.Uint16(b[4:6])) != 17 || int32(le.Uint32(b[8:12])) != 2400 {
+			t.Fatalf("buy echo % x", b)
+		}
+	})
+	t.Run("sell_echo", func(t *testing.T) {
+		b := body(t, "sell_echo")
+		if len(b) != 6 || le.Uint16(b[0:2]) != 12474 || int16(le.Uint16(b[2:4])) != 1 || int16(le.Uint16(b[4:6])) != 13 {
+			t.Fatalf("sell echo % x", b)
+		}
+	})
 	t.Run("update_etc", func(t *testing.T) {
 		var l struct {
 			Hold         uint32 `json:"hold"`
@@ -618,6 +658,14 @@ func TestExtDialectOutbound(t *testing.T) {
 		var m MsgTradingItemBody
 		if h.Type != MsgTradingItem || len(b) != MsgTradingItemBodySize || m.Decode(b) != nil || m != l.body() {
 			t.Fatalf("type %v len %d %+v", h.Type, len(b), m)
+		}
+	})
+	t.Run("buy", func(t *testing.T) {
+		h, b := frame("buy")
+		// handler/shop.go buy: TargetID u16 @body0, NPC slot @2, bag slot @4.
+		if h.Type != MsgBuy || len(b) != 12 || le.Uint16(b[0:2]) != 12474 ||
+			int16(le.Uint16(b[2:4])) != 3 || int16(le.Uint16(b[4:6])) != 17 || b[6] != 0 || b[7] != 0 {
+			t.Fatalf("type %v % x", h.Type, b)
 		}
 	})
 	t.Run("use_item", func(t *testing.T) {

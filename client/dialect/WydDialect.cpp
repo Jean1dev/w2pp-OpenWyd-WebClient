@@ -95,6 +95,21 @@ static_assert(sizeof(MSG_UseItem) == 36 && offsetof(MSG_UseItem, SourType) == 12
 // UpdateCarry (0x185, protocol/carry.go): Carry[64]@12 + Coin@524, identical.
 static_assert(sizeof(MSG_Carry) == 528 && offsetof(MSG_Carry, Carry) == 12 &&
 	offsetof(MSG_Carry, Coin) == 524, "MSG_Carry");
+// Shop, cargo gold and chat (ADR 008). MSG_Buy: TargetID@12, TargetCarryPos@14,
+// MyCarryPos@16, padding @18, Coin@20 (handler/shop.go buy reads @12/14/16 and
+// writes the new gold at @20 of its echo). MSG_Sell (20) and
+// MSG_MessageWhisper (160) end in 2 bytes of alignment padding that the
+// server's 18/158-byte contract does not have; the padding is never sent.
+// Chat and whisper are forwarded unchanged by the server (handler/chat.go;
+// protocol MsgWhisperBody: MobName[16] + trailing string).
+static_assert(sizeof(MSG_Buy) == 24 && offsetof(MSG_Buy, TargetID) == 12 &&
+	offsetof(MSG_Buy, TargetCarryPos) == 14 && offsetof(MSG_Buy, MyCarryPos) == 16 &&
+	offsetof(MSG_Buy, Coin) == 20, "MSG_Buy");
+static_assert(sizeof(MSG_Sell) == 20 && offsetof(MSG_Sell, TargetID) == 12 && offsetof(MSG_Sell, MyType) == 14 &&
+	offsetof(MSG_Sell, MyPos) == 16, "MSG_Sell");
+static_assert(sizeof(MSG_MessageChat) == 140 && offsetof(MSG_MessageChat, String) == 12, "MSG_MessageChat");
+static_assert(sizeof(MSG_MessageWhisper) == 160 && offsetof(MSG_MessageWhisper, MobName) == 12 &&
+	offsetof(MSG_MessageWhisper, String) == 28 && offsetof(MSG_MessageWhisper, Color) == 156, "MSG_MessageWhisper");
 static_assert(offsetof(MSG_ApplyBonus, BonusType) == 12 && offsetof(MSG_ApplyBonus, Detail) == 14 &&
 	offsetof(MSG_ApplyBonus, TargetID) == 16 && sizeof(MSG_ApplyBonus) == 20, "MSG_ApplyBonus");
 
@@ -118,6 +133,11 @@ constexpr int kSetHpDam = 20;
 constexpr int kSwapItem = 20;
 constexpr int kUseItemWire = 34;
 constexpr int kUpdateCarry = 528;
+constexpr int kUpdateCargoCoin = 57; // protocol/cargo.go: coin @12 (UNVERIFIED offset)
+constexpr int kBuy = 24;
+constexpr int kSell = 18;
+constexpr int kWhisperFixed = 28; // header + MobName[16]; the text is the remainder
+constexpr int kWhisper = 158;     // MobName + String[128] + Color, no tail padding
 // Slots the runtime grids can hold (TMFieldScene OnPacketSwapItem indexes
 // m_pGridInvList[pos/15] over 4 pages and the 16 server equip slots).
 constexpr int kEquipSlots = 16;
@@ -184,6 +204,13 @@ enum : unsigned short
 	OpAction2 = 0x368,
 	OpAction = 0x36C,
 	OpPing = 0x3A0,
+	OpMessageChat = 0x333,
+	OpMessageWhisper = 0x334,
+	OpUpdateCargoCoin = 0x339,
+	OpBuy = 0x379,
+	OpSell = 0x37A,
+	OpWithdraw = 0x387,
+	OpDeposit = 0x388,
 	OpAccountSecure = 0xFDE,
 	OpAccountSecureFail = 0xFDF,
 };
@@ -743,6 +770,50 @@ int InUseItem(const char* w, char* out, int outCap, int* outSize)
 	return WYD_DIALECT_TRANSLATED;
 }
 
+// Chat line (0x333). A player's line is forwarded as the speaker sent it (140
+// bytes from this runtime); server notices (sendChatText, sendNPCChatText, /nick)
+// are the bare NUL-terminated text. Both become the runtime's fixed layout with
+// a terminator the consumers can rely on.
+int InMessageChat(const char* w, int wireSize, char* out, int outCap, int* outSize)
+{
+	if (wireSize > static_cast<int>(sizeof(MSG_MessageChat)))
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpMessageChat);
+	auto* m = Begin<MSG_MessageChat>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpMessageChat);
+	std::memcpy(m->String, w + kHeader, wireSize - kHeader);
+	m->String[sizeof(m->String) - 1] = 0;
+	return WYD_DIALECT_TRANSLATED;
+}
+
+// Whisper (0x334): the server forwards the sender's payload (MobName + text,
+// any length >= 16 body bytes); normalize to the 160-byte runtime layout.
+int InMessageWhisper(const char* w, int wireSize, char* out, int outCap, int* outSize)
+{
+	if (wireSize < kWhisperFixed || wireSize > kWhisper)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpMessageWhisper);
+	auto* m = Begin<MSG_MessageWhisper>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpMessageWhisper);
+	std::memcpy(out + kHeader, w + kHeader, wireSize - kHeader);
+	m->MobName[sizeof(m->MobName) - 1] = 0;
+	m->String[sizeof(m->String) - 1] = 0;
+	return WYD_DIALECT_TRANSLATED;
+}
+
+// Account cargo gold (0x339): 57 bytes on the wire, StandardParm(coin) in the
+// runtime (OnPacketUpdateCargoCoin). The server writes the coin at @12 and
+// marks that offset UNVERIFIED; ADR 008 keeps it a hypothesis until a run
+// compares the bank display with the server log.
+int InUpdateCargoCoin(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_STANDARDPARM>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpUpdateCargoCoin);
+	m->Parm = I32(w, 12);
+	return WYD_DIALECT_TRANSLATED;
+}
+
 int PassIfSize(int wireSize, int want, unsigned short op)
 {
 	if (wireSize != want)
@@ -826,6 +897,20 @@ int WydDialectInbound(const char* wire, int wireSize, char* out, int outCap, int
 			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
 	case OpUpdateEtc:
 		return PassIfSize(wireSize, 48, op);
+	case OpMessageChat:
+		return Translated(InMessageChat(wire, wireSize, out, outCap, outSize));
+	case OpMessageWhisper:
+		return Translated(InMessageWhisper(wire, wireSize, out, outCap, outSize));
+	case OpUpdateCargoCoin:
+		return exact(kUpdateCargoCoin) ? Translated(InUpdateCargoCoin(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpBuy: // echo of this runtime's 24-byte request, new gold @20 (OnPacketBuy ignores it)
+		return PassIfSize(wireSize, kBuy, op);
+	case OpSell: // echo of the 18-byte request; OnPacketSell reads fields up to @17
+		return PassIfSize(wireSize, kSell, op);
+	case OpDeposit: // echo of StandardParm(amount); the runtime applies it as a delta
+	case OpWithdraw:
+		return PassIfSize(wireSize, 16, op);
 	case OpAction:
 	case OpActionStop:
 	case OpAction2:
@@ -1029,6 +1114,41 @@ int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int*
 		Put16(out, 32, in->ItemID);
 		return OutDone(outSize, kUseItemWire);
 	}
+	case OpBuy:
+	{
+		// Buy from the open NPC shop (SGrid.cpp). Written by field so the
+		// runtime's padding @18 never reaches the server, which echoes the
+		// payload back with the new gold at @20.
+		if (msgSize != static_cast<int>(sizeof(MSG_Buy)) || outCap < kBuy)
+			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		const auto* in = reinterpret_cast<const MSG_Buy*>(msg);
+		std::memset(out, 0, kBuy);
+		std::memcpy(out, msg, kHeader);
+		Put16(out, 12, in->TargetID);
+		Put16(out, 14, static_cast<std::uint16_t>(in->TargetCarryPos));
+		Put16(out, 16, static_cast<std::uint16_t>(in->MyCarryPos));
+		Put32(out, 20, static_cast<std::uint32_t>(in->Coin));
+		return OutDone(outSize, kBuy);
+	}
+	case OpSell: // TargetID, MyType, MyPos (handler/shop.go sell); padding @18 dropped
+		if (msgSize != static_cast<int>(sizeof(MSG_Sell)) || outCap < kSell)
+			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		std::memcpy(out, msg, kSell);
+		out[0] = static_cast<char>(kSell);
+		out[1] = 0;
+		return OutDone(outSize, kSell);
+	case OpDeposit: // StandardParm(amount) (handler/cargo.go)
+	case OpWithdraw:
+		return OutPass(msgSize, 16, op);
+	case OpMessageChat: // String[128]; the server multicasts it unchanged
+		return OutPass(msgSize, static_cast<int>(sizeof(MSG_MessageChat)), op);
+	case OpMessageWhisper: // MobName[16] + String[128] + Color; also carries "/command"
+		if (msgSize != static_cast<int>(sizeof(MSG_MessageWhisper)) || outCap < kWhisper)
+			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		std::memcpy(out, msg, kWhisper); // tail padding @158 dropped
+		out[0] = static_cast<char>(kWhisper);
+		out[1] = 0;
+		return OutDone(outSize, kWhisper);
 	case OpRestart: // header only (TMFieldScene recall after death / town)
 		return OutPass(msgSize, kHeader, op);
 	case OpReqMobByID: // StandardParm(mob id): unknown attacker, ask for CreateMob
