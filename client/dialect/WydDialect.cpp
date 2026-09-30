@@ -19,6 +19,10 @@ namespace
 {
 // ---- runtime layout contract (measured by tools/probe_upstream_layouts.py) ----
 static_assert(sizeof(MSG_STANDARD) == 12, "header");
+static_assert(sizeof(MSG_REQParty) == 44 && offsetof(MSG_REQParty, TargetID) == 40, "REQParty");
+static_assert(sizeof(MSG_AddParty) == 40 && sizeof(PARTY) == 26, "AddParty");
+static_assert(sizeof(MSG_CNFParty2) == 32 && offsetof(MSG_CNFParty2, LeaderName) == 14, "AcceptParty");
+static_assert(sizeof(MSG_Trade) == 156 && offsetof(MSG_Trade, TradeMoney) == 148, "Trade remains blocked");
 static_assert(sizeof(STRUCT_ITEM) == 8, "STRUCT_ITEM");
 static_assert(sizeof(STRUCT_SCORE) == 48, "STRUCT_SCORE");
 static_assert(MAX_CARGO >= 128, "cargo must hold the server's 128 slots (patch 0003)");
@@ -213,6 +217,10 @@ enum : unsigned short
 	OpDeposit = 0x388,
 	OpAccountSecure = 0xFDE,
 	OpAccountSecureFail = 0xFDF,
+	OpReqParty = 0x37F,
+	OpAcceptParty = 0x3AB,
+	OpAddParty = 0x37D,
+	OpRemoveParty = 0x37E,
 };
 
 int g_clientVersion = 0;
@@ -814,6 +822,49 @@ int InUpdateCargoCoin(const char* w, char* out, int outCap, int* outSize)
 	return WYD_DIALECT_TRANSLATED;
 }
 
+int InParty(const char* w, int size, char* out, int cap, int* outSize, unsigned short op)
+{
+	const int want = op == OpReqParty ? 48 : op == OpAddParty ? 40 : 16;
+	if (size != want) return Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	if (op == OpRemoveParty)
+	{
+		const int id = I16(w, 12);
+		if (id < 0 || id >= 1000) return Fail(WYD_STAT_IN_DROP_RANGE, 0, op);
+		auto* m = Begin<MSG_STANDARDPARM>(w, out, cap, outSize);
+		if (!m) return Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+		m->Parm = id; // ignore legacy tail padding; do not read it as high ID bits
+		return WYD_DIALECT_TRANSLATED;
+	}
+	const int id = U16(w, 20), level = U16(w, 14), maxHp = U16(w, 16), hp = U16(w, 18);
+	const int leader = U16(w, 12);
+	if (id <= 0 || id >= 1000 || level > 32767 || maxHp > 32767 || hp > 32767 ||
+		(op == OpAddParty && leader != id && leader != 30000) ||
+		(op == OpReqParty && (U8(w, 12) > 3 || U8(w, 13) != 0)))
+		return Fail(WYD_STAT_IN_DROP_RANGE, 0, op);
+	PARTY* p;
+	if (op == OpReqParty)
+	{
+		auto* m = Begin<MSG_REQParty>(w, out, cap, outSize);
+		if (!m) return Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+		p = &m->Leader;
+		p->Class = U8(w, 12);
+	}
+	else
+	{
+		auto* m = Begin<MSG_AddParty>(w, out, cap, outSize);
+		if (!m) return Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+		p = &m->Party;
+		p->Class = -1; // absent on wire; scene may resolve it from the real entity
+		p->PartyIndex = leader == id ? 0 : 1;
+	}
+	p->ID = id;
+	p->Level = static_cast<short>(level);
+	p->MaxHp = static_cast<short>(maxHp);
+	p->Hp = static_cast<short>(hp);
+	std::memcpy(p->Name, w + 22, 16);
+	return WYD_DIALECT_TRANSLATED;
+}
+
 int PassIfSize(int wireSize, int want, unsigned short op)
 {
 	if (wireSize != want)
@@ -843,6 +894,10 @@ int WydDialectInbound(const char* wire, int wireSize, char* out, int outCap, int
 
 	switch (op)
 	{
+	case OpReqParty:
+	case OpAddParty:
+	case OpRemoveParty:
+		return Translated(InParty(wire, wireSize, out, outCap, outSize, op));
 	case OpCNFAccountLogin:
 		return exact(kCNFAccountLogin) ? Translated(InCNFAccountLogin(wire, out, outCap, outSize))
 			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
@@ -964,6 +1019,44 @@ int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int*
 
 	switch (op)
 	{
+	case OpReqParty:
+	{
+		if (msgSize != sizeof(MSG_REQParty) || outCap < 48) return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		const auto* m = reinterpret_cast<const MSG_REQParty*>(msg);
+		if (m->TargetID <= 0 || m->TargetID >= 1000 || m->Leader.ID <= 0 || m->Leader.ID >= 1000 ||
+			m->Leader.ID != U16(msg, 6) || m->Leader.Class < -1 || m->Leader.Class > 3 || m->Leader.PartyIndex != 0)
+			return OutFail(WYD_STAT_OUT_DROP_RANGE, op);
+		std::memset(out, 0, 48);
+		std::memcpy(out, msg, 12);
+		Put16(out, 0, 48);
+		// Runtime sends body mesh - 1 (-1 for male bodies), as 7662 does; the server
+		// ignores @12 and re-encodes its own class in the forwarded invite.
+		out[12] = m->Leader.Class;
+		Put16(out, 14, static_cast<unsigned short>(m->Leader.Level));
+		Put16(out, 16, static_cast<unsigned short>(m->Leader.MaxHp));
+		Put16(out, 18, static_cast<unsigned short>(m->Leader.Hp));
+		Put16(out, 20, m->Leader.ID);
+		std::memcpy(out + 22, m->Leader.Name, 16);
+		Put32(out, 40, m->TargetID); // server Unk is its primary destination
+		Put16(out, 44, m->TargetID);
+		return OutDone(outSize, 48);
+	}
+	case OpAcceptParty:
+	{
+		if (msgSize != sizeof(MSG_CNFParty2) || outCap < 32) return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		const auto* m = reinterpret_cast<const MSG_CNFParty2*>(msg);
+		if (m->LeaderID <= 0 || m->LeaderID >= 1000) return OutFail(WYD_STAT_OUT_DROP_RANGE, op);
+		std::memset(out, 0, 32);
+		std::memcpy(out, msg, 12);
+		Put16(out, 0, 32);
+		Put16(out, 12, m->LeaderID);
+		std::memcpy(out + 14, m->LeaderName, 16);
+		return OutDone(outSize, 32);
+	}
+	case OpRemoveParty:
+		if (msgSize != 16) return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		if (I32(msg, 12) < 0 || I32(msg, 12) >= 1000) return OutFail(WYD_STAT_OUT_DROP_RANGE, op);
+		return OutPass(msgSize, 16, op);
 	case OpAccountLogin:
 	{
 		if (msgSize != static_cast<int>(sizeof(MSG_AccountLogin)) || outCap < kAccountLoginWire)

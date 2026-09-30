@@ -466,6 +466,40 @@ def out_attack(d: dict) -> bytearray:
     return b
 
 
+def party_frame(kind: str) -> bytearray:
+    if kind == "accept":
+        b = header(32, 0x3AB, 8)
+        struct.pack_into("<h", b, 12, 7)
+        put_name(b, 14, "PartyA")
+    elif kind == "remove":
+        b = header(16, 0x37E, 30000)
+        struct.pack_into("<hh", b, 12, 8, 0)
+    elif kind in ("leader", "member"):
+        b = header(40, 0x37D, 30000)
+        struct.pack_into("<HHHHH", b, 12, 7 if kind == "leader" else 30000, 8, 130, 80, 7 if kind == "leader" else 8)
+        put_name(b, 22, "PartyA" if kind == "leader" else "PartyB")
+        struct.pack_into("<H", b, 38, 52428)
+    else:
+        b = header(48, 0x37F, 7 if kind == "request" else 30000)
+        struct.pack_into("<BBHHHh", b, 12, 0, 0, 8, 130, 80, 7)
+        put_name(b, 22, "PartyA")
+        if kind == "request":
+            struct.pack_into("<ih", b, 40, 8, 8)
+    return b
+
+
+def trade_frame(result=False) -> bytearray:
+    b = header(21 if result else 154, 0x383, 7)
+    if result:
+        b[12] = 1
+        put_item(b, 13, {"index": 1100})
+    else:
+        put_item(b, 12, {"index": 1100})
+        b[132] = 3
+        struct.pack_into("<iBH", b, 147, 50, 1, 8)
+    return b
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.parse_args()
@@ -528,6 +562,13 @@ def main() -> int:
         "use_item": (use_item(OUT_USE), OUT_USE),
         "buy": (buy(OUT_BUY), OUT_BUY),
     }
+    for kind in ("invite", "leader", "member", "remove"):
+        inbound["party_" + kind] = (party_frame(kind), {"kind": kind})
+    for kind in ("request", "accept"):
+        outbound["party_" + kind] = (party_frame(kind), {"kind": kind})
+    outbound["trade_offer_blocked"] = (trade_frame(), {"blocked": True})
+    inbound["trade_result_blocked"] = (trade_frame(True), {"blocked": True})
+    inbound["trade_ack_blocked"] = (header(13, 0x383, 7), {"blocked": True})
     doc = {
         "generator": "tools/protocol/gen_fixtures.py",
         "note": "synthetic; no real account data. wire_hex is the full plaintext frame (header included).",

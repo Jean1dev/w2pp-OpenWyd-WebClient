@@ -6,6 +6,7 @@
 package protocol
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -13,6 +14,39 @@ import (
 	"strconv"
 	"testing"
 )
+
+func TestExtDialectPartyTrade(t *testing.T) {
+	d := loadDialect(t)
+	body := func(group map[string]fxFrame, name string) []byte {
+		b, err := hex.DecodeString(group[name].WireHex)
+		if err != nil || len(b) < HeaderSize { t.Fatalf("invalid fixture %s", name) }
+		return b[HeaderSize:]
+	}
+	req := MsgSendReqPartyBody{Class: 0, Level: 8, MaxHP: 130, HP: 80, PartyID: 7}
+	copy(req.MobName[:], "PartyA")
+	if !bytes.Equal(req.Encode(), body(d.Inbound, "party_invite")) { t.Fatal("invite encoder differs") }
+	req.Unk, req.Target = 8, 8
+	var decoded MsgSendReqPartyBody
+	if decoded.Decode(body(d.Outbound, "party_request")) != nil || decoded != req { t.Fatal("invite decoder differs") }
+	accept := MsgAcceptPartyBody{LeaderID: 7}; copy(accept.MobName[:], "PartyA")
+	var got MsgAcceptPartyBody
+	if got.Decode(body(d.Outbound, "party_accept")) != nil || got != accept || !bytes.Equal(accept.Encode(), body(d.Outbound, "party_accept")) { t.Fatal("accept differs") }
+	for _, kind := range []string{"leader", "member"} {
+		m := MsgCNFAddPartyBody{LeaderConn: 7, Level: 8, MaxHP: 130, HP: 80, PartyID: 7, Target: 52428}
+		name := "PartyA"
+		if kind == "member" { m.LeaderConn, m.PartyID, name = 30000, 8, "PartyB" }
+		copy(m.MobName[:], name)
+		if !bytes.Equal(m.Encode(), body(d.Inbound, "party_" + kind)) { t.Fatal("add differs", kind) }
+	}
+	remove := MsgRemovePartyBody{LeaderConn: 8}
+	if !bytes.Equal(remove.Encode(), body(d.Inbound, "party_remove")) { t.Fatal("remove differs") }
+	var trade MsgTradeBody
+	offer := body(d.Outbound, "trade_offer_blocked")
+	if trade.Decode(offer) != nil || trade.Item[0].Index != 1100 || trade.InvenPos[0] != 3 || trade.TradeMoney != 50 || trade.MyCheck != 1 || trade.OpponentID != 8 || !bytes.Equal(trade.Encode(), offer) { t.Fatal("blocked trade offer differs") }
+	for _, name := range []string{"trade_ack_blocked", "trade_result_blocked"} {
+		if trade.Decode(body(d.Inbound, name)) == nil { t.Fatal("placeholder unexpectedly fits classic offer", name) }
+	}
+}
 
 type fxItem struct {
 	Index uint16     `json:"index"`

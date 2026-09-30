@@ -827,6 +827,72 @@ static void TestShopCargoChat()
 	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_UNKNOWN) == 0);
 }
 
+static void TestParty()
+{
+	int size = 0;
+	CHECK(In(k_in_party_invite, &size) == WYD_DIALECT_TRANSLATED && size == 44);
+	auto* req = reinterpret_cast<MSG_REQParty*>(g_out);
+	CHECK(req->Leader.ID == 7 && req->Leader.Class == 0 && req->Leader.PartyIndex == 0);
+	CHECK(req->Leader.Level == 8 && req->Leader.MaxHp == 130 && req->Leader.Hp == 80 && Name(req->Leader.Name, "PartyA"));
+	CHECK(req->TargetID == 0);
+	CHECK(In(k_in_party_leader, &size) == WYD_DIALECT_TRANSLATED && size == 40);
+	auto* add = reinterpret_cast<MSG_AddParty*>(g_out);
+	CHECK(add->Party.ID == 7 && add->Party.PartyIndex == 0 && add->Party.Class == -1);
+	CHECK(In(k_in_party_member, &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(add->Party.ID == 8 && add->Party.PartyIndex == 1 && Name(add->Party.Name, "PartyB"));
+	CHECK(add->Party.Level == 8 && add->Party.Hp == 80 && add->Party.MaxHp == 130);
+	CHECK(In(k_in_party_remove, &size) == WYD_DIALECT_TRANSLATED && size == 16);
+	CHECK(reinterpret_cast<MSG_STANDARDPARM*>(g_out)->Parm == 8);
+	for (int n = 12; n < 48; ++n) CHECK(In(k_in_party_invite, &size, n) == WYD_DIALECT_DROP);
+	char bad[49] = {};
+	std::memcpy(bad, k_in_party_member, 40);
+	bad[20] = 0; bad[21] = 0;
+	CHECK(WydDialectInbound(bad, 40, g_out, sizeof(g_out), &size) == WYD_DIALECT_DROP);
+	std::memcpy(bad, k_in_party_member, 40); bad[15] = static_cast<char>(128);
+	CHECK(WydDialectInbound(bad, 40, g_out, sizeof(g_out), &size) == WYD_DIALECT_DROP);
+	CHECK(WydDialectInbound(reinterpret_cast<const char*>(k_in_party_member), 40, g_out, 39, &size) == WYD_DIALECT_DROP);
+	std::memcpy(bad, k_in_party_remove, 16); bad[14] = bad[15] = static_cast<char>(0xAB);
+	CHECK(WydDialectInbound(bad, 16, g_out, sizeof(g_out), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(reinterpret_cast<MSG_STANDARDPARM*>(g_out)->Parm == 8);
+	MSG_REQParty r{};
+	std::memcpy(&r.Header, k_out_party_request, 12);
+	r.Header.Size = sizeof(r); r.Leader.Class = 0; r.Leader.ID = 7;
+	r.Leader.Level = 8; r.Leader.MaxHp = 130; r.Leader.Hp = 80;
+	std::memcpy(r.Leader.Name, "PartyA", 6); r.TargetID = 8;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&r), sizeof(r), g_out, sizeof(g_out), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 48 && std::memcmp(g_out, k_out_party_request, 48) == 0);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&r), sizeof(r) - 1, g_out, sizeof(g_out), &size) == WYD_DIALECT_DROP);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&r), sizeof(r), g_out, 47, &size) == WYD_DIALECT_DROP);
+	r.Leader.ID = 8;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&r), sizeof(r), g_out, sizeof(g_out), &size) == WYD_DIALECT_DROP);
+	r.Leader.ID = 7;
+	r.Leader.Class = -1; // male body: 7662 sends 0xFF, the server ignores it
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&r), sizeof(r), g_out, sizeof(g_out), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 48 && static_cast<unsigned char>(g_out[12]) == 0xFF && std::memcmp(g_out + 13, k_out_party_request + 13, 35) == 0);
+	r.Leader.Class = 4;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&r), sizeof(r), g_out, sizeof(g_out), &size) == WYD_DIALECT_DROP);
+	r.Leader.Class = 0;
+	r.TargetID = 1000;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&r), sizeof(r), g_out, sizeof(g_out), &size) == WYD_DIALECT_DROP);
+	MSG_CNFParty2 a;
+	std::memset(&a, 0xAB, sizeof(a));
+	std::memcpy(&a, k_out_party_accept, 30);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), sizeof(a), g_out, sizeof(g_out), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 32 && std::memcmp(g_out, k_out_party_accept, 32) == 0);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), 30, g_out, sizeof(g_out), &size) == WYD_DIALECT_DROP);
+	MSG_STANDARDPARM leave{}; leave.Header.Type = 0x37E; leave.Header.Size = sizeof(leave); leave.Parm = 8;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&leave), sizeof(leave), g_out, sizeof(g_out), &size) == WYD_DIALECT_PASS);
+	leave.Parm = -1;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&leave), sizeof(leave), g_out, sizeof(g_out), &size) == WYD_DIALECT_DROP);
+	a.LeaderID = -1;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&a), sizeof(a), g_out, sizeof(g_out), &size) == WYD_DIALECT_DROP);
+	CHECK(In(k_in_trade_result_blocked, &size) == WYD_DIALECT_DROP);
+	CHECK(In(k_in_trade_ack_blocked, &size) == WYD_DIALECT_DROP);
+	CHECK(WydDialectInbound(reinterpret_cast<const char*>(k_out_trade_offer_blocked), 154, g_out, sizeof(g_out), &size) == WYD_DIALECT_DROP);
+	MSG_Trade t{}; t.Header.Type = 0x383;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&t), sizeof(t), g_out, sizeof(g_out), &size) == WYD_DIALECT_DROP);
+}
+
 int main()
 {
 	TestAccountLogin();
@@ -840,6 +906,7 @@ int main()
 	TestCombatDiagnostics();
 	TestItems();
 	TestShopCargoChat();
+	TestParty();
 	std::printf("%d checks, %d failures\n", g_checks, g_failures);
 	return g_failures == 0 ? 0 : 1;
 }

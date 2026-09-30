@@ -36,6 +36,7 @@ import { freemem, totalmem } from 'node:os';
 import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { areaPair, checkAreaAttempt } from './area_checks.mjs';
+import { checkParty, checkPartyEvidence } from './party_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
   checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkChat, itemAmount } from './world_checks.mjs';
 
@@ -628,6 +629,71 @@ class Session {
     });
   }
 
+  party() {
+    return this.eval(() => Array.from({ length: Module._wyd_field_party_count() }, (_, row) => {
+      const id = Module._wyd_field_party_value(row, 0);
+      return { id, state: Module._wyd_field_party_value(row, 1), level: Module._wyd_field_party_value(row, 2),
+        member: Module._wyd_field_party_member(id), x: Module._wyd_field_party_value(row, 4), y: Module._wyd_field_party_value(row, 5) };
+    }));
+  }
+
+  async partyButton(id) {
+    await this.frames(2);
+    const p = await this.eval(id => [Module._wyd_field_button_screen(id, 0), Module._wyd_field_button_screen(id, 1)], id);
+    assert(p.every(n => n >= 0), `party control ${id} not visible`);
+    await this.clickCanvas(...p);
+  }
+
+  async inviteParty(other) {
+    await this.closePanels();
+    await this.until('party target visible', id => Module._wyd_field_human_present(id) === 1, 30000, other.id);
+    // NPCs crowd the spawn; approach B so its pick volume is on screen and unobstructed.
+    const seen = await this.other(other.id), me = await this.me();
+    if (Math.hypot(seen.x - me.x, seen.y - me.y) > 3)
+      await this.walkTo(seen.x, seen.y, { near: 2, maxClicks: 8, stallOk: true });
+    // Ctrl only once hover confirms B: closePanels/hover must not run with Ctrl held.
+    let ctrl = false;
+    try {
+      const picked = await this.clickHuman(other.id, 'right', async () => {
+        await this.page.keyboard.down('Control'); ctrl = true; await this.frames(1); return true;
+      });
+      if (!picked) {
+        await this.shot('party-pick-failed');
+        throw new Error(`party target not picked: ${JSON.stringify({ me: await this.me(), other: await this.other(other.id),
+          screen: await this.eval(i => [Module._wyd_field_human_screen(i, 0), Module._wyd_field_human_screen(i, 1)], other.id),
+          hover: await this.eval(() => Module._wyd_field_hover_human_id()) })}`);
+      }
+    } finally { if (ctrl) await this.page.keyboard.up('Control'); }
+    await this.until('player menu', id => Module._wyd_field_party_menu_target() === id, 15000, other.id);
+    await this.partyButton(641);
+    await other.until('party invitation', id => Module._wyd_field_party_count() === 1 &&
+      Module._wyd_field_party_value(0, 0) === id && Module._wyd_field_party_value(0, 1) === 1, 30000, this.id);
+  }
+
+  async partyRow(id, ctrl = false) {
+    const row = (await this.party()).find(r => r.id === id);
+    assert(row, 'party row missing');
+    if (ctrl) await this.page.keyboard.down('Control');
+    try { await this.clickCanvas(row.x, row.y); }
+    finally { if (ctrl) await this.page.keyboard.up('Control'); }
+  }
+
+  async waitParty(ids, leader) {
+    await this.until('confirmed party rows', ({ ids, leader }) => {
+      if (Module._wyd_field_party_count() !== ids.length) return false;
+      const seen = new Set();
+      for (let k = 0; k < ids.length; ++k) {
+        const id = Module._wyd_field_party_value(k, 0);
+        if (!ids.includes(id) || seen.has(id) || Module._wyd_field_party_value(k, 1) !== (id === leader ? 2 : 0)) return false;
+        seen.add(id);
+      }
+      return true;
+    }, 30000, { ids, leader });
+    const rows = await this.party();
+    checkParty(rows, ids, leader);
+    return rows;
+  }
+
   // The inventory window with the real "i" key (OnKeyVisibleInven), page 0.
   async openInventory() {
     await this.closePanels();
@@ -869,7 +935,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat'].some(x => phases.has(x)) ? 25 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party'].some(x => phases.has(x)) ? 25 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -920,6 +986,7 @@ async function main() {
 
   let a, b;
   try {
+    if (phases.has('party')) assert(freemem() >= 2 * 1024 ** 3, 'party requires 2 GiB free before opening A/B');
     gw = await startGateway(await freePort(), opt.target);
     browser = await chromium.launch({ headless: !opt.headed });
     await step('badpass', async () => {
@@ -1095,7 +1162,7 @@ async function main() {
       if (!pin.already && pin.result !== 'lock1') throw new Error(`PIN rejected (${pin.result})`);
       let slots = await b.slots();
       if (!slots[0].name) {
-        assert(!phases.has('attack') && !phases.has('castarea'), 'combat requires an existing B character');
+        assert(!phases.has('attack') && !phases.has('castarea') && !phases.has('party'), 'scenario requires an existing B character');
         await b.create(B.char, cls); slots = await b.slots();
       }
       const me = await b.enter(0);
@@ -2202,6 +2269,62 @@ async function main() {
       const c5 = await a.cargo();
       res.relogin = { coin: c5.coin, cargo: c5.cargo, item: c5.items[free] };
       checkBank(res);
+      return res;
+    });
+
+    await step('party', async () => {
+      const res = {}; r.party = res;
+      const inventory = async s => {
+        const v = await s.bag(); return { equip: v.equip, carry: v.carry, coin: v.coin, level: v.level, exp: v.exp };
+      };
+      const beforeA = await inventory(a), beforeB = await inventory(b);
+      const pair = async () => ({ aId: a.id, bId: b.id,
+        a: await a.waitParty([a.id, b.id], a.id), b: await b.waitParty([a.id, b.id], a.id) });
+      const empty = async () => ({ a: await a.waitParty([], 0), b: await b.waitParty([], 0) });
+      const joinParty = async () => {
+        await a.inviteParty(b); await b.partyRow(a.id); return pair();
+      };
+      const reconnect = async (label, creds) => {
+        const s = await newSession(label, creds);
+        await s.loginToSelect(); const pin = await s.pin();
+        assert(pin.already || pin.result === 'lock1', 'party relogin PIN rejected');
+        await s.enter(0); return s;
+      };
+      await a.waitParty([], 0); await b.waitParty([], 0);
+      await a.inviteParty(b);
+      await b.shot('party-invitation');
+      assert.equal(await b.eval(id => Module._wyd_field_party_member(id), a.id), 0, 'invitation prematurely joined');
+      await b.partyButton(475139);
+      res.refused = await empty();
+      res.accepted = await joinParty();
+      await a.shot('party-accepted'); await b.shot('party-accepted');
+      await b.partyRow(a.id); await b.partyRow(a.id);
+      res.repeated = await pair();
+      await b.partyButton(475139);
+      res.left = await empty();
+      await joinParty();
+      await a.partyRow(b.id, true);
+      await a.until('kick confirmation', () => Module._wyd_scene_msgbox_message() === 50001, 15000);
+      await a.page.locator('#canvas').press('Enter'); await a.frames(2);
+      res.kicked = await empty();
+      await joinParty();
+      await b.healthy(); await b.close();
+      res.memberDisconnected = { a: await a.waitParty([], 0) };
+      b = await reconnect('B-party-relogin', B);
+      assert.deepEqual(await inventory(b), beforeB, 'B changed after relogin');
+      await b.waitParty([], 0);
+      res.rejoined = await joinParty();
+      await a.healthy(); await a.close();
+      res.leaderDisconnected = { b: await b.waitParty([], 0) };
+      a = await reconnect('A-party-relogin', A);
+      await a.waitParty([], 0);
+      await joinParty();
+      await b.partyButton(475139); await empty();
+      assert.deepEqual(await inventory(a), beforeA, 'A changed after relogin');
+      assert.deepEqual(await inventory(b), beforeB, 'B changed during party tests');
+      res.inventoryPreserved = true;
+      await a.shot('party-final'); await b.shot('party-final');
+      checkPartyEvidence(res);
       return res;
     });
 
