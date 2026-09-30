@@ -1,0 +1,24 @@
+Skill master NPC: record the clicked NPC for the skill grid as well.
+
+TMFieldScene::MouseClick dispatches NPCs by CurrentScore.Reserved & 0xF. The
+server sends Merchant 19 for class skill masters (19 & 0xF == 3), which enters
+the shop branch: it sends 0x027B and stores the NPC in m_pGridShop only. The
+later MouseClick_SkillMasterNPC branch has the same condition and is never
+reached, so m_pGridSkillMaster->m_dwMerchantID stayed 0 and a learn request
+would carry TargetID 0 (skill.go learnSkill rejects it). No packet changes.
+
+diff --git a/Projects/TMProject/TMFieldScene.cpp b/Projects/TMProject/TMFieldScene.cpp
+--- a/Projects/TMProject/TMFieldScene.cpp
++++ b/Projects/TMProject/TMFieldScene.cpp
+@@ -11060,6 +11060,11 @@ int TMFieldScene::MouseClick_NPC(int nX, int nY, D3DXVECTOR3 vec, unsigned int d
+ 			stReqShopList.TargetID = pOver->m_dwID;
+ 
+ 			m_pGridShop->m_dwMerchantID = pOver->m_dwID;
++			// Merchant 19 (class skill master) also lands here: & 0xF == 3. The
++			// MouseClick_SkillMasterNPC branch below has the same condition and is
++			// unreachable, so record the NPC for the skill grid too; the server's
++			// ShopType (1 shop, 3 skills) decides which window opens.
++			m_pGridSkillMaster->m_dwMerchantID = pOver->m_dwID;
+ 
+ 			SendOneMessage((char*)&stReqShopList, sizeof(stReqShopList));
+ 

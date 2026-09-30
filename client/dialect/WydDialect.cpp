@@ -71,6 +71,18 @@ static_assert(offsetof(MSG_Attack, FakeExp) == 12 && offsetof(MSG_Attack, ReqMp)
 	offsetof(MSG_Attack, Dam) == 60, "MSG_Attack");
 static_assert(offsetof(MSG_AttackOne, Dam) == 60 && offsetof(MSG_AttackTwo, Dam) == 60 &&
 	offsetof(MSG_AttackOne, SkillIndex) == 56 && offsetof(MSG_AttackTwo, SkillIndex) == 56, "Attack prefix");
+// NPC shop / skill learning: identical to protocol/shop.go EncodeShopListBody
+// (ShopType@12, List[27]@16 of 8-byte items, Tax@232), reqShopList (u16
+// target @12) and MsgApplyBonusBody (BonusType@12, Detail@14, TargetID@16).
+static_assert(sizeof(STRUCT_ITEM) == 8 && sizeof(MSG_ShopList) == 236 && offsetof(MSG_ShopList, ShopType) == 12 &&
+	offsetof(MSG_ShopList, List) == 16 && offsetof(MSG_ShopList, Tax) == 232, "MSG_ShopList");
+// Motion (level-up/emote animation, mobkilled.go): server Motion u16@12, Parm
+// u16@14, NotUsed int32@16 always zero -> runtime Direction float@16 = 0.0f.
+static_assert(sizeof(MSG_Motion) == 20 && offsetof(MSG_Motion, Motion) == 12 && offsetof(MSG_Motion, Parm) == 14 &&
+	offsetof(MSG_Motion, Direction) == 16, "MSG_Motion");
+static_assert(offsetof(MSG_REQShopList, TargetID) == 12 && sizeof(MSG_REQShopList) == 16, "MSG_REQShopList");
+static_assert(offsetof(MSG_ApplyBonus, BonusType) == 12 && offsetof(MSG_ApplyBonus, Detail) == 14 &&
+	offsetof(MSG_ApplyBonus, TargetID) == 16 && sizeof(MSG_ApplyBonus) == 20, "MSG_ApplyBonus");
 
 // ---- server wire contract ----
 constexpr int kHeader = 12;
@@ -140,6 +152,11 @@ enum : unsigned short
 	OpRestart = 0x289,
 	OpReqMobByID = 0x369,
 	OpDelayStart = 0x3AE,
+	OpSetShortSkill = 0x378,
+	OpShopList = 0x17C,
+	OpREQShopList = 0x27B,
+	OpApplyBonus = 0x277,
+	OpMotion = 0x36A,
 	OpAction2 = 0x368,
 	OpAction = 0x36C,
 	OpPing = 0x3A0,
@@ -695,6 +712,10 @@ int WydDialectInbound(const char* wire, int wireSize, char* out, int outCap, int
 		return PassIfSize(wireSize, 16, op);
 	case OpSetHpMp:
 		return PassIfSize(wireSize, 28, op);
+	case OpMotion: // same layout (static_assert above)
+		return PassIfSize(wireSize, static_cast<int>(sizeof(MSG_Motion)), op);
+	case OpShopList: // same layout (static_assert above); ShopType 3 = skill master
+		return PassIfSize(wireSize, static_cast<int>(sizeof(MSG_ShopList)), op);
 	case OpSendItem:
 		return PassIfSize(wireSize, 24, op);
 	case OpUpdateEtc:
@@ -818,15 +839,18 @@ int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int*
 	case OpAttackOne:
 	case OpAttackTwo:
 	{
-		// Runtime sizes are fixed per opcode (168/72/80, trailing alignment
-		// included); the server derives N from the length. Every field is
-		// rewritten by offset so padding never reaches the server, where
+		// The runtime struct is chosen by size (168/72/80, trailing alignment
+		// included), not by opcode: the melee path (TMHuman.cpp, nSize =
+		// sizeof(MSG_Attack)) sends 0x039D with the full 13-target struct.
+		// The server ignores the opcode here and derives N from the length
+		// (MsgAttackBody.Decode), so the opcode is kept as sent. Every field
+		// is rewritten by offset so padding never reaches the server, where
 		// Dam[].TargetID is an i32 and would absorb it.
-		const int n = AttackCapacity(op);
-		const int want = op == OpAttackOne ? static_cast<int>(sizeof(MSG_AttackOne))
-			: op == OpAttackTwo ? static_cast<int>(sizeof(MSG_AttackTwo)) : static_cast<int>(sizeof(MSG_Attack));
+		const int n = msgSize == static_cast<int>(sizeof(MSG_Attack)) ? kMaxTarget
+			: msgSize == static_cast<int>(sizeof(MSG_AttackTwo)) ? 2
+			: msgSize == static_cast<int>(sizeof(MSG_AttackOne)) ? 1 : 0;
 		const int wireSize = kAttackFixed + n * kAttackDam;
-		if (msgSize != want || outCap < wireSize)
+		if (n == 0 || outCap < wireSize)
 			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
 		const auto* in = reinterpret_cast<const MSG_Attack*>(msg); // shared prefix
 		std::memset(out, 0, wireSize);
@@ -867,6 +891,14 @@ int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int*
 		// Restart. The server has no route for it and only logs it, as it does
 		// for the Windows client; dropping it here would hide nothing.
 		return OutPass(msgSize, 16, op);
+	case OpSetShortSkill: // Skill[20] (Basedef.h); server copies [0:4] bar + [4:20]
+		// short skills (handler/skill.go setShortSkill), no reply. Same layout.
+		return OutPass(msgSize, 32, op);
+	case OpREQShopList: // click on a merchant NPC; server reads the u16 target only
+		return OutPass(msgSize, static_cast<int>(sizeof(MSG_REQShopList)), op);
+	case OpApplyBonus: // score/special points and, BonusType 2, learn skill 5000+idx
+		// from the NPC in TargetID (handler/skill.go learnSkill); same layout.
+		return OutPass(msgSize, static_cast<int>(sizeof(MSG_ApplyBonus)), op);
 	case OpNewCharacter:
 		return OutPass(msgSize, 36, op);
 	case OpAction:

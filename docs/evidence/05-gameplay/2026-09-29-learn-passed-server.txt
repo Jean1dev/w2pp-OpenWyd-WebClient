@@ -1,0 +1,45 @@
+# Railway read-only; 2026-09-29T21:57:26Z .. 2026-09-29T22:02:00Z; sanitized identities.
+time=2026-09-29T21:57:48.043Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-09-29T21:57:48.043Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-09-29T21:57:48.043Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-09-29T21:57:48.043Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<redacted>
+time=2026-09-29T21:57:48.226Z level=INFO msg="account login: OK" conn=1 account=<redacted> id=160 role=player chars=4
+time=2026-09-29T21:57:53.498Z level=INFO msg="recv packet" conn=1 type=0x0fde len=20 routed=true
+time=2026-09-29T21:58:03.253Z level=INFO msg="recv packet" conn=1 type=0x0213 len=8 routed=true
+time=2026-09-29T21:58:03.253Z level=INFO msg="character login request" conn=1 slot=1 mode=11
+time=2026-09-29T21:58:03.329Z level=INFO msg="char login: sending CNFCharacterLogin" path=template conn=1 slot=1 client_id=1 class=1 name=<redacted> last_city=0 spawn_x=2089 spawn_y=2098 cnf_pos_x=2089 cnf_pos_y=2098 mob_spx=2096 mob_spy=2096 body=1820
+time=2026-09-29T21:58:06.360Z level=INFO msg="recv packet" conn=1 type=0x0291 len=4 routed=true
+time=2026-09-29T21:58:30.091Z level=INFO msg="recv packet" conn=1 type=0x036c len=40 routed=true
+time=2026-09-29T21:58:30.091Z level=INFO msg="movement: first action after login" conn=1 type=876 client_tick=4012714098 server_x=2089 server_y=2098 login_spawn_x=2089 login_spawn_y=2098 pos_x=2089 pos_y=2098 target_x=2088 target_y=2110 effect=0 speed=4 route="[55 56 56 56 56 56 56 56 56 56 56 56 0 0 0 0 0 0 0 0 0 0 0 0]"
+time=2026-09-29T21:58:31.808Z level=INFO msg="recv packet" conn=1 type=0x036c len=40 routed=true
+time=2026-09-29T21:58:32.293Z level=INFO msg="recv packet" conn=1 type=0x0366 len=40 routed=true
+time=2026-09-29T21:58:47.560Z level=INFO msg="recv packet" conn=1 type=0x036c len=40 routed=true
+time=2026-09-29T21:58:48.795Z level=INFO msg="recv packet" conn=1 type=0x0366 len=40 routed=true
+time=2026-09-29T21:59:02.274Z level=INFO msg="recv packet" conn=1 type=0x036c len=40 routed=true
+time=2026-09-29T21:59:03.961Z level=INFO msg="recv packet" conn=1 type=0x0366 len=40 routed=true
+time=2026-09-29T21:59:17.853Z level=INFO msg="recv packet" conn=1 type=0x036c len=40 routed=true
+time=2026-09-29T21:59:18.918Z level=INFO msg="recv packet" conn=1 type=0x0366 len=40 routed=true
+time=2026-09-29T21:59:32.056Z level=INFO msg="recv packet" conn=1 type=0x036c len=40 routed=true
+time=2026-09-29T21:59:33.120Z level=INFO msg="recv packet" conn=1 type=0x0366 len=40 routed=true
+time=2026-09-29T21:59:47.269Z level=INFO msg="recv packet" conn=1 type=0x036c len=40 routed=true
+time=2026-09-29T21:59:48.358Z level=INFO msg="recv packet" conn=1 type=0x0366 len=40 routed=true
+time=2026-09-29T22:00:02.812Z level=INFO msg="recv packet" conn=1 type=0x036c len=40 routed=true
+time=2026-09-29T22:00:04.025Z level=INFO msg="recv packet" conn=1 type=0x0366 len=40 routed=true
+time=2026-09-29T22:00:15.752Z level=INFO msg="recv packet" conn=1 type=0x027b len=4 routed=true
+time=2026-09-29T22:00:15.752Z level=INFO msg="shop opened" conn=1 npc=12474 merchant=19
+time=2026-09-29T22:00:43.727Z level=INFO msg="recv packet" conn=1 type=0x0277 len=8 routed=true
+time=2026-09-29T22:00:43.727Z level=INFO msg="skill learned" conn=1 skill=24 name=<redacted> cost=12 rest=0
+time=2026-09-29T22:00:48.032Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-09-29T22:00:48.032Z level=INFO msg="connection closed" conn=1
+time=2026-09-29T22:01:09.197Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-09-29T22:01:09.197Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-09-29T22:01:09.197Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-09-29T22:01:09.197Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<redacted>
+time=2026-09-29T22:01:09.439Z level=INFO msg="account login: OK" conn=1 account=<redacted> id=160 role=player chars=4
+time=2026-09-29T22:01:14.906Z level=INFO msg="recv packet" conn=1 type=0x0fde len=20 routed=true
+time=2026-09-29T22:01:17.094Z level=INFO msg="recv packet" conn=1 type=0x0213 len=8 routed=true
+time=2026-09-29T22:01:17.094Z level=INFO msg="character login request" conn=1 slot=1 mode=11
+time=2026-09-29T22:01:17.171Z level=INFO msg="char login: sending CNFCharacterLogin" path=template conn=1 slot=1 client_id=1 class=1 name=<redacted> last_city=0 spawn_x=2087 spawn_y=2107 cnf_pos_x=2087 cnf_pos_y=2107 mob_spx=2096 mob_spy=2096 body=1820
+time=2026-09-29T22:01:19.951Z level=INFO msg="recv packet" conn=1 type=0x0291 len=4 routed=true
+time=2026-09-29T22:01:27.618Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-09-29T22:01:27.619Z level=INFO msg="connection closed" conn=1

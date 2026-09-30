@@ -14,7 +14,7 @@ export function redactEvidence(value, secrets) {
 }
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
-  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'concurrent'];
+  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -28,9 +28,24 @@ export function validateOptions(opt) {
   assert(new Set(names).size === names.length, 'duplicate phase');
   const phases = new Set(names);
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
-    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], concurrent: ['enter'] };
+    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
     assert(phases.has(dep), `${name} requires ${dep}`);
+  // death takes A through the portal and needs B waiting at the Armia spawn;
+  // mapchange/attack move B away (attack also closes it).
+  for (const other of ['mapchange', 'attack'])
+    assert(!(phases.has('death') && phases.has(other)), `death cannot run with ${other}`);
+  // grind enters the --class character itself, alone (one game page).
+  const own = ['login', 'grind', 'learn', 'cast'];
+  for (const p of own.slice(1)) {
+    if (!phases.has(p)) continue;
+    for (const other of phases)
+      assert(own.includes(other), `${p} runs only with ${own.join('/')} (got ${other})`);
+  }
+  if (phases.has('grind')) {
+    assert(/^\d+$/.test(opt['grind-level'] ?? '') && Number(opt['grind-level']) >= 2 &&
+      Number(opt['grind-level']) <= 20, '--grind-level must be 2..20');
+  }
   return phases;
 }
 
@@ -39,7 +54,10 @@ export function validateOptions(opt) {
 // scene). Only these, and only as "unknown" drops, may appear in a scenario;
 // they are reported in the evidence. Any other drop still fails.
 // 0x0367 (MSG_Attack) left the list when it was translated (ADR 004).
-export const DEFERRED_INBOUND = new Set();
+// 0x5000 MSG_Exp_Msg_Panel_ is a server-custom text panel ("+N de EXP",
+// mobkilled.go) with no runtime handler; the EXP itself arrives in the
+// MSG_Attack echo (CurrentExp). Deferred, not rendered (ADR 004 revision).
+export const DEFERRED_INBOUND = new Set(['0x5000']);
 
 export function checkHealth(p, errors = [], deferredIn = DEFERRED_INBOUND) {
   assert.equal(errors.length, 0, 'page errors');
@@ -79,6 +97,8 @@ export function checkTeleport(after) {
 // Combat result as observed by the clients. Damage, HP and experience are the
 // server's (0x0367 echo / broadcast); the harness only compares observations.
 export function checkCombat(c) {
+  assert(!c.died, 'attacker died before combat verification');
+  assert(!c.lost, 'target disappeared without confirmed death');
   assert(c.attacksSent > 0, 'no attack left the client');
   assert(c.echoes > 0, 'no attack echo from the server');
   assert(c.hpTrail.length >= 2, 'target HP never observed twice');
@@ -88,6 +108,85 @@ export function checkCombat(c) {
   assert(c.exp1 >= c.exp0, 'experience decreased while attacking');
   for (let i = 1; i < c.hpTrail.length; i++)
     assert(c.hpTrail[i] <= c.hpTrail[i - 1] || c.regen, 'target HP rose without regeneration');
-  if (c.observer?.sawTarget) assert(c.observer.hpTrail.at(-1) < c.observer.hpTrail[0] || c.observer.sawKill,
+  assert(c.observer?.sawTarget, 'observer never saw the target');
+  assert(c.observer.echoes > 0, 'observer received no attack broadcast');
+  assert(c.observer.hpTrail.length >= 2 || c.observer.sawKill, 'observer has no damage observation');
+  assert(c.observer.hpTrail.at(-1) < c.observer.hpTrail[0] || c.observer.sawKill,
     'observer did not see the damage');
+}
+
+export function checkCombatRelogin(before, after) {
+  for (const key of ['name', 'characterClass', 'equip', 'look', 'level', 'exp'])
+    assert.deepEqual(after[key], before[key], `post-combat persistence differs: ${key}`);
+  checkArmiaSpawn(after);
+}
+
+// Death and respawn (stage 5). Everything is server-confirmed state seen by the
+// clients: A's HP reaches 0 through mob attacks (0x0367 broadcast), the
+// runtime opens box 11 on a field click, OK sends 0x03AE and, 5 s later,
+// 0x0289; handler/character.go restart revives (HP = 2) and recalls to
+// CitySpawn(LastCity). Mortal characters below level 35 lose no EXP
+// (death_exp.go FREEEXP gate), so level and EXP must be unchanged there.
+export function checkRespawn(d) {
+  assert(d.died, 'A never died');
+  assert(d.hpAtDeath <= 0, 'death without HP 0');
+  assert(d.mobHits > 0, 'death without a server attack on A');
+  assert.equal(d.box, 11, 'return-to-town box did not open');
+  assert(d.sent.includes('0x03ae'), 'DelayStart (0x03AE) not sent');
+  assert(d.sent.includes('0x0289'), 'Restart (0x0289) not sent');
+  checkArmiaSpawn(d.after);
+  assert(d.after.hp > 0 && d.after.hp <= d.after.maxHp, 'respawned without valid HP');
+  assert.notEqual(d.after.die, 1, 'still dead after respawn');
+  assert.equal(d.after.level, d.before.level, 'level changed by death');
+  if (d.before.level < 35) assert.equal(d.after.exp, d.before.exp, 'EXP lost below the level-35 gate');
+  else assert(d.after.exp <= d.before.exp, 'EXP rose on death');
+  assert(d.observer?.sawRespawn, 'B did not see A back in the city');
+}
+
+// Leveling by real combat: every kill is a target the server took to 0 HP and
+// paid EXP for; level only rises through the server's level-up (mobkilled.go).
+export function checkGrind(g) {
+  assert(g.kills.length > 0, 'no kill');
+  for (const k of g.kills) {
+    assert(k.hpTrail.at(-1) <= 0 || k.gone, `kill ${k.id} without HP 0`);
+    assert(k.hpTrail.length >= 2 && k.hpTrail[0] > k.hpTrail.at(-1), `kill ${k.id} without damage`);
+    assert(k.exp1 > k.exp0, `kill ${k.id} paid no EXP`);
+  }
+  assert(g.end.exp > g.start.exp, 'EXP did not rise');
+  assert(g.end.level >= g.start.level, 'level fell');
+  assert(!g.died, 'grinding character died');
+}
+
+// Learning a skill from the class master (skill.go learnSkill). The client
+// only asks: NPC click (0x027B) -> server ShopType 3 list -> box 4 -> ApplyBonus
+// BonusType 2 (Detail = 5000+idx, TargetID = master). The learned bit and the
+// spent points are the server's (MSG_UpdateEtc), and must survive a relogin.
+export function checkLearn(l) {
+  const bit = (l.skill - 5000) % 24;
+  const cls = Math.floor((l.skill - 5000) / 24);
+  assert(l.offered.includes(l.skill), 'skill not offered by the master');
+  assert(l.offered.every(i => i >= 5000 + cls * 24 && i < 5024 + cls * 24), 'master offered another class');
+  assert.equal(l.merchant, l.npc, 'runtime recorded another merchant');
+  assert.equal(l.box, 4, 'learn box did not open');
+  assert.equal((l.before.learned >>> bit) & 1, 0, 'skill already learned before');
+  assert.equal((l.after.learned >>> bit) & 1, 1, 'server did not set the learned bit');
+  assert.equal(l.after.learned & ~(1 << bit), l.before.learned & ~(1 << bit), 'other learned bits changed');
+  assert.equal(l.before.bonus - l.after.bonus, l.cost, 'skill points not charged by the cost');
+  assert.equal((l.relogin.learned >>> bit) & 1, 1, 'learned bit lost on relogin');
+  assert.equal(l.relogin.bonus, l.after.bonus, 'skill points differ after relogin');
+}
+
+// Using a learned skill (skill.go / combat.go). The client assigns it to the
+// belt (0x0378), selects the slot and right-clicks the target; the server
+// validates the learned bit and class, charges MP and decides the damage.
+// MP spent is the signature of a skill: plain melee costs none.
+export function checkCast(c) {
+  assert.equal(c.cell, 5000 + c.cls * 24 + c.pos, 'skill window shows another skill');
+  assert.equal(c.belt, c.skill, 'belt slot does not hold the skill');
+  assert.equal(c.selected, c.slot, 'slot not selected');
+  assert(c.attacksSent > 0, 'no skill attack left the client');
+  assert(c.echoes > 0, 'no attack echo from the server');
+  assert(c.mpTrail.length >= 2 && Math.min(...c.mpTrail) < c.mpTrail[0], 'server charged no MP');
+  assert(c.hpTrail.length >= 2 && c.hpTrail.at(-1) < c.hpTrail[0], 'target took no damage');
+  assert(!c.died, 'caster died');
 }

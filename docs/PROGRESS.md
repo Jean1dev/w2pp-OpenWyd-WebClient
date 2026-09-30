@@ -1,6 +1,6 @@
 # Progresso
 
-Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. O combate (`MSG_Attack`) está traduzido e testado contra os codecs reais, mas ainda não foi provado online. O deploy no Railway (Dockerfile, Volume de assets, senha) e a CI estão preparados; nenhum deploy foi executado. Cliente Windows e o restante do gameplay ainda não foram provados.
+Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. A morte para os Trolls e a volta à cidade (caixa 11, `0x03AE`/`0x0289`, HP 2 no spawn) também foram aprovadas ([morte e respawn](evidence/05-gameplay/2026-09-29-death-respawn.md)). O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. Cliente Windows e o restante do gameplay ainda não foram provados.
 
 | Etapa | Estado | Evidência |
 |---|---|---|
@@ -8,19 +8,19 @@ Atualização: 29/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (combate básico, morte/respawn, aprender e usar skill aprovados) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Pendente | — |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
 
 ## Próxima ação
 
-1. Etapa 5 — combate online: com memória livre, rodar `node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --env-file .env --phases login,enter,second,attack` e registrar o resultado em [evidências](evidence/05-gameplay/README.md). Depois: morte/respawn (`03AE`→`0289`), máscara `LearnedSkill` das classes para decidir as skills, e as fatias seguintes (chat `0333/0334`, itens, loja, banco, grupo, troca, persistência).
+1. Etapa 5 — próximas fatias de gameplay: skills das outras classes (nível 6–8) e de área, buff e cura; depois chat `0333/0334`, itens, loja, banco, grupo, troca e persistência. Combate básico com relogin e morte/respawn já aprovados. Rodar os cenários online como processo separado (`Start-Process`), por causa da memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar:
    - repetir `npm run world` completo com o trajeto novo até o portal (a execução de 29/09 falhou só na caminhada da `mapchange`);
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
    - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
-3. Etapa 8 — primeiro deploy pelo operador ([deploy.md](deploy.md)): serviço, variáveis, Volume, upload dos assets e verificação. Confirmar em execução o reenvio da credencial no WebSocket, o `X-Forwarded-For` e a leitura do Volume pelo uid `nonroot`. Verificar a primeira execução da CI no GitHub.
+3. Etapa 8 — confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
 4. Fechar a etapa 3 (falta DeleteCharacter ponta a ponta) e a etapa 1 (consumidores ainda assinalados na [matriz](compatibility.md)).
 5. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
 
@@ -238,5 +238,73 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
 
   Detalhes nas [evidências](evidence/08-entrega/README.md).
 - **Pendente:** merge do PR #3 (o deploy automático do `main` substitui o `railway up`); confirmar o `X-Forwarded-For`; flag de build para as exports `wyd_debug_*` antes de qualquer abertura pública.
+
+### 29/09/2026 — retomada: combate no Railway
+
+- **Pedido do usuário:** continuar a sessão Codex (plano "combate básico"), usando o tm-server do Railway (`98286fdf`, `ClientVersion=12000`).
+- **Arquivos:**
+  - alterados: `client/dialect/WydDialect.cpp`, `tools/protocol/dialect_test.cpp`, `tools/{verify_world,world_checks}.mjs`, `tools/world_checks.test.mjs`, ADR 004, `docs/compatibility.md`, `CONTEXT.md`, README da etapa 5;
+  - novos: `docs/evidence/05-gameplay/2026-09-29-*` (relato, JSONs sanitizados, logs do servidor, hashes dos artefatos reutilizados).
+- **Harness:**
+  - observador obrigatório, e morte do atacante reprova;
+  - exclusão de alvos por `target.id`;
+  - relogin pós-combate (`checkCombatRelogin`);
+  - rota até os Gremlins pela saída leste, corredor y=2102 calculado dos mapas de colisão;
+  - pick coberto por entidade tenta outro ponto.
+- **Dialeto:**
+  - saída de ataque pelo tamanho, com opcode preservado (o corpo a corpo manda `0x039D` com `sizeof(MSG_Attack)`);
+  - `0x0378` passa com 32 bytes;
+  - `0x5000` diferido.
+- **Confirmado em teste:** `protocol:dialect` 435/0, `protocol:vectors` verde, `world:checks` 8/0, `scene` e `client:stream` verdes. WASM recompilado duas vezes com o em++ 6.0.0 de `../start` (certificado, 0 indefinidos).
+- **Confirmado em execução (Railway, execução 5):** A atacou um Gremlin (HP 70→3→0) e ganhou 274 de Exp; B viu o mesmo HP e a morte. A execução reprovou na saúde de protocolo, que foi corrigida depois.
+- **Não executado:** execução limpa com relogin pós-combate. A execução 6 foi interrompida por falta de memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)). Validação do cliente Windows, skills e morte/respawn também ficam de fora.
+- **Memória (issue #6):** o harness passou a amostrar memória por fase e a fechar B antes do relogin de A. Medido: uma página usa 865 MiB no Chromium (heap JS 497 MiB, WASM 150 MiB), com 1,9 GB livres de 8 GB. Hipótese: o preload integral de `openwyd_assets.data` domina o heap JS. [Detalhes](evidence/05-gameplay/2026-09-29-basic-combat.md#memória-do-harness-issue-6).
+- **Execução 7 (aprovada):** `login,enter,second,attack` passou no Railway, rodando como processo separado. Gremlin HP 70→0, Exp 274→548, B observou, relogin preservou o estado, protocolo limpo. Três `0x039D` roteados no servidor (N=1 e N=13).
+- **Próximo passo:** morte/respawn e skills (etapa 5 continua Em andamento).
+
+### 29/09/2026 — etapa 5: morte e respawn
+
+- **Pedido do usuário:** seguir para morte e respawn.
+- **Arquivos:** `tools/verify_world.mjs` (fase `death`), `tools/world_checks.mjs` (`checkRespawn`, fase `death` e combinações proibidas), `tools/world_checks.test.mjs`, evidências `docs/evidence/05-gameplay/2026-09-29-death-*`.
+- **Fonte:** caixa 11 → `0x03AE` → `0x0289` 5 s depois (runtime). O servidor revive com HP 2 e chama `recall` para `CitySpawn`; abaixo do nível 35 não há perda de EXP. Dialeto sem mudança.
+- **Confirmado em teste:** `world:checks` 9/0.
+- **Confirmado em execução (Railway):**
+  - execução 1 reprovou só na métrica do harness (ataques do Troll antes da linha de base), com o resto do fluxo ok;
+  - execução 2 aprovada: HP 105→0, `0x03AE`/`0x0289` nos logs do servidor, HP 2 no spawn de Armia, EXP intacta, B vê A voltar, protocolo limpo.
+- **Limites:** B não observa a morte em si; o OK da caixa usa o export de automação; perda de EXP acima do nível 35 e PvP não foram exercitados.
+- **Próximo passo:** skills (máscara `LearnedSkill` das classes).
+
+### 29/09/2026 — etapa 5: skills (subir de nível e aprender)
+
+- **Pedido do usuário:** seguir para skills. Decisão do usuário: upar a Foema da conta A por combate real.
+- **Arquivos:**
+  - `client/dialect/WydDialect.cpp` e `tools/protocol/dialect_test.cpp`: `0x027B`, `0x0277`, `0x017C` e `0x036A`;
+  - patches `0013-skill-master-probes`, `0014-skill-master-merchant-id` e `0015-skill-points-label`;
+  - `tools/verify_world.mjs`: fases `grind` e `learn`, opção `--grind-level`;
+  - `tools/world_checks{,.test}.mjs`: `checkGrind`, `checkLearn` e regras de fases;
+  - `tools/capture_world_logs.py`: `shop opened` e `skill learned` no filtro;
+  - evidências `docs/evidence/05-gameplay/2026-09-29-{skills,grind-*,learn-*}`.
+- **Confirmado em teste:** `protocol:dialect` 447/0, `world:checks` 11/0, `client:stream` verde, WASM certificado com 0 indefinidos.
+- **Confirmado em execução (Railway):**
+  - grind: 12 abates, nível 1→4, EXP 0→2735;
+  - learn: NPC 12474 (Merchant 19), Flecha Mágica aprendida, pontos 12→0, preservada no relogin; logs `shop opened` e `skill learned`.
+- **Falhas registradas:** saúde (`0x036A`), rota bloqueada, NPC errado (a loja comum funcionou) e geometria da célula. Todas foram corrigidas.
+- **Limites:**
+  - a skill ainda não foi usada em combate;
+  - as outras classes exigem nível 6–8;
+  - a Foema da conta A agora tem nível 4 e a skill 24.
+- **Próximo passo:** usar a skill em combate.
+
+### 29/09/2026 — etapa 5: usar a skill em combate
+
+- **Arquivos:** patch `0016-skill-belt-probes`; `tools/verify_world.mjs` (fase `cast`, `clickHuman` com botão direito); `tools/world_checks{,.test}.mjs` (`checkCast`); evidências `2026-09-29-cast-passed*`.
+- **Confirmado em teste:** `world:checks` 12/0; WASM certificado com 0 indefinidos; `client:stream` verde.
+- **Confirmado em execução (Railway):**
+  - Flecha Mágica atribuída pelo gesto original (`S`, mouse, Shift+1) com `0x0378` enviado;
+  - slot 0 selecionado com a tecla `1`; clique direito no Gremlin;
+  - MP 110→105 (servidor), HP 70→16;
+  - logs: `recv 0x0378` e `recv 0x039d len=56`.
+- **Limites:** outras classes; skills de área, buff e cura; comparação visual da barra com o cliente Windows.
+- **Próximo passo:** skills das outras classes, ou as fatias seguintes (chat, itens, loja, banco, grupo, troca).
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

@@ -1,0 +1,34 @@
+[
+  {
+    "path": "assets-local/manifest.json",
+    "sha256": "df78bcc9d15517d0be5d939cd73e5ae4b51fb9ba0f88638b02589b0a0fcda1ab"
+  },
+  {
+    "path": ".cache/local-scene/openwyd_assets.data",
+    "sha256": "3dad59775988f3970931b9e5d9b06b4fb5f799cf558239d3c38c39468fe4a905"
+  },
+  {
+    "path": ".cache/local-scene/openwyd_assets.js",
+    "sha256": "e82dc47da208a1d9db643441cd2f8f6bce5fa3c43bf1363a85d3fb23b9e24781"
+  },
+  {
+    "path": ".cache/toolchains/go/bin/go.exe",
+    "sha256": "3bb20857d8c61715618e4dc1463af5dac56874665dda15093258164a95c9bac6"
+  },
+  {
+    "path": "external\\OpenWyd\\webclient\\client-wasm\\build\\link\\tmproject_startup.js",
+    "sha256": "f6c0cd9da6f7afa0c3f19b28d5319609991a9014e4d20aa01de91d4423b26c7a"
+  },
+  {
+    "path": "external\\OpenWyd\\webclient\\client-wasm\\build\\link\\tmproject_startup.1790696597685688500.js",
+    "sha256": "70d4a37337987abab8a5a118d82cc5c14dc3e8d67f662c0677adfaa0810fb6ff"
+  },
+  {
+    "path": "external\\OpenWyd\\webclient\\client-wasm\\build\\link\\tmproject_startup.1790696597685688500.wasm",
+    "sha256": "6fa5e86a7412d66595bd1a65525400c586c3e3047a94c7700d258b18a28eb1dd"
+  },
+  {
+    "path": ".cache\\toolchains\\node\\node.exe",
+    "sha256": "c5ff4c736112dd483c750fd4149d30c8a116db1a49b8b3ec88be4b65e6c86c19"
+  }
+]

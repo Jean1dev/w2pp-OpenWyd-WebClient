@@ -15,21 +15,26 @@
 //   move      A walks (mouse click on the canvas) and B sees it; then B walks and A sees it
 //   logout    A closes; B loses A. A logs in again and B sees A again
 //   mapchange A walks onto the Armia -> Armia Field portal and confirms; B loses A
-//   attack    A and B go to Armia Field; A attacks a mob with real clicks, B watches
+//   attack    A and B walk to Armia's Gremlins; A attacks, B watches, then A relogs
+//   grind     the --class character of A kills Gremlins until --grind-level (server EXP)
+//   learn     the --class character learns its cheapest skill from the class master
+//   cast      the --class character assigns its learned skill (hover + Shift+1) and casts it on a Gremlin
+//   death     A dies to the Armia Field Trolls, returns to town (box 11, 0x03AE/0x0289); B at the spawn sees it
 //   concurrent A's account logs in a second time while A is in the Field
 //
 // Credentials come from W2PP_TEST_{ACCOUNT,PASSWORD,PIN,CHAR}[2] (env or --env-file)
 // and are handed to the game UI only. Evidence holds counters, opcodes, states,
 // positions and masked names; screenshots stay in .cache (they contain assets).
 import { chromium } from 'playwright';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, execFile, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { resolve, join } from 'node:path';
-import { parseArgs } from 'node:util';
+import { freemem, totalmem } from 'node:os';
+import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -48,6 +53,7 @@ const { values: opt } = parseArgs({
     'env-file': { type: 'string' },
     phases: { type: 'string', default: 'badpass,login,create,enter,second,move,logout,mapchange,concurrent' },
     'class': { type: 'string', default: '0' },
+    'grind-level': { type: 'string', default: '4' },
     headed: { type: 'boolean', default: false },
   },
 });
@@ -55,6 +61,24 @@ const phases = validateOptions(opt);
 const clientVersion = Number.parseInt(opt['client-version'], 10);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const MiB = n => (n == null ? null : Math.round(n / 1048576));
+
+// Sum of the working sets of Playwright's own Chromium processes (never the
+// user's browser: matched by the ms-playwright install path). Shared pages are
+// counted once per process, so this overestimates; it is a trend, not a budget.
+async function browserWorkingSet() {
+  try {
+    if (process.platform === 'win32') {
+      const { stdout } = await promisify(execFile)('powershell', ['-NoProfile', '-Command',
+        "(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like '*ms-playwright*' } | " +
+        'Measure-Object WorkingSetSize -Sum).Sum'], { timeout: 20000 });
+      return Number(stdout.trim()) || null;
+    }
+    const { stdout } = await promisify(execFile)('ps', ['-A', '-o', 'rss=,command='], { timeout: 20000 });
+    return stdout.split('\n').filter(l => l.includes('ms-playwright'))
+      .reduce((n, l) => n + Number(l.trim().split(/\s+/)[0]) * 1024, 0) || null;
+  } catch { return null; }
+}
 const mask = s => (s ? s.slice(0, 3) + '*'.repeat(Math.max(0, s.length - 3)) : s);
 
 async function readEnvFile(path) {
@@ -127,6 +151,12 @@ class Session {
   }
 
   async close() { await this.context?.close(); this.context = null; }
+
+  // WASM linear memory (grows, never shrinks) and live JS heap of this page.
+  memory() {
+    return this.eval(() => ({ wasm: window.Module?.HEAPU8?.length ?? null,
+      js: performance.memory?.usedJSHeapSize ?? null }));
+  }
 
   eval(fn, arg) { return this.page.evaluate(fn, arg); }
 
@@ -359,7 +389,15 @@ class Session {
         try { await this.clickGround(dx + ox, dy + oy); clicked = true; break; }
         catch (e) { if (!String(e.message).includes('ground click overlaps entity')) throw e; }
       }
-      assert(clicked, 'no entity-free ground near target');
+      // An entity standing on the best projection is transient: pick another
+      // screen point on the next iteration (still bounded by maxClicks).
+      if (!clicked) {
+        console.log(`      ${this.label}: entity covers ${best.lx},${best.ly}; picking again`);
+        avoid.push(lastPick);
+        lastPick = null;
+        await sleep(700);
+        continue;
+      }
       // Wait until the character stops (or the stop condition holds).
       let last = me, still = 0;
       const end = Date.now() + 40000;
@@ -438,6 +476,22 @@ class Session {
     return { clicks: trail.length, at };
   }
 
+  async toGremlinField() {
+    // NPCGener.txt at the locked server revision: generators 27..30 put
+    // Gremlins at x=2184, y=2086..2118. The portal to 2588,2096 instead
+    // landed our initial characters among Trolls and killed A before input.
+    const trail = [];
+    // HeightMap + baked AttributeMap put the east gate corridor at y=2102;
+    // a direct click toward 2146,2096 runs into the gatehouse fence.
+    for (const [x, y] of [[2117.5, 2095.5], [2130.5, 2091.5],
+      [2138.5, 2102.5], [2152.5, 2102.5], [2166.5, 2102.5], [2184.5, 2106.5]]) {
+      trail.push(...await this.walkTo(x, y, { near: 2 }));
+      const score = await this.combat(0);
+      assert(score.myHp > 0 && score.myDie !== 1, `${this.label}: died on the way to Gremlins`);
+    }
+    return { route: 'Armia east / generators 27..30', clicks: trail.length, at: await this.me() };
+  }
+
   // Live non-player entities (server ids >= MaxUser = 1000) the runtime has on
   // screen, nearest first. Nothing here decides what is hostile: the server
   // writes 0 damage for non-combat NPCs, which the scenario then reports.
@@ -461,7 +515,7 @@ class Session {
 
   // A real click on an entity: hover until the runtime's own pick reports it
   // under the cursor, then press. The scene builds and sends the attack.
-  async clickHuman(id) {
+  async clickHuman(id, button = 'left') {
     await this.closePanels();
     const box = await this.page.locator('#canvas').boundingBox();
     for (let attempt = 0; attempt < 4; attempt++) {
@@ -475,8 +529,8 @@ class Session {
         await this.page.mouse.move(box.x + sx * box.width / cw, box.y + (sy + oy) * box.height / ch, { steps: 3 });
         await this.frames(2);
         if ((await this.eval(() => Module._wyd_field_hover_human_id())) !== id) continue;
-        await this.page.mouse.down();
-        try { await this.frames(2); } finally { await this.page.mouse.up(); }
+        await this.page.mouse.down({ button });
+        try { await this.frames(2); } finally { await this.page.mouse.up({ button }); }
         await this.frames(1);
         return true;
       }
@@ -552,7 +606,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = phases.has('attack') ? 25 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast'].some(x => phases.has(x)) ? 25 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -562,6 +616,21 @@ async function main() {
     return s;
   };
   const r = ev.results;
+  // Memory trend for issue #6: system free RAM, Playwright Chromium working
+  // set and, per open page, WASM/JS heap. Sampling never fails a scenario.
+  ev.memory = [];
+  const sample = async point => {
+    const pages = {};
+    for (const s of sessions) {
+      if (!s.context) continue;
+      try { const m = await s.memory(); pages[s.label] = { wasmMiB: MiB(m.wasm), jsMiB: MiB(m.js) }; } catch {}
+    }
+    const m = { point, at: new Date().toISOString(), freeMiB: MiB(freemem()), totalMiB: MiB(totalmem()),
+      browserMiB: MiB(await browserWorkingSet()), pages };
+    ev.memory.push(m);
+    console.log(`    mem ${point}: free ${m.freeMiB}/${m.totalMiB} MiB, browser ${m.browserMiB ?? '?'} MiB, ` +
+      Object.entries(pages).map(([k, v]) => `${k} wasm ${v.wasmMiB} js ${v.jsMiB}`).join(', '));
+  };
   const step = async (name, fn) => {
     if (!phases.has(name)) return;
     const t0 = Date.now();
@@ -573,11 +642,12 @@ async function main() {
       for (const s of sessions) if (s.context) await s.healthy();
     } catch (e) {
       r[name] = { ...r[name], ok: false, error: redact(e?.message ?? e), ...(e?.trail && { trail: e.trail }),
-        ...(e?.stall && { stall: e.stall }) };
+        ...(e?.stall && { stall: e.stall }), ...(e?.combat && { combat: e.combat }) };
       throw e;
     } finally {
       r[name].ms = Date.now() - t0;
       r[name].at = new Date().toISOString();
+      await sample(`end ${name}`);
       ev.screenshots = sessions.flatMap(s => s.shots);
       ev.activePhase = null;
       await writeFile(join(OUT, 'evidence.json'), evidenceJson(ev));
@@ -759,7 +829,10 @@ async function main() {
       const pin = await b.pin();
       if (!pin.already && pin.result !== 'lock1') throw new Error(`PIN rejected (${pin.result})`);
       let slots = await b.slots();
-      if (!slots[0].name) { await b.create(B.char, cls); slots = await b.slots(); }
+      if (!slots[0].name) {
+        assert(!phases.has('attack'), 'combat requires an existing B character');
+        await b.create(B.char, cls); slots = await b.slots();
+      }
       const me = await b.enter(0);
       assert.equal(me.name, B.char, 'B entered the wrong character');
       await b.shot('field');
@@ -862,37 +935,364 @@ async function main() {
         dialect: dialectSummary(p) };
     });
 
-    // Stage 5, slice 1: A attacks a mob in Armia Field with real clicks; B, in
+    // Stage 5, skills: level the --class character of account A by real combat
+    // until it has the points its cheapest skill costs (skill.go
+    // deriveSkillBonus: level*3). Level-ups are the server's (mobkilled.go);
+    // progress persists, so a phase cut by the deadline resumes on the next run.
+    await step('grind', async () => {
+      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      privateValues.push(name);
+      const slot = (await a.slots()).findIndex(x => x.name === name);
+      assert(slot >= 0, `class ${cls} character missing`);
+      await a.enter(slot);
+      const want = Number(opt['grind-level']);
+      const s0 = await a.combat(0);
+      const res = { class: cls, slot, want, start: { level: s0.myLevel, exp: s0.exp }, kills: [], rests: 0, died: false };
+      r.grind = res;
+      console.log(`    class ${cls} level ${s0.myLevel} exp ${s0.exp} -> want level ${want}`);
+      if (s0.myLevel < want) res.trip = await a.toGremlinField();
+      // Leave time for the evidence and a clean logout inside the deadline.
+      const end = Date.now() + 19 * 60000;
+      const tried = new Set();
+      while (Date.now() < end) {
+        const s = await a.combat(0);
+        if (s.myLevel >= want) break;
+        if (s.myDie === 1 || s.myHp <= 0) { res.died = true; break; }
+        // Regenerate between fights instead of dying to the next Gremlin.
+        if (s.myHp < s.myMaxHp * 0.5) { res.rests++; await sleep(6000); continue; }
+        const mob = (await a.mobs()).find(m => m.name.trim() === 'Gremlin' && m.onScreen && m.hp > 0 && !tried.has(m.id));
+        if (!mob) { await a.walk(res.kills.length % 2 ? -160 : 160, 80); tried.clear(); continue; }
+        tried.add(mob.id);
+        const c0 = await a.combat(mob.id);
+        const k = { id: mob.id, hpTrail: [c0.hp], exp0: c0.exp, clicks: 0, gone: false };
+        let lastClick = 0;
+        const fightEnd = Date.now() + 60000;
+        while (Date.now() < fightEnd) {
+          const c = await a.combat(mob.id);
+          if (c.myDie === 1 || c.myHp <= 0) { res.died = true; break; }
+          if (!c.present) { k.gone = true; break; }
+          if (c.hp !== k.hpTrail.at(-1)) k.hpTrail.push(c.hp);
+          if (c.die === 1 || c.hp <= 0) break;
+          if (Date.now() - lastClick > 6000) { if (await a.clickHuman(mob.id)) k.clicks++; lastClick = Date.now(); }
+          await sleep(1000);
+        }
+        await sleep(2000);
+        const c1 = await a.combat(mob.id);
+        k.exp1 = c1.exp;
+        k.level = c1.myLevel;
+        if (res.died) break;
+        // Only server-paid kills count; a Gremlin that walked away is skipped.
+        if (k.exp1 > k.exp0) {
+          res.kills.push(k);
+          console.log(`    kill ${res.kills.length}: Gremlin ${k.id} HP ${k.hpTrail.join(',')} exp ${k.exp0}->${k.exp1} level ${k.level}`);
+          await writeFile(join(OUT, 'evidence.json'), evidenceJson(ev));
+        }
+      }
+      const s1 = await a.combat(0);
+      res.end = { level: s1.myLevel, exp: s1.exp, hp: s1.myHp, maxHp: s1.myMaxHp };
+      res.reached = s1.myLevel >= want;
+      res.skillPoints = s1.myLevel * 3; // server-derived rule; spent points not visible here
+      await a.shot('grind-end');
+      if (res.start.level < want) checkGrind(res);
+      assert(res.reached, `level ${s1.myLevel} of ${want} after ${res.kills.length} kills (run again to continue)`);
+      return res;
+    });
+
+    // Stage 5, skills: the --class character learns its cheapest skill from the
+    // class master with real clicks (the NPC, then the skill in the master's
+    // grid). The server decides and charges (skill.go learnSkill); the client
+    // only sends 0x027B and ApplyBonus. Masters from NPCGener.txt at the locked
+    // revision; the list the NPC actually sends is what the check trusts.
+    await step('learn', async () => {
+      // route: HeightMap + AttributeMap of the locked revision (same search as
+      // the east gate); the straight line north of the spawn is blocked.
+      const PLANS = { 1: { skill: 5024, name: 'Flecha_Magica', cost: 12, master: [2094, 2126], npcName: /foema|ancia/i,
+        route: [[2088.5, 2111.5], [2088.5, 2116.5], [2090.5, 2122.5]] } };
+      const plan = PLANS[cls];
+      assert(plan, `no learn plan for class ${cls}`);
+      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      privateValues.push(name);
+      const enterOwn = async s => {
+        const slot = (await s.slots()).findIndex(x => x.name === name);
+        assert(slot >= 0, `class ${cls} character missing`);
+        return s.enter(slot);
+      };
+      if ((await a.eval(() => Module._wyd_get_game_state())) !== 0) await enterOwn(a);
+      const read = s => s.eval(() => ({ learned: Module._wyd_field_my_score(6) >>> 0,
+        bonus: Module._wyd_field_my_skill_bonus(), level: Module._wyd_field_my_score(4) }));
+      const before = await read(a);
+      console.log(`    level ${before.level}, ${before.bonus} skill points, learned 0x${before.learned.toString(16)}`);
+      assert(before.bonus >= plan.cost, `${before.bonus} skill points at level ${before.level}; ${plan.name} costs ${plan.cost}`);
+      const walk = [];
+      for (const [x, y] of plan.route) walk.push(...await a.walkTo(x, y, { near: 2, stallOk: true }));
+      const at = await a.me();
+      // By name: a plain merchant stands next to the master (first run clicked
+      // it and got ShopType 1). The generator name is Foema_Ancian.
+      const near = (await a.mobs()).filter(m => Math.hypot(m.x - at.x, m.y - at.y) <= 15);
+      const npc = near.find(m => plan.npcName.test(m.name));
+      assert(npc, `class master not in view from ${at.x},${at.y}: ${near.map(m => `${m.id} ${m.name.trim()} ${m.x},${m.y}`).join('; ')}`);
+      let visible = false;
+      const clicks = [];
+      for (let i = 0; i < 3 && !visible; i++) {
+        const hit = await a.clickHuman(npc.id);
+        clicks.push({ hit, lastSent: await a.eval(() => window.clientProbe().socket.lastSentOpcode) });
+        if (!hit) continue;
+        try { visible = await a.until('skill master window', () => Module._wyd_field_skillmaster_visible() === 1, 15000); }
+        catch { visible = false; }
+      }
+      await a.shot('master-click');
+      assert(visible, `skill master window did not open (at ${at.x},${at.y}, npc ${npc.id} at ${npc.x},${npc.y}, clicks ${JSON.stringify(clicks)})`);
+      await a.frames(3);
+      const offered = await a.eval(() => {
+        const o = [];
+        for (let k = 0; k < 128; k++) { const i = Module._wyd_field_skillmaster_item(k); if (i) o.push(i); }
+        return o;
+      });
+      const merchant = await a.eval(() => Module._wyd_field_skillmaster_merchant());
+      await a.shot('skill-master');
+      const k = offered.length ? await a.eval(sk => {
+        for (let k = 0; k < 128; k++) if (Module._wyd_field_skillmaster_item(k) === sk) return k;
+        return -1;
+      }, plan.skill) : -1;
+      assert(k >= 0, `master did not offer ${plan.skill} (offered ${offered.join(',')})`);
+      const [sx, sy, cw, ch] = await a.eval(k => {
+        const c = document.getElementById('canvas');
+        return [Module._wyd_field_skillmaster_item_screen(k, 0), Module._wyd_field_skillmaster_item_screen(k, 1), c.width, c.height];
+      }, k);
+      assert(sx >= 0 && sy >= 0, 'skill cell not laid out');
+      // Real left click on the drawn cell (SGridControl GRID_SKILLM -> box 4).
+      const cb = await a.page.locator('#canvas').boundingBox();
+      await a.page.mouse.move(cb.x + sx * cb.width / cw, cb.y + sy * cb.height / ch, { steps: 3 });
+      await a.frames(2);
+      await a.page.mouse.down();
+      try { await a.frames(2); } finally { await a.page.mouse.up(); }
+      await a.frames(2);
+      const box = await a.eval(() => Module._wyd_scene_msgbox_message());
+      await a.shot('learn-box');
+      assert.equal(box, 4, `learn box did not open (box ${box}, cursor cell ${sx},${sy})`);
+      assert.equal(await a.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'OK refused');
+      const bit = (plan.skill - 5000) % 24;
+      await a.until('learned bit from the server', b => ((Module._wyd_field_my_score(6) >>> b) & 1) === 1, 20000, bit);
+      await sleep(2000);
+      const after = await read(a);
+      console.log(`    learned 0x${after.learned.toString(16)}, ${after.bonus} skill points left`);
+      await a.page.keyboard.press('Escape');
+      await a.healthy();
+      await a.close();
+      a = await newSession('A-learn-relogin', A);
+      await a.loginToSelect();
+      assert.equal((await a.pin()).result, 'lock1', 'relogin PIN rejected');
+      await enterOwn(a);
+      const relogin = await read(a);
+      const res = { skill: plan.skill, name: plan.name, cost: plan.cost, npc: npc.id, npcAt: [npc.x, npc.y],
+        walkClicks: walk.length, merchant, offered, box, before, after, relogin };
+      r.learn = res;
+      checkLearn(res);
+      return res;
+    });
+
+    // Stage 5, skills: use the learned skill. Assignment is the original
+    // gesture (skill window "S", hover the skill, Shift+1 -> 0x0378), the slot
+    // is selected with the real "1" key and the cast is a real right click on a
+    // Gremlin (TMFieldScene SkillUse). MP and damage are the server's.
+    await step('cast', async () => {
+      const PLANS = { 1: { skill: 24, pos: 0, name: 'Flecha_Magica' } };
+      const plan = PLANS[cls];
+      assert(plan, `no cast plan for class ${cls}`);
+      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      privateValues.push(name);
+      if ((await a.eval(() => Module._wyd_get_game_state())) !== 0) {
+        const slot = (await a.slots()).findIndex(x => x.name === name);
+        assert(slot >= 0, `class ${cls} character missing`);
+        await a.enter(slot);
+      }
+      const learned = await a.eval(() => Module._wyd_field_my_score(6) >>> 0);
+      assert(((learned >>> plan.pos) & 1) === 1, `skill ${plan.skill} not learned (run learn first)`);
+      const trip = await a.toGremlinField();
+      const res = { cls, pos: plan.pos, skill: plan.skill, name: plan.name, slot: 0, trip, attempts: 0 };
+      r.cast = res;
+      // Assign: open the skill window with the real "s" key, hover the cell.
+      await a.closePanels();
+      await a.page.focus('#canvas');
+      await a.page.keyboard.press('s');
+      await a.until('skill window', () => Module._wyd_field_skill_panel_visible() === 1, 10000);
+      await a.frames(3);
+      const [cx, cy, cw, ch, cell] = await a.eval(i => {
+        const c = document.getElementById('canvas');
+        return [Module._wyd_field_skill_cell_screen(i, 0), Module._wyd_field_skill_cell_screen(i, 1), c.width, c.height,
+          Module._wyd_field_skill_cell_item(i)];
+      }, plan.pos);
+      res.cell = cell;
+      assert(cx >= 0 && cy >= 0, 'skill cell not laid out');
+      const cb = await a.page.locator('#canvas').boundingBox();
+      await a.page.mouse.move(cb.x + cx * cb.width / cw, cb.y + cy * cb.height / ch, { steps: 3 });
+      await a.frames(2);
+      await a.page.keyboard.press('Shift+Digit1');
+      await a.frames(3);
+      res.belt = await a.eval(() => Module._wyd_field_short_skill(0));
+      res.lastSentAfterAssign = await a.eval(() => window.clientProbe().socket.lastSentOpcode);
+      await a.shot('skill-assigned');
+      await a.page.keyboard.press('s');
+      await a.frames(2);
+      await a.page.keyboard.press('Digit1');
+      await a.frames(2);
+      res.selected = await a.eval(() => Module._wyd_field_selected_short_skill());
+      console.log(`    cell ${cell}, belt[0] ${res.belt}, selected ${res.selected}, last sent 0x${res.lastSentAfterAssign.toString(16)}`);
+      // Cast on the nearest live Gremlin with real right clicks.
+      let mob;
+      for (let i = 0; i < 4 && !mob; i++) {
+        mob = (await a.mobs()).find(m => m.name.trim() === 'Gremlin' && m.onScreen && m.hp > 0);
+        if (!mob) await a.walk(i % 2 ? -160 : 160, 80);
+      }
+      assert(mob, 'no live Gremlin on screen');
+      const c0 = await a.combat(mob.id);
+      res.target = { id: mob.id, distance: Math.round(mob.d) };
+      res.mpTrail = [c0.myMp];
+      res.hpTrail = [c0.hp];
+      res.died = false;
+      const end = Date.now() + 60000;
+      let lastCast = 0;
+      while (Date.now() < end) {
+        const c = await a.combat(mob.id);
+        if (c.myMp !== res.mpTrail.at(-1)) res.mpTrail.push(c.myMp);
+        if (c.present && c.hp !== res.hpTrail.at(-1)) res.hpTrail.push(c.hp);
+        if (c.myDie === 1 || c.myHp <= 0) { res.died = true; break; }
+        if (!c.present || c.die === 1 || c.hp <= 0) break;
+        if (Math.min(...res.mpTrail) < res.mpTrail[0] && res.hpTrail.at(-1) < res.hpTrail[0]) break;
+        if (Date.now() - lastCast > 4000 && res.attempts < 6) {
+          if (await a.clickHuman(mob.id, 'right')) res.attempts++;
+          lastCast = Date.now();
+        }
+        await sleep(500);
+      }
+      await sleep(2000);
+      const c1 = await a.combat(mob.id);
+      if (c1.myMp !== res.mpTrail.at(-1)) res.mpTrail.push(c1.myMp);
+      res.attacksSent = c1.outAttack - c0.outAttack;
+      res.echoes = c1.inAttack - c0.inAttack;
+      await a.shot('cast');
+      console.log(`    cast x${res.attempts}: MP ${res.mpTrail.join(',')} target HP ${res.hpTrail.join(',')} sent ${res.attacksSent} echoes ${res.echoes}`);
+      checkCast(res);
+      return res;
+    });
+
+    // Stage 5, slice 2: A dies to the Armia Field Trolls (the portal route that
+    // killed the starter character in the first combat run) and returns to town
+    // through the runtime's own box 11 -> 0x03AE -> 0x0289. B waits at the
+    // Armia spawn and must see A come back. Death, revival HP and the city
+    // spawn are all decided by the server (mobai.go, character.go restart).
+    await step('death', async () => {
+      const c0 = await a.combat(0);
+      const before = { level: c0.myLevel, exp: c0.exp, hp: c0.myHp, maxHp: c0.myMaxHp };
+      // Baseline before the portal: the Trolls can kill a starter character
+      // during toArmiaField's post-teleport wait (first death run: mobHits 0).
+      const hits0 = c0.inAttack;
+      const trip = await a.toArmiaField();
+      await sample('death: A in Armia Field');
+      const hpTrail = [c0.myHp];
+      let dead, approaches = 0, lastApproach = Date.now();
+      const end = Date.now() + 180000;
+      while (Date.now() < end) {
+        const c = await a.combat(0);
+        if (c.myHp !== hpTrail.at(-1)) hpTrail.push(c.myHp);
+        if (c.myHp <= 0 || c.myDie === 1) { dead = c; break; }
+        // Trolls aggro on sight; if none has after a while, step next to the
+        // nearest live mob with a real ground click. A never attacks.
+        if (Date.now() - lastApproach > 20000) {
+          const mob = (await a.mobs()).find(m => m.hp > 0);
+          if (mob) { approaches++; await a.walkTo(mob.x, mob.y, { near: 2, maxClicks: 3, stallOk: true }); }
+          lastApproach = Date.now();
+        }
+        await sleep(1000);
+      }
+      assert(dead, `A did not die within 3 minutes (HP ${hpTrail.join(',')})`);
+      console.log(`    A died: HP ${hpTrail.join(',')}`);
+      await sleep(2000);
+      await a.shot('dead');
+      // A left click on the field while dead opens box 11 (TMFieldScene
+      // OnMouseEvent); a Troll under the cursor is skipped, not clicked.
+      let box = 0;
+      for (const [dx, dy] of [[0, 120], [-160, 60], [160, 60], [0, -120], [120, 120], [-120, 120]]) {
+        try { await a.clickGround(dx, dy); }
+        catch (e) { if (String(e.message).includes('overlaps entity')) continue; throw e; }
+        box = await a.eval(() => Module._wyd_scene_msgbox_message());
+        if (box === 11) break;
+      }
+      await a.shot('return-box');
+      const at0 = await a.me();
+      assert.equal(await a.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'OK refused');
+      // The runtime sends 0x03AE now and 0x0289 about 5 s later; record the
+      // sequence of last-sent opcodes until the server's recall moves A.
+      const sent = [];
+      let moved;
+      const t0 = Date.now();
+      while (Date.now() - t0 < 30000) {
+        const op = '0x' + (await a.eval(() => window.clientProbe().socket.lastSentOpcode)).toString(16).padStart(4, '0');
+        if (sent.at(-1) !== op) sent.push(op);
+        const me = await a.me();
+        if (Math.hypot(me.x - at0.x, me.y - at0.y) > 50) { moved = me; break; }
+        await sleep(100);
+      }
+      assert(moved, `no recall within 30 s (sent ${sent.join(',')})`);
+      await sleep(3000);
+      const c1 = await a.combat(0);
+      const after = { ...(await a.me()), hp: c1.myHp, maxHp: c1.myMaxHp, die: c1.myDie, level: c1.myLevel, exp: c1.exp };
+      const sawRespawn = (await b.until('B sees A back in town', id => Module._wyd_field_human_present(id) === 1,
+        30000, a.id)) === true;
+      await a.shot('respawned');
+      await b.shot('respawn-observer');
+      const res = { before, trip, hpTrail, hpAtDeath: dead.myHp, mobHits: dead.inAttack - hits0, approaches,
+        died: true, box, sent, firstHpAfterRecall: moved.hp, after, observer: { sawRespawn, at: await b.me() } };
+      r.death = res;
+      checkRespawn(res);
+      return res;
+    });
+
+    // Stage 5, slice 1: A attacks a Gremlin with real clicks; B, in
     // the same field, watches. Every number comes from the server: damage via
     // the 0x0367 broadcast, experience/gold via the echo and UpdateEtc.
     await step('attack', async () => {
-      const [aTrip, bTrip] = await Promise.all([a.toArmiaField(), b.toArmiaField()]);
+      const [aTrip, bTrip] = await Promise.all([a.toGremlinField(), b.toGremlinField()]);
+      await sample('attack: both at Gremlins');
+      r.attack = { aTrip, bTrip, attempts: [] };
       const tried = [];
       let res;
       for (let pick = 0; pick < 3 && !res; pick++) {
         let mob;
         for (let i = 0; i < 4 && !mob; i++) {
-          mob = (await a.mobs()).find(m => m.onScreen && m.hp > 0 && m.maxHp > 0 && !tried.some(t => t.id === m.id));
+          mob = (await a.mobs()).find(m => m.name.trim() === 'Gremlin' && m.onScreen &&
+            m.hp > 0 && m.maxHp > 0 && !tried.some(t => t.target.id === m.id));
           if (!mob) await a.walk(i % 2 ? -160 : 160, 80);
         }
-        assert(mob, `no live entity on screen in Armia Field (tried ${tried.length})`);
+        assert(mob, `no live Gremlin on screen (tried ${tried.length})`);
+        if ((await b.combat(mob.id)).present !== 1) {
+          const at = await a.me();
+          await b.walkTo(at.x, at.y, { near: 3 });
+        }
+        await b.until('B sees combat target', id => Module._wyd_field_human_present(id) === 1, 30000, mob.id);
         const c0 = await a.combat(mob.id);
+        const b0 = await b.combat(mob.id);
+        assert(c0.myHp > 0 && c0.myDie !== 1, 'attacker dead before first input');
+        assert(c0.present === 1 && c0.hp > 0 && b0.present === 1 && b0.hp > 0, 'target unavailable before attack');
         const bSees = (await b.eval(i => Module._wyd_field_human_present(i), mob.id)) === 1;
-        const bTrail = bSees ? [(await b.combat(mob.id)).hp] : [];
+        const bTrail = [b0.hp];
         const hpTrail = [c0.hp];
+        console.log(`    target ${mob.id} Gremlin: HP ${c0.hp}, observer HP ${b0.hp}`);
         let clicks = 0, lastClick = 0, killed = false, lost = false, died = false, bKill = false;
         const end = Date.now() + 150000;
         while (Date.now() < end) {
           const c = await a.combat(mob.id);
+          const v = await b.combat(mob.id);
+          if (v.present) {
+            if (v.hp !== bTrail.at(-1)) bTrail.push(v.hp);
+            if (v.die === 1 || v.hp <= 0) bKill = true;
+          }
           if (c.myDie === 1 || c.myHp <= 0) { died = true; break; }
           if (!c.present) { lost = hpTrail.at(-1) > 0; killed = !lost; break; }
           if (c.hp !== hpTrail.at(-1)) hpTrail.push(c.hp);
           if (c.die === 1 || c.hp <= 0) { killed = true; break; }
-          if (bSees) {
-            const v = await b.combat(mob.id);
-            if (!v.present || v.die === 1 || v.hp <= 0) bKill = true;
-            if (v.present && v.hp !== bTrail.at(-1)) bTrail.push(v.hp);
-          }
+          if (c.hp < c0.hp && bTrail.at(-1) < b0.hp &&
+              c.outAttack > c0.outAttack && c.inAttack > c0.inAttack && v.inAttack > b0.inAttack) break;
           // One click per intent; the runtime paces its own swings. Re-click
           // only when the target is still alive after a while (auto-attack
           // stops when the target leaves reach).
@@ -910,24 +1310,61 @@ async function main() {
         const c1 = await a.combat(mob.id);
         if (bSees && !bKill) {
           const v = await b.combat(mob.id);
-          if (!v.present || v.die === 1 || v.hp <= 0) bKill = true;
+          if (v.present) {
+            if (v.hp !== bTrail.at(-1)) bTrail.push(v.hp);
+            if (v.die === 1 || v.hp <= 0) bKill = true;
+          }
         }
+        if (c1.myDie === 1 || c1.myHp <= 0) died = true;
+        if (c1.present) {
+          if (c1.hp !== hpTrail.at(-1)) hpTrail.push(c1.hp);
+          if (c1.die === 1 || c1.hp <= 0) killed = true;
+        } else if (!killed) lost = true;
         const r1 = {
           target: { id: mob.id, name: mob.name, maxHp: mob.maxHp, distance: Math.round(mob.d) },
           clicks, attacksSent: c1.outAttack - c0.outAttack, echoes: c1.inAttack - c0.inAttack,
           hpTrail, killed, lost, died, exp0: c0.exp, exp1: c1.exp, coin0: c0.coin, coin1: c1.coin,
           learnedSkill: c0.learnedSkill.toString(16), myClass: c0.myClass,
           level: [c0.myLevel, c1.myLevel], myHp: [c0.myHp, c1.myHp], myMp: [c0.myMp, c1.myMp],
-          observer: { sawTarget: bSees, hpTrail: bTrail, sawKill: bKill },
+          observer: { sawTarget: bSees, hpTrail: bTrail, sawKill: bKill,
+            echoes: (await b.combat(mob.id)).inAttack - b0.inAttack },
         };
         tried.push(r1);
+        r.attack.attempts = tried;
+        await writeFile(join(OUT, 'evidence.json'), evidenceJson(ev));
         await a.shot(`attack-${pick}`);
         if (bSees) await b.shot(`attack-${pick}`);
         if (died || killed || hpTrail.length > 1) res = r1;
       }
       assert(res, `no target took damage: ${JSON.stringify(tried.map(t => ({ n: t.target.name, e: t.echoes, s: t.attacksSent })))}`);
-      if (!res.died) checkCombat(res);
+      await sample('attack: after combat');
+      try { checkCombat(res); } catch (error) { throw Object.assign(error, { combat: { result: res, tried } }); }
+      // A ground click cancels auto-attack; only server-confirmed state is saved.
+      await a.walk(0, 100);
+      const last = await a.me();
+      const score = await a.combat(res.target.id);
+      assert(score.myDie !== 1 && score.myHp > 0, 'attacker died before relogin');
+      const before = { ...last, level: score.myLevel, exp: score.exp };
+      await a.healthy();
+      await a.close();
+      await b.until('B loses A after combat', id => Module._wyd_field_human_present(id) === 0, 30000, a.id);
+      // B's part (observer, A's departure) is over: close it so the relogin
+      // runs with a single game page, the scenario's memory peak otherwise.
+      // Its final dialect summary is kept before the page goes away.
+      await b.healthy();
+      ev.final_B = dialectSummary(await b.probe());
+      await b.close();
+      await sample('attack: B closed, before relogin');
+      a = await newSession('A-combat-relogin', A);
+      await a.loginToSelect();
+      assert.equal((await a.pin()).result, 'lock1', 'post-combat PIN rejected');
+      const again = await a.enter(0);
+      const againScore = await a.combat(0);
+      const after = { ...again, level: againScore.myLevel, exp: againScore.exp };
+      checkCombatRelogin(before, after);
+      await a.shot('post-combat-relogin');
       return { aTrip, bTrip, result: res, tried: tried.length,
+        relogin: { before, after, persisted: true },
         panelsClosed: { A: a.panelsClosed ?? [], B: b.panelsClosed ?? [] } };
     });
 
