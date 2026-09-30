@@ -8,7 +8,7 @@ Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (combate básico, morte/respawn e uma skill de cada uma das quatro classes aprovados, inclusive de área) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (combate básico, morte/respawn, uma skill de cada uma das quatro classes e dano do Giro da Fúria em dois alvos no mesmo golpe aprovados) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Pendente | — |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
@@ -16,7 +16,6 @@ Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server
 ## Próxima ação
 
 1. Etapa 5:
-   - tentar observar dano em vários alvos do Giro da Fúria;
    - buff e cura exigem nível 11+ ou 16–20;
    - depois chat `0333/0334`, itens, loja, banco, grupo, troca e persistência.
 
@@ -341,5 +340,18 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
   - uma loja comum foi aberta por engano durante uma caminhada, sem efeito;
   - não houve comparação com o cliente Windows.
 - **Próximo passo:** dano em vários alvos da skill de área e buff/cura (exigem níveis mais altos), ou a fatia 2 (inventário, equipamento, drop).
+
+### 30/09/2026 — etapa 5: Giro da Fúria em vários alvos
+
+- **Pedido do usuário:** executar o plano "Giro da Fúria com múltiplos alvos" ([ADR 006](decisions/006-area-combat-evidence.md)); o usuário autorizou criar contas de teste no portal do operador.
+- **Arquivos:**
+  - alterados: `client/dialect/WydDialect.{h,cpp}` (diagnóstico de combate opt-in, 2×64 eventos), `tools/protocol/dialect_test.cpp`, `tools/verify_world.mjs` (fase `castarea`), `tools/world_checks.mjs`, `package.json`;
+  - novos: `tools/area_checks{,.test}.mjs`, ADR 006, evidência [`2026-09-30-area-multiple`](evidence/05-gameplay/2026-09-30-area-multiple.md) com JSON e log do servidor sanitizados.
+- **Confirmado em teste:** `world:checks` 15/0; `protocol:dialect` 469/0; `protocol:vectors` 97 vetores e 28 fluxos; `scene`; `client:stream`. WASM `9479750f…`.
+- **Confirmado em execução (Railway, contas novas):** personagens criados; TK nível 1→8 em duas execuções de grind (51 abates, a primeira encerrada pelo prazo em nível 7); Giro da Fúria aprendido e preservado no relogin; `castarea` aprovado na primeira tentativa de lançamento: um `0x0367` e uma resposta com dano 40 em cada um dos Gremlins 1037 e 1035, recebida igual por A e B, com HP 70→30 nas duas sessões, MP 112→97, e relogin preservando equipamento, nível, EXP e skill.
+- **Falhas registradas:** senhas de 12 caracteres truncadas para 11 pela cena de login (`AccountPass[12]`), com contas substituídas; a primeira execução de `castarea` parou na proteção de 1 GiB livre antes de abrir B, sem combate.
+- **Hipótese aberta:** o snapshot local de MP após o golpe (112) diverge do MP autoritativo (97); pode ser regeneração, não foi verificado.
+- **Limites:** um par e um lançamento; buff/cura não exercitados; sem comparação com o cliente Windows. Nenhum commit ou deploy nesta fatia.
+- **Próximo passo:** investigar a divergência de MP local ou seguir para buff/cura (níveis 11+) e a fatia 2 (inventário, equipamento, drop).
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

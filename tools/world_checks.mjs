@@ -14,7 +14,7 @@ export function redactEvidence(value, secrets) {
 }
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
-  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'concurrent'];
+  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -27,6 +27,11 @@ export function validateOptions(opt) {
   assert(names.length && names.every(n => PHASES.includes(n)), 'unknown or empty phase');
   assert(new Set(names).size === names.length, 'duplicate phase');
   const phases = new Set(names);
+  if (phases.has('castarea')) {
+    assert.equal(opt.class, '0', 'castarea requires Transknight');
+    assert.deepEqual([...phases].sort(), ['castarea', 'enter', 'login', 'second'],
+      'castarea runs only with login,enter,second');
+  }
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
     move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])

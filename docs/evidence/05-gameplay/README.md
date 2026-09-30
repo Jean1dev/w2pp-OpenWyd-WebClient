@@ -18,6 +18,7 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 | Skills: usar em combate | **confirmado em execução** (Foema) | [skills](2026-09-29-skills.md#uso-da-skill-em-combate): Flecha Mágica na barra (Shift+1, `0x0378`), clique direito no Gremlin, MP 110→105 cobrado pelo servidor, HP 70→16 |
 | Skills: Huntress (Golpe Felino) | **confirmado em execução** | [outras classes](2026-09-30-skills-classes.md): grind 1→6, aprendida no ForeLearner, usada: MP 110→100, HP 70→0 |
 | Skills: Transknight, área (Giro da Fúria) | **confirmado em execução** (um alvo atingido) | [outras classes](2026-09-30-skills-classes.md): grind 1→8, aprendida no Cap.Cavaleiros, `0x0367` de 152 bytes (N=13) roteado, MP 112→97, HP 70→30. O dano em vários mobs no mesmo golpe não foi observado |
+| Skills: Transknight, área em dois alvos no mesmo golpe | **confirmado em execução** | [área múltipla](2026-09-30-area-multiple.md#prova-de-área--aprovada): um `0x0367` com alvos 1037/1035, resposta autoritativa com dano 40 em ambos recebida igual por A e B, HP 70→30 nas duas sessões, MP 112→97, relogin preservado |
 | Skills: BeastMaster (Fera Flamejante) | **confirmado em execução** | [outras classes](2026-09-30-skills-classes.md#beastmaster): grind 1→8, aprendida no Mestre_Archi, usada: MP 119→111, HP 70→1 |
 | `0x02CB` MoveStop (saída) | diferido | sem rota no servidor (`routed=false`); `DEFERRED_OUTBOUND` na ADR 004 |
 | Skills de buff e cura | pendente | exigem nível 11+ (BM) ou 16–20 (Foema) |

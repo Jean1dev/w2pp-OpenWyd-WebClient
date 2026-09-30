@@ -1,0 +1,1678 @@
+{
+ "when": "2026-09-30T12:43:41.006Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "enter",
+  "second",
+  "castarea"
+ ],
+ "accounts": {
+  "A": "wae*******",
+  "B": "wad*******"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 7
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 26474,
+   "at": "2026-09-30T12:44:08.150Z"
+  },
+  "enter": {
+   "ok": true,
+   "me": {
+    "id": 1,
+    "name": "Are*********",
+    "x": 2099.5,
+    "y": 2103.5,
+    "hp": 127,
+    "maxHp": 127,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 34,
+    "inPass": 2,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 36,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "glErrors": 0,
+   "ms": 14343,
+   "at": "2026-09-30T12:44:28.150Z"
+  },
+  "second": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "me": {
+    "id": 2,
+    "name": "Are*********",
+    "x": 2091.5,
+    "y": 2097.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 35,
+    "inPass": 3,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 38,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "ms": 102894,
+   "at": "2026-09-30T12:46:15.325Z"
+  },
+  "castarea": {
+   "ok": true,
+   "attempts": [
+    {
+     "attacker": 1,
+     "target": 1037,
+     "pair": [
+      {
+       "id": 1037,
+       "x": 2183.5,
+       "y": 2103.5
+      },
+      {
+       "id": 1035,
+       "x": 2183.5,
+       "y": 2104.5
+      }
+     ],
+     "before": [
+      {
+       "id": 1037,
+       "hp": 70,
+       "x": 2183.5,
+       "y": 2103.5
+      },
+      {
+       "id": 1035,
+       "hp": 70,
+       "x": 2183.5,
+       "y": 2104.5
+      },
+      {
+       "id": 1036,
+       "hp": 70,
+       "x": 2185.5,
+       "y": 2108.5
+      },
+      {
+       "id": 1045,
+       "hp": 70,
+       "x": 2194.530029296875,
+       "y": 2102.469970703125
+      },
+      {
+       "id": 1032,
+       "hp": 70,
+       "x": 2179.5,
+       "y": 2093.5
+      },
+      {
+       "id": 1038,
+       "hp": 70,
+       "x": 2188.5,
+       "y": 2091.5
+      },
+      {
+       "id": 1046,
+       "hp": 70,
+       "x": 2196.5,
+       "y": 2097.5
+      },
+      {
+       "id": 1030,
+       "hp": 70,
+       "x": 2179.5,
+       "y": 2116.5
+      },
+      {
+       "id": 1044,
+       "hp": 70,
+       "x": 2198.5,
+       "y": 2109.5
+      },
+      {
+       "id": 1047,
+       "hp": 70,
+       "x": 2194.5,
+       "y": 2088.5
+      },
+      {
+       "id": -1,
+       "hp": 70,
+       "x": 2189.5,
+       "y": 2119.5
+      },
+      {
+       "id": 1043,
+       "hp": 70,
+       "x": 2198.5302734375,
+       "y": 2116.530029296875
+      }
+     ],
+     "beforeB": [
+      {
+       "id": 1036,
+       "hp": 70
+      },
+      {
+       "id": 1035,
+       "hp": 70
+      },
+      {
+       "id": 1037,
+       "hp": 70
+      },
+      {
+       "id": 1030,
+       "hp": 70
+      },
+      {
+       "id": 1045,
+       "hp": 70
+      },
+      {
+       "id": 1044,
+       "hp": 70
+      },
+      {
+       "id": 1032,
+       "hp": 70
+      },
+      {
+       "id": 1043,
+       "hp": 70
+      },
+      {
+       "id": 1046,
+       "hp": 70
+      },
+      {
+       "id": 1034,
+       "hp": 70
+      },
+      {
+       "id": 1038,
+       "hp": 70
+      }
+     ],
+     "mpBefore": 112,
+     "clicked": true,
+     "logsA": {
+      "in": [
+       {
+        "sequence": 1,
+        "attacker": 1037,
+        "skill": 0,
+        "progress": 0,
+        "hp": 70,
+        "mp": 0,
+        "exp": "0",
+        "x": 2184,
+        "y": 2102,
+        "targets": [
+         {
+          "id": 1,
+          "damage": 1
+         }
+        ]
+       },
+       {
+        "sequence": 2,
+        "attacker": 1037,
+        "skill": 0,
+        "progress": 0,
+        "hp": 70,
+        "mp": 0,
+        "exp": "0",
+        "x": 2184,
+        "y": 2102,
+        "targets": [
+         {
+          "id": 1,
+          "damage": 1
+         }
+        ]
+       },
+       {
+        "sequence": 3,
+        "attacker": 1,
+        "skill": 0,
+        "progress": 0,
+        "hp": 122,
+        "mp": 97,
+        "exp": "6726",
+        "x": 2183,
+        "y": 2103,
+        "targets": [
+         {
+          "id": 1037,
+          "damage": 40
+         },
+         {
+          "id": 1035,
+          "damage": 40
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         }
+        ]
+       },
+       {
+        "sequence": 4,
+        "attacker": 1037,
+        "skill": 0,
+        "progress": 0,
+        "hp": 30,
+        "mp": 0,
+        "exp": "0",
+        "x": 2184,
+        "y": 2102,
+        "targets": [
+         {
+          "id": 1,
+          "damage": 1
+         }
+        ]
+       },
+       {
+        "sequence": 5,
+        "attacker": 1037,
+        "skill": 0,
+        "progress": 0,
+        "hp": 30,
+        "mp": 0,
+        "exp": "0",
+        "x": 2184,
+        "y": 2102,
+        "targets": [
+         {
+          "id": 1,
+          "damage": 1
+         }
+        ]
+       }
+      ],
+      "out": [
+       {
+        "sequence": 1,
+        "attacker": 1,
+        "skill": 0,
+        "progress": 0,
+        "hp": 0,
+        "mp": -1,
+        "exp": "0",
+        "x": 2183,
+        "y": 2103,
+        "targets": [
+         {
+          "id": 1037,
+          "damage": -1
+         },
+         {
+          "id": 1035,
+          "damage": -1
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         }
+        ]
+       }
+      ],
+      "lost": 0
+     },
+     "logsB": {
+      "in": [
+       {
+        "sequence": 1,
+        "attacker": 1037,
+        "skill": 0,
+        "progress": 0,
+        "hp": 70,
+        "mp": 0,
+        "exp": "0",
+        "x": 2184,
+        "y": 2102,
+        "targets": [
+         {
+          "id": 1,
+          "damage": 1
+         }
+        ]
+       },
+       {
+        "sequence": 2,
+        "attacker": 1037,
+        "skill": 0,
+        "progress": 0,
+        "hp": 70,
+        "mp": 0,
+        "exp": "0",
+        "x": 2184,
+        "y": 2102,
+        "targets": [
+         {
+          "id": 1,
+          "damage": 1
+         }
+        ]
+       },
+       {
+        "sequence": 3,
+        "attacker": 1,
+        "skill": 0,
+        "progress": 0,
+        "hp": 122,
+        "mp": 97,
+        "exp": "6726",
+        "x": 2183,
+        "y": 2103,
+        "targets": [
+         {
+          "id": 1037,
+          "damage": 40
+         },
+         {
+          "id": 1035,
+          "damage": 40
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         },
+         {
+          "id": 0,
+          "damage": 0
+         }
+        ]
+       },
+       {
+        "sequence": 4,
+        "attacker": 1037,
+        "skill": 0,
+        "progress": 0,
+        "hp": 30,
+        "mp": 0,
+        "exp": "0",
+        "x": 2184,
+        "y": 2102,
+        "targets": [
+         {
+          "id": 1,
+          "damage": 1
+         }
+        ]
+       },
+       {
+        "sequence": 5,
+        "attacker": 1037,
+        "skill": 0,
+        "progress": 0,
+        "hp": 30,
+        "mp": 0,
+        "exp": "0",
+        "x": 2184,
+        "y": 2102,
+        "targets": [
+         {
+          "id": 1,
+          "damage": 1
+         }
+        ]
+       }
+      ],
+      "out": [],
+      "lost": 0
+     },
+     "afterA": [
+      {
+       "id": 1037,
+       "present": 1,
+       "die": 0,
+       "hp": 30,
+       "maxHp": 100,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      },
+      {
+       "id": 1035,
+       "present": 1,
+       "die": 0,
+       "hp": 30,
+       "maxHp": 100,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      },
+      {
+       "id": 1036,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      },
+      {
+       "id": 1045,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      },
+      {
+       "id": 1032,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      },
+      {
+       "id": 1038,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      },
+      {
+       "id": 1046,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      },
+      {
+       "id": 1030,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      },
+      {
+       "id": 1044,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      },
+      {
+       "id": 1047,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      },
+      {
+       "id": -1,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      },
+      {
+       "id": 1043,
+       "present": 0,
+       "die": -1,
+       "hp": -1,
+       "maxHp": -1,
+       "myHp": 125,
+       "myMaxHp": 127,
+       "myMp": 112,
+       "myLevel": 8,
+       "coin": 1000000,
+       "exp": 6726,
+       "myDie": 0,
+       "learnedSkill": 1,
+       "myClass": 0,
+       "inAttack": 820,
+       "outAttack": 1
+      }
+     ],
+     "afterB": [
+      {
+       "id": 1037,
+       "present": 1,
+       "die": 0,
+       "hp": 30,
+       "maxHp": 100,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      },
+      {
+       "id": 1035,
+       "present": 1,
+       "die": 0,
+       "hp": 30,
+       "maxHp": 100,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      },
+      {
+       "id": 1036,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      },
+      {
+       "id": 1045,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      },
+      {
+       "id": 1032,
+       "present": 0,
+       "die": -1,
+       "hp": -1,
+       "maxHp": -1,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      },
+      {
+       "id": 1038,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      },
+      {
+       "id": 1046,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      },
+      {
+       "id": 1030,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      },
+      {
+       "id": 1044,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      },
+      {
+       "id": 1047,
+       "present": 0,
+       "die": -1,
+       "hp": -1,
+       "maxHp": -1,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      },
+      {
+       "id": -1,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      },
+      {
+       "id": 1043,
+       "present": 1,
+       "die": 0,
+       "hp": 70,
+       "maxHp": 100,
+       "myHp": 105,
+       "myMaxHp": 105,
+       "myMp": 105,
+       "myLevel": 1,
+       "coin": 1000000,
+       "exp": 0,
+       "myDie": 0,
+       "learnedSkill": 0,
+       "myClass": 0,
+       "inAttack": 170,
+       "outAttack": 0
+      }
+     ],
+     "died": false,
+     "result": {
+      "reply": {
+       "sequence": 3,
+       "attacker": 1,
+       "skill": 0,
+       "progress": 0,
+       "hp": 122,
+       "mp": 97,
+       "exp": "6726",
+       "x": 2183,
+       "y": 2103,
+       "targets": [
+        {
+         "id": 1037,
+         "damage": 40
+        },
+        {
+         "id": 1035,
+         "damage": 40
+        },
+        {
+         "id": 0,
+         "damage": 0
+        },
+        {
+         "id": 0,
+         "damage": 0
+        },
+        {
+         "id": 0,
+         "damage": 0
+        },
+        {
+         "id": 0,
+         "damage": 0
+        },
+        {
+         "id": 0,
+         "damage": 0
+        },
+        {
+         "id": 0,
+         "damage": 0
+        },
+        {
+         "id": 0,
+         "damage": 0
+        },
+        {
+         "id": 0,
+         "damage": 0
+        },
+        {
+         "id": 0,
+         "damage": 0
+        },
+        {
+         "id": 0,
+         "damage": 0
+        },
+        {
+         "id": 0,
+         "damage": 0
+        }
+       ]
+      },
+      "hitIds": [
+       1037,
+       1035
+      ]
+     },
+     "ok": true
+    }
+   ],
+   "relogin": {
+    "before": {
+     "id": 1,
+     "name": "<redacted>",
+     "x": 2180.5,
+     "y": 2098.5,
+     "hp": 127,
+     "maxHp": 127,
+     "cls": 1,
+     "characterClass": 0,
+     "equip": [
+      1,
+      1103,
+      1115,
+      1127,
+      1139,
+      1151,
+      861,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "look": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      863
+     ],
+     "level": 8,
+     "exp": 6726,
+     "learnedSkill": 1
+    },
+    "after": {
+     "id": 1,
+     "name": "<redacted>",
+     "x": 2087.5,
+     "y": 2104.5,
+     "hp": 127,
+     "maxHp": 127,
+     "cls": 1,
+     "characterClass": 0,
+     "equip": [
+      1,
+      1103,
+      1115,
+      1127,
+      1139,
+      1151,
+      861,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "look": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      863
+     ],
+     "level": 8,
+     "exp": 6726,
+     "learnedSkill": 1
+    },
+    "persisted": true
+   },
+   "aTrip": {
+    "route": "Armia east / generators 27..30",
+    "clicks": 23,
+    "at": {
+     "id": 1,
+     "name": "<redacted>",
+     "x": 2184.5,
+     "y": 2107.5,
+     "hp": 126,
+     "maxHp": 127,
+     "cls": 1,
+     "characterClass": 0,
+     "equip": [
+      1,
+      1103,
+      1115,
+      1127,
+      1139,
+      1151,
+      861,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "look": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      863
+     ]
+    }
+   },
+   "bTrip": {
+    "route": "Armia east / generators 27..30",
+    "clicks": 23,
+    "at": {
+     "id": 2,
+     "name": "<redacted>",
+     "x": 2184.5,
+     "y": 2107.5,
+     "hp": 105,
+     "maxHp": 105,
+     "cls": 1,
+     "characterClass": 0,
+     "equip": [
+      1,
+      1103,
+      1115,
+      1127,
+      1139,
+      1151,
+      861,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "look": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      863
+     ]
+    }
+   },
+   "assignment": {
+    "cell": 5000,
+    "belt": 0,
+    "lastSentAfterAssign": 888,
+    "selected": 0
+   },
+   "lastSearch": [
+    {
+     "id": 1037,
+     "hp": 70,
+     "x": 2183.5,
+     "y": 2103.5,
+     "onScreen": true
+    },
+    {
+     "id": 1035,
+     "hp": 70,
+     "x": 2183.5,
+     "y": 2104.5,
+     "onScreen": true
+    },
+    {
+     "id": 1036,
+     "hp": 70,
+     "x": 2185.5,
+     "y": 2108.5,
+     "onScreen": true
+    },
+    {
+     "id": -1,
+     "hp": 70,
+     "x": 2184.5,
+     "y": 2094.449951171875,
+     "onScreen": false
+    },
+    {
+     "id": 1038,
+     "hp": 70,
+     "x": 2189.484130859375,
+     "y": 2094.484130859375,
+     "onScreen": false
+    },
+    {
+     "id": 1045,
+     "hp": 70,
+     "x": 2194.5,
+     "y": 2102.5,
+     "onScreen": false
+    },
+    {
+     "id": 1032,
+     "hp": 70,
+     "x": 2184.48193359375,
+     "y": 2089.517822265625,
+     "onScreen": false
+    },
+    {
+     "id": 1046,
+     "hp": 70,
+     "x": 2197.5,
+     "y": 2096.5,
+     "onScreen": false
+    },
+    {
+     "id": 1044,
+     "hp": 70,
+     "x": 2197.5,
+     "y": 2109.5,
+     "onScreen": false
+    },
+    {
+     "id": 1034,
+     "hp": 70,
+     "x": 2187.51806640625,
+     "y": 2117.51806640625,
+     "onScreen": false
+    },
+    {
+     "id": 1030,
+     "hp": 70,
+     "x": 2179.5,
+     "y": 2118.5,
+     "onScreen": false
+    },
+    {
+     "id": 1047,
+     "hp": 70,
+     "x": 2194.5,
+     "y": 2088.5,
+     "onScreen": false
+    },
+    {
+     "id": 1043,
+     "hp": 70,
+     "x": 2197.5,
+     "y": 2115.5,
+     "onScreen": false
+    }
+   ],
+   "searches": 1,
+   "ms": 1280420,
+   "at": "2026-09-30T13:07:47.840Z"
+  }
+ },
+ "ok": true,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "92eb55f7090cc00cae3b5b8b3e69788245c0b33d",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-09-30T12:44:08.567Z",
+   "freeMiB": 1162,
+   "totalMiB": 8014,
+   "browserMiB": 879,
+   "pages": {
+    "A": {
+     "wasmMiB": 150,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end enter",
+   "at": "2026-09-30T12:44:28.544Z",
+   "freeMiB": 1062,
+   "totalMiB": 8014,
+   "browserMiB": 983,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end second",
+   "at": "2026-09-30T12:46:16.519Z",
+   "freeMiB": 635,
+   "totalMiB": 8014,
+   "browserMiB": 1767,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 497
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  },
+  {
+   "point": "castarea: both in Gremlin field",
+   "at": "2026-09-30T13:05:26.409Z",
+   "freeMiB": 801,
+   "totalMiB": 8014,
+   "browserMiB": 1706,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  },
+  {
+   "point": "castarea: B closed, before relogin",
+   "at": "2026-09-30T13:07:10.192Z",
+   "freeMiB": 1412,
+   "totalMiB": 8014,
+   "browserMiB": 250,
+   "pages": {}
+  },
+  {
+   "point": "end castarea",
+   "at": "2026-09-30T13:07:48.263Z",
+   "freeMiB": 1236,
+   "totalMiB": 8014,
+   "browserMiB": 1030,
+   "pages": {
+    "A-area-relogin": {
+     "wasmMiB": 259,
+     "jsMiB": 595
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "field",
+   "file": ".cache/world/2026-09-30T12-43-40-996Z/A-field.png",
+   "sha256": "0cd810fdcdd6f4763d343f0addbe303392069dbd1d90e95bfc3d9188a2bf5a99"
+  },
+  {
+   "name": "skill-assigned",
+   "file": ".cache/world/2026-09-30T12-43-40-996Z/A-skill-assigned.png",
+   "sha256": "b3a7bd8c3323a5206bfedff6bddd3a59dd1382c5f53a3a5b26a4795b4c8716c2"
+  },
+  {
+   "name": "area-1",
+   "file": ".cache/world/2026-09-30T12-43-40-996Z/A-area-1.png",
+   "sha256": "4d064de2c9d0232045b8ba0a4e090c1cce215d09ca774c339c9e36e812b918da"
+  },
+  {
+   "name": "field",
+   "file": ".cache/world/2026-09-30T12-43-40-996Z/B-field.png",
+   "sha256": "b08bad2fe4433c8891118f1a062258391e6488f4893f0bf055f5aa2936374415"
+  },
+  {
+   "name": "area-1",
+   "file": ".cache/world/2026-09-30T12-43-40-996Z/B-area-1.png",
+   "sha256": "032d5a3a77803cc8a3b1fdb84f5ed1a2ea5d2cb55eda345bc9e0c505bd346577"
+  },
+  {
+   "name": "area-relogin",
+   "file": ".cache/world/2026-09-30T12-43-40-996Z/A-area-relogin-area-relogin.png",
+   "sha256": "700e83c89195bd5d658d88c38788858d3acc22fdf57497e3989d21cbfc2d14a1"
+  }
+ ],
+ "final_B": {
+  "inTranslated": 296,
+  "inPass": 500,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 36,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 796,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "final_A-area-relogin": {
+  "inTranslated": 33,
+  "inPass": 2,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 2,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 35,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "B": [],
+  "A-area-relogin": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-09-30T09:43:41.4841134-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-09-30T09:44:01.1893256-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-30T09:45:26.286225-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-30T10:06:58.0850208-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 2500,
+   "bytes_down": 196640
+  },
+  {
+   "time": "2026-09-30T10:07:10.1914205-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 1848,
+   "bytes_down": 65736
+  },
+  {
+   "time": "2026-09-30T10:07:25.6491833-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-30T10:07:52.2355782-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 200,
+   "bytes_down": 10900
+  }
+ ]
+}

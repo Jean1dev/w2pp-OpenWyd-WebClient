@@ -82,3 +82,12 @@ constexpr int WYD_DIALECT_DROP_LOG = 64;
 int WydDialectDroppedCount(int outbound);
 unsigned int WydDialectDroppedOpcode(int outbound, int index);
 unsigned int WydDialectDroppedTimes(int outbound, int index);
+
+// Opt-in, bounded combat-only diagnostics. Enable/disable clears both rings.
+// Fields: sequence, attacker, skill, progress, HP, MP, EXP low/high,
+// target X/Y, count, then 13 pairs of target ID/damage. No raw frames.
+void WydCombatEnable(int enabled);
+void WydCombatClear();
+int WydCombatCount(int outbound);
+unsigned int WydCombatLost(int outbound);
+int WydCombatValue(int outbound, int index, int field);

@@ -18,6 +18,7 @@
 //   attack    A and B walk to Armia's Gremlins; A attacks, B watches, then A relogs
 //   grind     the --class character of A kills Gremlins until --grind-level (server EXP)
 //   learn     the --class character learns its cheapest skill from the class master
+//   castarea  TK hits two Gremlins in one result, B observes, then A relogs
 //   cast      the --class character assigns its learned skill (hover + Shift+1) and casts it on a Gremlin
 //   death     A dies to the Armia Field Trolls, returns to town (box 11, 0x03AE/0x0289); B at the spawn sees it
 //   concurrent A's account logs in a second time while A is in the Field
@@ -34,6 +35,7 @@ import { resolve, join } from 'node:path';
 import { freemem, totalmem } from 'node:os';
 import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
+import { areaPair, checkAreaAttempt } from './area_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -515,7 +517,7 @@ class Session {
 
   // A real click on an entity: hover until the runtime's own pick reports it
   // under the cursor, then press. The scene builds and sends the attack.
-  async clickHuman(id, button = 'left') {
+  async clickHuman(id, button = 'left', beforePress) {
     await this.closePanels();
     const box = await this.page.locator('#canvas').boundingBox();
     for (let attempt = 0; attempt < 4; attempt++) {
@@ -529,6 +531,7 @@ class Session {
         await this.page.mouse.move(box.x + sx * box.width / cw, box.y + (sy + oy) * box.height / ch, { steps: 3 });
         await this.frames(2);
         if ((await this.eval(() => Module._wyd_field_hover_human_id())) !== id) continue;
+        if (beforePress && !(await beforePress())) return false;
         await this.page.mouse.down({ button });
         try { await this.frames(2); } finally { await this.page.mouse.up({ button }); }
         await this.frames(1);
@@ -536,6 +539,50 @@ class Session {
       }
     }
     return false;
+  }
+
+  async assignSkill(plan) {
+    const res = {};
+    // Assign: open the skill window with the real "s" key, hover the cell.
+    await this.closePanels();
+    await this.page.focus('#canvas');
+    await this.page.keyboard.press('s');
+    await this.until('skill window', () => Module._wyd_field_skill_panel_visible() === 1, 10000);
+    await this.frames(3);
+    const [cx, cy, cw, ch, cell] = await this.eval(i => {
+      const c = document.getElementById('canvas');
+      return [Module._wyd_field_skill_cell_screen(i, 0), Module._wyd_field_skill_cell_screen(i, 1), c.width, c.height,
+        Module._wyd_field_skill_cell_item(i)];
+    }, plan.pos);
+    res.cell = cell;
+    assert(cx >= 0 && cy >= 0, 'skill cell not laid out');
+    const cb = await this.page.locator('#canvas').boundingBox();
+    await this.page.mouse.move(cb.x + cx * cb.width / cw, cb.y + cy * cb.height / ch, { steps: 3 });
+    await this.frames(2);
+    await this.page.keyboard.press('Shift+Digit1');
+    await this.frames(3);
+    res.belt = await this.eval(() => Module._wyd_field_short_skill(0));
+    res.lastSentAfterAssign = await this.eval(() => window.clientProbe().socket.lastSentOpcode);
+    await this.shot('skill-assigned');
+    await this.page.keyboard.press('s');
+    await this.frames(2);
+    await this.page.keyboard.press('Digit1');
+    await this.frames(2);
+    res.selected = await this.eval(() => Module._wyd_field_selected_short_skill());
+    console.log(`    cell ${cell}, belt[0] ${res.belt}, selected ${res.selected}, last sent 0x${res.lastSentAfterAssign.toString(16)}`);
+    return res;
+  }
+
+  combatLog() {
+    return this.eval(() => {
+      const read = dir => Array.from({ length: Module._wyd_combat_count(dir) }, (_, i) => {
+        const v = f => Module._wyd_combat_value(dir, i, f);
+        return { sequence: v(0), attacker: v(1), skill: v(2), progress: v(3), hp: v(4), mp: v(5),
+          exp: ((BigInt(v(7) >>> 0) << 32n) + BigInt(v(6) >>> 0)).toString(), x: v(8), y: v(9),
+          targets: Array.from({ length: v(10) }, (_, j) => ({ id: v(11 + 2*j), damage: v(12 + 2*j) })) };
+      });
+      return { in: read(0), out: read(1), lost: Module._wyd_combat_lost(0) + Module._wyd_combat_lost(1) };
+    });
   }
 
   combat(id) {
@@ -606,7 +653,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast'].some(x => phases.has(x)) ? 25 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea'].some(x => phases.has(x)) ? 25 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -824,13 +871,15 @@ async function main() {
     });
 
     await step('second', async () => {
+      if (phases.has('castarea'))
+        assert(freemem() >= 1024 * 1024 * 1024, 'less than 1 GiB free before opening observer');
       b = await newSession('B', B);
       await b.loginToSelect();
       const pin = await b.pin();
       if (!pin.already && pin.result !== 'lock1') throw new Error(`PIN rejected (${pin.result})`);
       let slots = await b.slots();
       if (!slots[0].name) {
-        assert(!phases.has('attack'), 'combat requires an existing B character');
+        assert(!phases.has('attack') && !phases.has('castarea'), 'combat requires an existing B character');
         await b.create(B.char, cls); slots = await b.slots();
       }
       const me = await b.enter(0);
@@ -1159,6 +1208,108 @@ async function main() {
       return res;
     });
 
+    await step('castarea', async () => {
+      const res = { attempts: [], relogin: null };
+      r.castarea = res;
+      assert.equal((await a.me()).characterClass, 0, 'castarea needs the existing TK');
+      assert((await a.combat(0)).learnedSkill & 1, 'Giro da Furia not learned');
+      res.aTrip = await a.toGremlinField();
+      res.bTrip = await b.toGremlinField();
+      await sample('castarea: both in Gremlin field');
+      res.assignment = await a.assignSkill({ pos: 0 });
+      assert.equal(res.assignment.cell, 5000);
+      assert.equal(res.assignment.belt, 0);
+      assert.equal(res.assignment.selected, 0);
+      for (const s of [a, b]) await s.eval(() => Module._wyd_combat_enable(1));
+      const end = Date.now() + 12 * 60 * 1000;
+      let searches = 0;
+      while (Date.now() < end && res.attempts.length < 6) {
+        const state = await a.combat(0);
+        assert(state.myHp > 0 && state.myDie !== 1, 'caster died while searching');
+        assert(state.myMp >= 15, 'insufficient MP for another Giro da Furia');
+        const mobs = await a.mobs();
+        res.lastSearch = mobs.filter(m => m.name.trim() === 'Gremlin').map(({ id, hp, x, y, onScreen }) => ({ id, hp, x, y, onScreen }));
+        let pair = areaPair(await a.me(), mobs);
+        if (!pair) {
+          // Search only the known Gremlin generators, via ordinary movement.
+          const y = [2102, 2110, 2118, 2094, 2086][searches++ % 5];
+          res.searches = searches;
+          await a.walkTo(2184.5, y + 0.5, { near: 3, maxClicks: 3, stallOk: true });
+          await sleep(2000);
+          continue;
+        }
+        const me = await a.me(), observer = await b.me();
+        if (Math.hypot(me.x - observer.x, me.y - observer.y) > 8)
+          await b.walkTo(me.x, me.y, { near: 5, maxClicks: 4, stallOk: true });
+        // Recheck after B's walk; mobs can wander while rendering input.
+        pair = areaPair(await a.me(), await a.mobs());
+        if (!pair) continue;
+        let before;
+        const attempt = { attacker: a.id, target: pair[0].id };
+        attempt.clicked = await a.clickHuman(pair[0].id, 'right', async () => {
+          before = (await a.mobs()).filter(m => m.name.trim() === 'Gremlin' && m.hp > 0);
+          const primary = before.find(m => m.id === attempt.target);
+          if (!primary) return false;
+          const fresh = areaPair(await a.me(), [primary, ...before.filter(m => m.id !== primary.id)]);
+          if (!fresh || fresh[0].id !== primary.id) return false;
+          const seen = await b.mobs();
+          if (!fresh.every(m => seen.some(o => o.id === m.id && o.hp === m.hp))) return false;
+          attempt.pair = fresh.map(({ id, x, y }) => ({ id, x, y }));
+          attempt.before = before.map(({ id, hp, x, y }) => ({ id, hp, x, y }));
+          attempt.beforeB = seen.map(({ id, hp }) => ({ id, hp }));
+          attempt.mpBefore = (await a.combat(0)).myMp;
+          for (const s of [a, b]) await s.eval(() => Module._wyd_combat_clear());
+          return true;
+        });
+        if (!attempt.clicked) { await sleep(1000); continue; }
+        res.attempts.push(attempt);
+        await sleep(2500);
+        attempt.logsA = await a.combatLog();
+        attempt.logsB = await b.combatLog();
+        const hp = async s => Promise.all(before.map(async m => ({ id: m.id, ...await s.combat(m.id) })));
+        attempt.afterA = await hp(a);
+        attempt.afterB = await hp(b);
+        const after = await a.combat(0);
+        attempt.died = after.myHp <= 0 || after.myDie === 1;
+        try {
+          attempt.result = checkAreaAttempt(attempt);
+          attempt.ok = true;
+        } catch (e) { attempt.ok = false; attempt.error = e.message; }
+        console.log(`    area attempt ${res.attempts.length}: ${attempt.ok ? 'two-target result confirmed by A/B' : attempt.error}`);
+        await a.shot(`area-${res.attempts.length}`);
+        await b.shot(`area-${res.attempts.length}`);
+        await a.healthy(); await b.healthy();
+        assert(!attempt.died, 'caster died');
+        assert(!attempt.logsA.lost && !attempt.logsB.lost, 'combat diagnostics lost');
+        assert(attempt.logsA.out.filter(e => e.attacker === a.id).length <= 1,
+          'multiple attacks during one click; observation window ambiguous');
+        if (attempt.ok) break;
+        // Cancel any ongoing attack before the next observation window.
+        await a.walk(0, 100);
+      }
+      assert(res.attempts.some(t => t.ok), 'no proven two-target cast within attempt/time budget');
+      await a.walk(0, 100);
+      const me = await a.me(), score = await a.combat(0);
+      assert(score.myHp > 0 && score.myDie !== 1, 'caster died before relogin');
+      const before = { ...me, level: score.myLevel, exp: score.exp, learnedSkill: score.learnedSkill };
+      await a.healthy(); await b.healthy();
+      ev.final_B = dialectSummary(await b.probe());
+      await a.close();
+      await b.until('B loses A after area cast', id => Module._wyd_field_human_present(id) === 0, 30000, a.id);
+      await b.close();
+      await sample('castarea: B closed, before relogin');
+      a = await newSession('A-area-relogin', A);
+      await a.loginToSelect();
+      assert.equal((await a.pin()).result, 'lock1', 'post-area PIN rejected');
+      const again = await a.enter(0), againScore = await a.combat(0);
+      const after = { ...again, level: againScore.myLevel, exp: againScore.exp, learnedSkill: againScore.learnedSkill };
+      checkCombatRelogin(before, after);
+      assert.equal(after.learnedSkill, before.learnedSkill, 'learned skill did not persist');
+      res.relogin = { before, after, persisted: true };
+      await a.shot('area-relogin');
+      return res;
+    });
+
     // Stage 5, skills: use the learned skill. Assignment is the original
     // gesture (skill window "S", hover the skill, Shift+1 -> 0x0378), the slot
     // is selected with the real "1" key and the cast is a real right click on a
@@ -1187,33 +1338,7 @@ async function main() {
       const trip = await a.toGremlinField();
       const res = { cls, pos: plan.pos, skill: plan.skill, name: plan.name, slot: 0, trip, attempts: 0, area: !!plan.area };
       r.cast = res;
-      // Assign: open the skill window with the real "s" key, hover the cell.
-      await a.closePanels();
-      await a.page.focus('#canvas');
-      await a.page.keyboard.press('s');
-      await a.until('skill window', () => Module._wyd_field_skill_panel_visible() === 1, 10000);
-      await a.frames(3);
-      const [cx, cy, cw, ch, cell] = await a.eval(i => {
-        const c = document.getElementById('canvas');
-        return [Module._wyd_field_skill_cell_screen(i, 0), Module._wyd_field_skill_cell_screen(i, 1), c.width, c.height,
-          Module._wyd_field_skill_cell_item(i)];
-      }, plan.pos);
-      res.cell = cell;
-      assert(cx >= 0 && cy >= 0, 'skill cell not laid out');
-      const cb = await a.page.locator('#canvas').boundingBox();
-      await a.page.mouse.move(cb.x + cx * cb.width / cw, cb.y + cy * cb.height / ch, { steps: 3 });
-      await a.frames(2);
-      await a.page.keyboard.press('Shift+Digit1');
-      await a.frames(3);
-      res.belt = await a.eval(() => Module._wyd_field_short_skill(0));
-      res.lastSentAfterAssign = await a.eval(() => window.clientProbe().socket.lastSentOpcode);
-      await a.shot('skill-assigned');
-      await a.page.keyboard.press('s');
-      await a.frames(2);
-      await a.page.keyboard.press('Digit1');
-      await a.frames(2);
-      res.selected = await a.eval(() => Module._wyd_field_selected_short_skill());
-      console.log(`    cell ${cell}, belt[0] ${res.belt}, selected ${res.selected}, last sent 0x${res.lastSentAfterAssign.toString(16)}`);
+      Object.assign(res, await a.assignSkill(plan));
       // Cast on the nearest live Gremlin with real right clicks.
       const gremlins = async () => (await a.mobs()).filter(m => m.name.trim() === 'Gremlin' && m.hp > 0);
       let mob;
