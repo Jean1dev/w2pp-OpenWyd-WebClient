@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
+  itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
   const value = { error: 'fixture-secret', nested: ['prefix fixture-secret suffix'], x: 123456 };
@@ -170,4 +171,101 @@ test('casting needs the belt, the selected slot, server-charged MP and damage', 
   assert.doesNotThrow(() => validateOptions(opts('login,cast')));
   assert.doesNotThrow(() => validateOptions(opts('login,learn,cast')));
   assert.throws(() => validateOptions(opts('login,enter,cast')));
+});
+
+// ---- items (stage 5, slice 2) ----
+const it = (index, ...ef) => ({ index, ef: [...ef, [0, 0], [0, 0], [0, 0]].slice(0, 3) });
+const empty = () => it(0);
+const bagOf = (equip, carry, extra = {}) => ({
+  equip: Array.from({ length: 16 }, (_, i) => equip[i] ?? empty()),
+  carry: Array.from({ length: 64 }, (_, i) => carry[i] ?? empty()),
+  coin: 1000, level: 8, exp: 5000, damage: 40, ac: 20, hp: 300, maxHp: 400, ...extra,
+});
+
+test('item amount reads EF_AMOUNT and counts a plain item as one', () => {
+  assert.equal(itemAmount(it(401, [61, 119])), 119);
+  assert.equal(itemAmount(it(1805)), 1);
+  assert.equal(itemAmount(empty()), 0);
+  assert.equal(itemAmount(undefined), 0);
+});
+
+test('inventory relogin compares every slot, effects, coin and progression', () => {
+  const a = bagOf({ 6: it(861) }, { 0: it(401, [61, 120]) });
+  checkInventoryRelogin(a, structuredClone(a));
+  for (const change of [b => { b.carry[0] = it(401, [61, 119]); }, b => { b.equip[6] = empty(); },
+    b => { b.carry[20] = it(400); }, b => { b.coin++; }, b => { b.exp++; }, b => { b.level++; }]) {
+    const b = structuredClone(a);
+    change(b);
+    assert.throws(() => checkInventoryRelogin(a, b));
+  }
+});
+
+test('equip needs the picked item, the server echo, a recomputed score, B and an unchanged refusal', () => {
+  const weapon = it(861, [2, 10]);
+  const before = bagOf({ 6: weapon }, { 0: it(401, [61, 120]) });
+  const off = bagOf({}, { 0: it(401, [61, 120]), 1: weapon }, { damage: 12 });
+  const on = structuredClone(before);
+  const e = { slot: 6, free: 1, item: 861, before, off, on,
+    unequip: { expect: 861, picked: 861, swapsSent: 1 }, equip: { expect: 861, picked: 861, swapsSent: 1 },
+    observer: { sawOff: true, sawOn: true },
+    refused: { cursor: 0, bag: { equip: on.equip, carry: on.carry } }, relogin: structuredClone(on) };
+  checkEquip(e);
+  // Login snapshot = template score: before may equal the unequipped value.
+  checkEquip({ ...e, before: { ...before, damage: 12 } });
+  const bad = [
+    { unequip: { expect: 861, picked: 0, swapsSent: 1 } }, { equip: { expect: 861, picked: 861, swapsSent: 0 } },
+    { off: { ...off, damage: 40 } }, { off: bagOf({ 6: weapon }, { 0: it(401, [61, 120]) }, { damage: 12 }) },
+    { on: { ...on, damage: 12 } }, { on: { ...on, carry: off.carry } }, { observer: { sawOff: false, sawOn: true } }, { observer: { sawOff: true, sawOn: false } },
+    { refused: { cursor: 401, bag: { equip: on.equip, carry: on.carry } } },
+    { refused: { cursor: 0, bag: { equip: on.equip, carry: off.carry } } },
+    { relogin: bagOf({}, { 0: it(401, [61, 120]) }) },
+  ];
+  for (const b of bad) assert.throws(() => checkEquip({ ...e, ...b }), JSON.stringify(Object.keys(b)));
+});
+
+test('potion needs missing HP, one unit per use, a heal B sees and the same count after relogin', () => {
+  const after = bagOf({}, { 0: it(401, [61, 117]) });
+  const p = { slot: 0, amount0: 120, hpBefore: 300, maxHp: 400,
+    use: { usesSent: 1, amount: 119, hp: 400 }, observer: { hpBefore: 300, hpAfter: 400 },
+    double: { usesSent: 2, amount: 117, bag: { equip: after.equip, carry: after.carry } },
+    empty: { usesSent: 0, bag: { equip: after.equip, carry: after.carry } },
+    beforeRelogin: after, relogin: structuredClone(after) };
+  checkPotion(p);
+  checkPotion({ ...p, double: { ...p.double, amount: 118 }, beforeRelogin: bagOf({}, { 0: it(401, [61, 118]) }),
+    relogin: bagOf({}, { 0: it(401, [61, 118]) }) });
+  const bad = [
+    { hpBefore: 400 }, { use: { usesSent: 0, amount: 119, hp: 400 } }, { use: { usesSent: 1, amount: 118, hp: 400 } },
+    { use: { usesSent: 1, amount: 119, hp: 300 } }, { use: { usesSent: 1, amount: 119, hp: 330 } },
+    { observer: { hpBefore: 300, hpAfter: 300 } },
+    { double: { ...p.double, amount: 119 } }, { double: { ...p.double, amount: 116 } },
+    { empty: { usesSent: 0, bag: { equip: after.equip, carry: bagOf({}, {}).carry } } },
+    { relogin: bagOf({}, { 0: it(401, [61, 118]) }) },
+  ];
+  for (const b of bad) assert.throws(() => checkPotion({ ...p, ...b }), JSON.stringify(Object.keys(b)));
+});
+
+test('loot needs server-paid kills that only add to carry or coin, kept after relogin', () => {
+  const end = bagOf({}, { 0: it(401, [61, 120]), 2: it(1805) }, { coin: 1270 });
+  const l = { kills: [{ id: 1037 }], coinGain: 270, itemGain: [{ slot: 2, before: 0, after: 1 }], lost: [],
+    start: { coin: 1000 }, end, relogin: structuredClone(end) };
+  checkLoot(l);
+  checkLoot({ ...l, itemGain: [] });
+  checkLoot({ ...l, coinGain: 0 });
+  for (const b of [{ kills: [] }, { coinGain: 0, itemGain: [] }, { lost: [{ slot: 0 }] },
+    { itemGain: [{ slot: 2, before: 1, after: 1 }] }, { start: { coin: 2000 } }, { relogin: { ...end, coin: 1000 } }])
+    assert.throws(() => checkLoot({ ...l, ...b }), JSON.stringify(Object.keys(b)));
+});
+
+test('item phases run alone after both sessions entered; loot runs with login', () => {
+  assert.doesNotThrow(() => validateOptions(options('login,enter,second,equip')));
+  assert.throws(() => validateOptions(options('login,enter,equip')));
+  assert.throws(() => validateOptions(options('login,enter,second,move,equip')));
+  assert.doesNotThrow(() => validateOptions(options('login,enter,second,death,potion')));
+  assert.throws(() => validateOptions(options('login,enter,second,potion')));
+  assert.throws(() => validateOptions(options('login,enter,second,attack,death,potion')));
+  assert.throws(() => validateOptions(options('login,enter,second,equip,potion')));
+  assert.doesNotThrow(() => validateOptions(options('login,loot')));
+  assert.doesNotThrow(() => validateOptions({ ...options('login,grind,loot'), 'grind-level': '4' }));
+  assert.throws(() => validateOptions(options('login,enter,loot')));
+  assert.throws(() => validateOptions(options('loot')));
 });

@@ -402,6 +402,34 @@ func TestExtDialectInbound(t *testing.T) {
 		mustJSON(t, d.Inbound["send_item"].Logical, &l)
 		same(t, EncodeSendItemBody(l.InvType, l.Slot, l.Item.sel()), body(t, "send_item"))
 	})
+	// Items (ADR 007): tradingItem/equipItem echo the request payload as
+	// received, so the fixtures must equal the server's own encoders.
+	for _, name := range []string{"swap_item", "swap_item_range"} {
+		t.Run(name, func(t *testing.T) {
+			var l fxSwap
+			mustJSON(t, d.Inbound[name].Logical, &l)
+			m := l.body()
+			same(t, m.Encode(), body(t, name))
+		})
+	}
+	t.Run("use_item", func(t *testing.T) {
+		var l fxUse
+		mustJSON(t, d.Inbound["use_item"].Logical, &l)
+		m := l.body()
+		same(t, m.Encode(), body(t, "use_item"))
+	})
+	t.Run("update_carry", func(t *testing.T) {
+		var l struct {
+			Coin  int32             `json:"coin"`
+			Items map[string]fxItem `json:"items"`
+		}
+		mustJSON(t, d.Inbound["update_carry"].Logical, &l)
+		var carry [64]SelItem
+		for k, it := range l.Items {
+			carry[atoi(k)] = it.sel()
+		}
+		same(t, EncodeUpdateCarryBody(carry, l.Coin), body(t, "update_carry"))
+	})
 	t.Run("update_etc", func(t *testing.T) {
 		var l struct {
 			Hold         uint32 `json:"hold"`
@@ -582,4 +610,52 @@ func TestExtDialectOutbound(t *testing.T) {
 			}
 		})
 	}
+	// Items: the server decodes the translated runtime frames into the same slots.
+	t.Run("swap_item", func(t *testing.T) {
+		h, b := frame("swap_item")
+		var l fxSwap
+		mustJSON(t, d.Outbound["swap_item"].Logical, &l)
+		var m MsgTradingItemBody
+		if h.Type != MsgTradingItem || len(b) != MsgTradingItemBodySize || m.Decode(b) != nil || m != l.body() {
+			t.Fatalf("type %v len %d %+v", h.Type, len(b), m)
+		}
+	})
+	t.Run("use_item", func(t *testing.T) {
+		h, b := frame("use_item")
+		var l fxUse
+		mustJSON(t, d.Outbound["use_item"].Logical, &l)
+		var m MsgUseItemBody
+		if h.Type != MsgUseItem || len(b) != MsgUseItemBodySize || m.Decode(b) != nil || m != l.body() {
+			t.Fatalf("type %v len %d %+v", h.Type, len(b), m)
+		}
+	})
+}
+
+// fxSwap: the four positional bytes of MSG_TradingItem, named as the server
+// reads them (DestPlace, DestSlot, SrcPlace, SrcSlot).
+type fxSwap struct {
+	Place0 uint8 `json:"place0"`
+	Slot0  uint8 `json:"slot0"`
+	Place1 uint8 `json:"place1"`
+	Slot1  uint8 `json:"slot1"`
+	Warp   int32 `json:"warp"`
+}
+
+func (f fxSwap) body() MsgTradingItemBody {
+	return MsgTradingItemBody{DestPlace: f.Place0, DestSlot: f.Slot0, SrcPlace: f.Place1, SrcSlot: f.Slot1, WarpID: f.Warp}
+}
+
+type fxUse struct {
+	SourType int32  `json:"sourType"`
+	SourPos  int32  `json:"sourPos"`
+	DestType int32  `json:"destType"`
+	DestPos  int32  `json:"destPos"`
+	GridX    uint16 `json:"gridX"`
+	GridY    uint16 `json:"gridY"`
+	WarpID   uint16 `json:"warpId"`
+}
+
+func (f fxUse) body() MsgUseItemBody {
+	return MsgUseItemBody{SourType: f.SourType, SourPos: f.SourPos, DestType: f.DestType, DestPos: f.DestPos,
+		GridX: f.GridX, GridY: f.GridY, WarpID: f.WarpID}
 }

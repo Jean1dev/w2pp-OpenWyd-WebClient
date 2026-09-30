@@ -22,7 +22,15 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 | Skills: BeastMaster (Fera Flamejante) | **confirmado em execução** | [outras classes](2026-09-30-skills-classes.md#beastmaster): grind 1→8, aprendida no Mestre_Archi, usada: MP 119→111, HP 70→1 |
 | `0x02CB` MoveStop (saída) | diferido | sem rota no servidor (`routed=false`); `DEFERRED_OUTBOUND` na ADR 004 |
 | Skills de buff e cura | pendente | exigem nível 11+ (BM) ou 16–20 (Foema) |
-| Inventário, drop, loja, banco, teleporte, chat, grupo, troca e persistência | pendente | fatias seguintes |
+| Dialeto de itens `0376` (C↔S), `0373` (36↔34), `0185` | confirmado em teste e em execução | C++ com 496 verificações; overlay Go com `MsgTradingItemBody`/`MsgUseItemBody` reais ([ADR 007](../../decisions/007-inventory-dialect.md)) |
+| Equipar/desequipar com B observando, score recalculado, relogin | **confirmado em execução** | [inventário](2026-09-30-inventory.md#equipar-e-desequipar--aprovado-railway): arma 861 equip 6 ↔ carry 13 por cliques reais, B vê `look` 863→0→863, Damage do servidor 28→30 com a arma, relogin idêntico |
+| Movimento impossível (poção no slot da arma) | **confirmado em execução** | o runtime recusa localmente, sem pacote; o estado não muda |
+| Score do login = template BaseMob | divergência do servidor (confirmada em fonte) | [inventário](2026-09-30-inventory.md#primeira-execução-reprovada-pela-regra-não-pelo-cliente); proposta: `sendScore` depois do login |
+| Poção (uso, clique repetido, célula vazia, B vê a cura, relogin) | implementado; **não provado** | [inventário](2026-09-30-inventory.md#poção--não-provada): duas execuções interrompidas por falta de memória no login de B (issue #6); uma sem dano suficiente dos Gremlins. O dano agora vem da fase `death` (HP 2 no respawn) |
+| Loot dos Gremlins no carry, relogin | **confirmado em execução** | [inventário](2026-09-30-inventory.md#loot--aprovado-railway-sem-ouro-por-defeito-do-servidor): 25 abates, 8 itens nos slots 13–20 via `0x0182`, relogin idêntico |
+| Ouro dos mobs (`0x0337`) | **bloqueado pelo servidor** (confirmado em fonte e em execução) | `SpawnMobAt` não copia o `Coin` do template, então `GoldDrop` sempre dá 0; 0 de ouro em 25 abates |
+| Drop e coleta no chão | **bloqueado pelo servidor** | sem `0x026E`, CNF placeholder de 16 bytes, sem decay; proposta na ADR 007 |
+| Loja, banco, teleporte, chat, grupo, troca e persistência após reinício | pendente | fatias seguintes |
 
 ## Execuções de 29/09/2026 (cenário `login,enter,second,attack`)
 
@@ -57,9 +65,9 @@ Detalhes em [2026-09-29-basic-combat.md](2026-09-29-basic-combat.md). Critérios
 ## Comandos
 
 ```powershell
-npm run protocol:dialect      # 447 verificações
+npm run protocol:dialect      # 496 verificações
 npm run protocol:vectors      # inclui TestExtDialect{Inbound,Outbound}/attack_*
-npm run world:checks          # 12 testes (checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast com área, DEFERRED_INBOUND = {0x5000}, DEFERRED_OUTBOUND = {0x02cb})
+npm run world:checks          # 21 testes (checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast com área, DEFERRED_INBOUND = {0x5000}, DEFERRED_OUTBOUND = {0x02cb})
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,attack
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,death
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,grind --class 1 --grind-level 4
@@ -70,5 +78,9 @@ node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-versio
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,learn --class 2
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,cast --class 2
 # rotas pelos mapas do servidor na revisão fixada (clone parcial que traz os blobs):
+# fatia 2 (itens): uma fase por processo
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,equip --class 0
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,potion --class 0
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,loot --class 0
 python tools/route_armia.py --git-dir ../start/external/server --from 2096,2097 --to 2077,2123
 ```
