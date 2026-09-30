@@ -8,7 +8,7 @@ Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
 | 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (combate básico, morte/respawn, uma skill de cada uma das quatro classes e dano do Giro da Fúria em dois alvos no mesmo golpe aprovados) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (combate básico, morte/respawn, uma skill de cada uma das quatro classes, Giro da Fúria em dois alvos e equipar/desequipar com observador aprovados; poção e loot implementados, sem execução online; drop no chão bloqueado pelo servidor) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Pendente | — |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
@@ -16,8 +16,9 @@ Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server
 ## Próxima ação
 
 1. Etapa 5:
+   - fatia 2: rodar `login,enter,second,death,potion` (duas páginas; precisa de mais memória livre que a disponível nesta sessão, issue #6);
    - buff e cura exigem nível 11+ ou 16–20;
-   - depois chat `0333/0334`, itens, loja, banco, grupo, troca e persistência.
+   - depois loja, banco, teleporte, chat `0333/0334`, grupo, troca e persistência após reinício.
 
    Rodar os cenários online em processos separados, por causa da memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar:
@@ -26,7 +27,11 @@ Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server
    - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
 3. Etapa 8 — confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
 4. Fechar a etapa 3 (falta DeleteCharacter ponta a ponta) e a etapa 1 (consumidores ainda assinalados na [matriz](compatibility.md)).
-5. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
+5. Servidor, entregas separadas (não feitas):
+   - itens no chão: `0x026E`, CNF de 28 bytes, decay e dono ([ADR 007](decisions/007-inventory-dialect.md));
+   - enviar `0x0336` depois do login, porque o CurrentScore do snapshot é o template da classe;
+   - copiar o `Coin` do template para o mob em `SpawnMobAt`, porque hoje nenhum mob dá ouro.
+6. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
 
@@ -353,5 +358,41 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
 - **Hipótese aberta:** o snapshot local de MP após o golpe (112) diverge do MP autoritativo (97); pode ser regeneração, não foi verificado.
 - **Limites:** um par e um lançamento; buff/cura não exercitados; sem comparação com o cliente Windows. Nenhum commit ou deploy nesta fatia.
 - **Próximo passo:** investigar a divergência de MP local ou seguir para buff/cura (níveis 11+) e a fatia 2 (inventário, equipamento, drop).
+
+### 30/09/2026 — etapa 5, fatia 2: itens
+
+- **Pedido do usuário:** executar o orquestrador. No plano aprovado, o usuário escolheu a fatia 2 (inventário, equipamento, consumo, loot e atributos).
+- **Arquivos:**
+  - alterados: `client/dialect/WydDialect.cpp` (`0x0376` C↔S posicional, `0x0373` 36↔34, `0x0185`), `tools/protocol/{gen_fixtures.py,dialect_test.cpp,overlay/zz_ext_dialect_test.go}`, `tools/verify_world.mjs` (fases `equip`, `potion`, `loot`; `bag`, `openInventory`, `moveItem`), `tools/world_checks{,.test}.mjs`, `tools/capture_world_logs.py` (`crack`), `docs/compatibility.md`, README da etapa 5;
+  - novos: `patches/openwyd/0017-inventory-probes.patch`, [ADR 007](decisions/007-inventory-dialect.md), [evidências](evidence/05-gameplay/2026-09-30-inventory.md) com JSONs e o log do servidor sanitizados.
+- **Confirmado em fonte:**
+  - a troca do servidor é simétrica e ecoa o payload, e o runtime só aplica a troca pelo eco;
+  - o runtime só remove um item jogado no chão ao receber o CNF;
+  - itens no chão não existem para o cliente no servidor fixado;
+  - o loot vai direto ao carry e ao Coin;
+  - o CurrentScore do login vem do template da classe.
+- **Confirmado em teste:**
+  - `protocol:dialect` 496/0;
+  - `protocol:vectors` verde (overlay com decoders e encoders reais);
+  - `world:checks` 21/0;
+  - build certificado e link com 0 indefinidos (WASM `3c27933b…`);
+  - `scene` e `client:stream` verdes;
+  - pilha de patches 0001–0017 verificada.
+- **Confirmado em execução (Railway):** `equip` aprovado na execução 2.
+  - A tira a arma 861 e a põe de volta por cliques reais, com um `0x0376` roteado em cada sentido.
+  - B vê a troca de visual.
+  - O Damage do servidor é 28 sem a arma e 30 com ela.
+  - A poção arrastada para o slot da arma é recusada localmente, sem pacote.
+  - O relogin preserva tudo, com protocolo limpo e nenhum `crack`.
+  - A execução 1 reprovou só na regra do harness, que usava o score de template do login como referência; a regra foi corrigida.
+- **`loot` aprovado** (execução pedida pelo usuário): 25 abates, 8 itens do loot do Gremlin no carry via `0x0182`, relogin idêntico, nível 8→9.
+  - Nenhum ouro. Causa confirmada em fonte: `SpawnMobAt` não copia o `Coin` do template, e `GoldDrop` devolve 0.
+- **`potion` não provada:**
+  - execuções 1 e 3 interrompidas pelo Claude Code por falta de memória no login de B;
+  - execução 2 sem dano suficiente: Gremlins não baixam o HP de um personagem de nível 8–9. A fase passou a usar o respawn com HP 2 da fase `death`.
+- **Não executado:**
+  - comparação com o cliente Windows.
+- **Limitações:** drop no chão bloqueado pelo servidor; cargo, split e delete fora desta fatia; a recusa por requisito no servidor (`NoticeReqNotMet`) não foi alcançada, porque o runtime bloqueia antes.
+- **Próximo passo:** rodar `potion` e `loot` com memória livre; depois buff/cura ou a fatia 3.
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

@@ -1,0 +1,94 @@
+Read-only probes for the inventory slice: the visible carry page, the
+on-screen center of carry and equip cells, the effect pairs of own slots
+(EF_AMOUNT 61 = stack size) and the item attached to the cursor, and
+the own Damage/Ac last sent by the server. The harness
+drags and right-clicks with real mouse input; nothing here sends a packet or
+changes state.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -934,6 +934,83 @@
+   return g_pObjectManager ? g_pObjectManager->m_cSelectShortSkill : -1;
+ }
+ 
++// Inventory and equipment (stage 5 items, read-only). The harness drags and
++// right-clicks cells with real mouse input; these only locate cells and read
++// the client's view of the slots, which the server corrects with 0x0182.
++namespace {
++SGridControl* WydEquipGrid(TMFieldScene* f, int slot) {
++  // Same table as TMFieldScene::OnPacketSwapItem (equip place 0).
++  SGridControl* g[16] = {f->m_pGridInv, f->m_pGridHelm, f->m_pGridCoat, f->m_pGridPants,
++                         f->m_pGridGloves, f->m_pGridBoots, f->m_pGridLeft, f->m_pGridRight,
++                         f->m_pGridRing, f->m_pGridNecklace, f->m_pGridOrb, f->m_pGridCabuncle,
++                         f->m_pGridGuild, f->m_pGridEvent, f->m_pGridDRing, f->m_pGridMantua};
++  return slot >= 0 && slot < 16 ? g[slot] : nullptr;
++}
++
++TMFieldScene* WydField() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD) return nullptr;
++  return static_cast<TMFieldScene*>(g_pCurrentScene);
++}
++
++int WydCellCenter(SGridControl* g, int x, int y, int which) {
++  if (!g || !g->IsVisible() || g->m_nColumnGridCount <= 0 || g->m_nRowGridCount <= 0 ||
++      x < 0 || y < 0 || x >= g->m_nColumnGridCount || y >= g->m_nRowGridCount ||
++      g->m_GCPanel.nWidth <= 0 || g->m_GCPanel.nHeight <= 0)
++    return -1;
++  const float cw = g->m_GCPanel.nWidth / g->m_nColumnGridCount;
++  const float ch = g->m_GCPanel.nHeight / g->m_nRowGridCount;
++  return static_cast<int>(which == 0 ? g->m_GCPanel.nPosX + cw * (x + 0.5f)
++                                     : g->m_GCPanel.nPosY + ch * (y + 0.5f));
++}
++}  // namespace
++
++// Visible carry page (0..3, control 67072+page) or -1.
++extern "C" WYD_EXPORT int wyd_field_inv_page() {
++  TMFieldScene* f = WydField();
++  if (!f || !f->m_pGridInv) return -1;
++  return static_cast<int>(f->m_pGridInv->m_dwControlID) - 67072;
++}
++
++// Center of carry cell (x 0..4, y 0..2) on the given page, canvas px; -1 when
++// that page is not the one on screen.
++extern "C" WYD_EXPORT int wyd_field_inv_cell_screen(int page, int x, int y, int which) {
++  TMFieldScene* f = WydField();
++  if (!f || page < 0 || page >= 4 || f->m_pGridInv != f->m_pGridInvList[page]) return -1;
++  return WydCellCenter(f->m_pGridInvList[page], x, y, which);
++}
++
++// Center of equip slot 1..15 (0 is the character cell, not an item slot).
++extern "C" WYD_EXPORT int wyd_field_equip_cell_screen(int slot, int which) {
++  TMFieldScene* f = WydField();
++  if (!f || slot < 1) return -1;
++  return WydCellCenter(WydEquipGrid(f, slot), 0, 0, which);
++}
++
++// Effect pair k (0..2) of an own slot: which 0 = effect, 1 = value. Effect 61
++// (EF_AMOUNT) carries the stack size. place 0 equip (0..17), 1 carry (0..63).
++extern "C" WYD_EXPORT int wyd_debug_my_item_ef(int place, int slot, int k, int which) {
++  if (!g_pObjectManager || k < 0 || k >= 3) return -1;
++  const STRUCT_ITEM* it = nullptr;
++  if (place == 0 && slot >= 0 && slot < 18) it = &g_pObjectManager->m_stMobData.Equip[slot];
++  if (place == 1 && slot >= 0 && slot < 64) it = &g_pObjectManager->m_stMobData.Carry[slot];
++  if (!it) return -1;
++  return which == 0 ? it->stEffect[k].cEffect : it->stEffect[k].cValue;
++}
++
++// Own Damage (0) and Ac (1) as the server last sent them (0x0336): an
++// equip change is visible here only after the server recomputes the score.
++extern "C" WYD_EXPORT int wyd_field_my_attack(int field) {
++  if (!g_pObjectManager) return -1;
++  const STRUCT_SCORE& s = g_pObjectManager->m_stMobData.CurrentScore;
++  return field == 0 ? s.Damage : field == 1 ? s.Ac : -1;
++}
++
++// Item index attached to the cursor (a drag in progress), 0 when none.
++extern "C" WYD_EXPORT int wyd_field_cursor_item() {
++  if (!g_pCursor || !g_pCursor->m_pAttachedItem || !g_pCursor->m_pAttachedItem->m_pItem) return 0;
++  return g_pCursor->m_pAttachedItem->m_pItem->sIndex;
++}
++
+ extern "C" int wyd_start_client() {
+   wchar_t empty_cmdline[] = L"";
+   return wWinMain(reinterpret_cast<HINSTANCE>(1), nullptr, empty_cmdline, 1);

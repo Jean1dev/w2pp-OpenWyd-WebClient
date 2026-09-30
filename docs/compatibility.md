@@ -64,11 +64,11 @@ Comentários genéricos de `messages.go` dizem pack(1), enquanto codecs como sel
 |---|---:|---|---|
 | SendItem S→C `0182` | 24/12 | lugar u16b0, slot u16b2, ITEM b4; Alan também 24 | slots equip/carry/cargo, remoção índice zero |
 | UpdateCarry S→C `0185` | 528/516 | ITEM[64]b0 + Coin i32b512 | inventário completo e gold após relogin |
-| UseItem C↔S `0373` | 34/22 | source/destination type/pos i32b0/4/8/12; XY u16b16/18; WarpID u16b20. Alan sizeof36 inclui cauda padding e nome ItemID | mover/equipar/consumir; não enviar padding por sizeof |
-| TradingItem C→S `0376` | 20/8 | destPlace/destSlot/srcPlace/srcSlot u8b0..3, WarpID i32b4 | inversão origem/destino, banco128 |
+| UseItem C↔S `0373` | 34/22 | source/destination type/pos i32b0/4/8/12; XY u16b16/18; WarpID u16b20. Alan sizeof36 inclui cauda padding e nome ItemID. **Traduzido** 36↔34 ([ADR 007](decisions/007-inventory-dialect.md)); o eco S→C só existe ao equipar e o runtime o ignora | poção no Railway ([etapa 5](evidence/05-gameplay/README.md)) |
+| TradingItem C↔S `0376` | 20/8 | destPlace/destSlot/srcPlace/srcSlot u8b0..3, WarpID i32b4. Troca simétrica e eco do payload: mapeamento **posicional** com o `MSG_SwapItem` (Sour/Dest), TargetID u16→WarpID i32; slots fora das grids do runtime recusados ([ADR 007](decisions/007-inventory-dialect.md)) | equipar/desequipar no Railway com B observando; cargo (fatia 3) |
 | DropItem C→S `0272` | 28/16 | source type/pos/rotation i32b0/4/8, XY u16b12/14 | remover apenas após resposta válida |
 | GetItem C→S `0270` | 24/12 | Go ItemID i32b0, destType/pos i32b4/8, marcado UNVERIFIED; Alan total28: destType/pos@12/16, ItemID u16@20, XY@22/24 | dependência de backend; validar contra legado/captura antes de codec final |
-| CNFDrop/CNFGet S→C `0175/0171` | atual16/4 | `handler/item.go` envia apenas slot i32; Alan espera28 (source/pos/rotate/XY ou destType/pos/ITEM). Spawn do item no chão está explicitamente adiado | bloqueia prova de drop/coleta real; entrega separada no servidor |
+| CNFDrop/CNFGet S→C `0175/0171` | atual16/4 | `handler/item.go` envia apenas slot i32; Alan espera28 (source/pos/rotate/XY ou destType/pos/ITEM). Spawn do item no chão está explicitamente adiado; sem `0x026E` S→C | **bloqueado pelo servidor**: proposta de entrega separada na [ADR 007](decisions/007-inventory-dialect.md); `0272/0270/0175/0171/016F/026E` continuam descartados |
 | DeleteItem/SplitItem C→S `02E4/02E5` | 20/8;24/12 | Slot i32b0, SIndex i32b4; Split acrescenta Num i32b8; consumidor Alan ainda a revisar | limites, quantidade e operação repetida |
 | REQShopList C→S `027B` | mínimo14/2 aceito | handler lê Target u16b0; comentário do codec descreve total16 | distinguir mínimo aceito de layout canônico |
 | ShopList S→C `017C` | 236/224 | shopType i32b0; ITEM[27]b4; tax i32b220. Mapeamento carry NPC (i%9)+(i/9)*27 | 3 abas e preços autoritativos; não usar RMBShopList de 39 itens |
@@ -124,7 +124,9 @@ Decisões no [ADR 003](decisions/003-in-world-dialect-and-automation.md). As fix
 | S→C | `0363` CreateMobTrade 252 → 260 | traduz como CreateMob + Desc[24]; Tab[26]→Nick é **hipótese** | unitário |
 | S→C | `018A` SetHpDam 20 | traduz: Dam i32→short, overflow zerado e contado | unitário |
 | S→C | `0102` MessageBoxOk 16 → `0101` MessagePanel 140 (ID 0) | traduz o código local de `notice.go` para texto fixo | unitário + Railway ("Senha incorreta.") |
-| S→C | `0181` 28, `0182` 24, `0337` 48, `0166` 16, `018B` 16 | repassa se o tamanho for exato (`static_assert` dos offsets) | unitário |
+| S→C | `0181` 28, `0182` 24, `0337` 48, `0166` 16, `018B` 16, `0185` 528 | repassa se o tamanho for exato (`static_assert` dos offsets) | unitário; `0181/0182/0337` no Railway (poção e loot) |
+| C↔S | `0376` SwapItem 20 | posicional; TargetID u16↔WarpID i32 com padding zerado; place ≤2, equip <16, carry <60, cargo <120 | unitário + overlay Go (decoder/encoder reais); Railway |
+| C→S | `0373` UseItem 36 → 34; S→C 34 → 36 | por campo; `Header.Size` reescrito; o eco de equipar é entregue e ignorado pelo runtime | unitário + overlay Go; Railway |
 | C→S | `0290` ReqTeleport 16, `0291` ChangeCity 16 | repassa se o tamanho for exato; o servidor lê só o header | unitário; teleporte no Railway (ver evidências) |
 | S→C | `0367/039D/039E` Attack `60+8N` (N 1..13, até a capacidade do opcode) → 168/72/80 | traduz: ReqMp i16@58→i32@16; CurrentHp@16 do atacante sem campo no runtime; TargetID i32→u16 (overflow zerado e contado); FakeExp 0. Contador `inAttack` ([ADR 004](decisions/004-combat-dialect.md)) | unitário + overlay Go; Railway em [etapa 5](evidence/05-gameplay/README.md) |
 | C→S | `0367/039D/039E` Attack 168/72/80 → `60+8N` (N 13/1/2 pelo tamanho, opcode preservado) | traduz por offset; padding e `@16/@58` zerados, TargetID ampliado a i32. Contador `outAttack` | unitário + overlay Go (decoder real) |
@@ -132,4 +134,4 @@ Decisões no [ADR 003](decisions/003-in-world-dialect-and-automation.md). As fix
 | S→C | `017C` ShopList 236, `036A` Motion 20 | passam com tamanho exato; o `NotUsed`=0 do Motion vira `Direction` 0,0 | unitário; Railway em [skills](evidence/05-gameplay/2026-09-29-skills.md) |
 | C→S | `0289` Restart 12, `0369` ReqMobByID 16, `03AE` 16 | repassa se o tamanho for exato; `03AE` não tem rota no servidor (só log `routed=false`) | unitário |
 
-Continuam descartados e contados: chat `0333/0334`, itens/loja/banco/troca/grupo e os demais opcodes da matriz acima (etapa 5, fatias seguintes). O combate foi traduzido em 29/09 ([ADR 004](decisions/004-combat-dialect.md)); com isso `DEFERRED_INBOUND` ficou vazio e nenhum descarte é mais tolerado nas verificações.
+Continuam descartados e contados: chat `0333/0334`, itens no chão (`0272/0270/0175/0171/016F/026E`, lacuna do servidor), split/delete `02E5/02E4`, loja de compra/venda, banco, troca, grupo e os demais opcodes da matriz acima (etapa 5, fatias seguintes). O combate foi traduzido em 29/09 ([ADR 004](decisions/004-combat-dialect.md)); com isso `DEFERRED_INBOUND` ficou vazio e nenhum descarte é mais tolerado nas verificações.

@@ -36,7 +36,8 @@ import { freemem, totalmem } from 'node:os';
 import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { areaPair, checkAreaAttempt } from './area_checks.mjs';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence } from './world_checks.mjs';
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
+  checkEquip, checkPotion, checkLoot, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -597,6 +598,72 @@ class Session {
       inAttack: window.clientProbe().dialect.inAttack, outAttack: window.clientProbe().dialect.outAttack,
     }), id);
   }
+
+  // Own slots as the client holds them: the 0x0114 snapshot corrected by the
+  // server's 0x0376 echoes and 0x0182 slot updates; coin from 0x0337, score
+  // (HP/MP, Damage/Ac) from 0x0336/0x0181. Index + effect pairs per slot.
+  bag() {
+    return this.eval(() => {
+      const slot = (place, s) => ({ index: Module._wyd_debug_my_item(place, s),
+        ef: [0, 1, 2].map(k => [Module._wyd_debug_my_item_ef(place, s, k, 0), Module._wyd_debug_my_item_ef(place, s, k, 1)]) });
+      return { equip: Array.from({ length: 16 }, (_, s) => slot(0, s)),
+        carry: Array.from({ length: 64 }, (_, s) => slot(1, s)),
+        coin: Module._wyd_field_my_score(5), level: Module._wyd_field_my_score(4), exp: Module._wyd_field_my_exp(),
+        hp: Module._wyd_field_my_score(0), maxHp: Module._wyd_field_my_score(1),
+        mp: Module._wyd_field_my_score(2), maxMp: Module._wyd_field_my_score(3),
+        damage: Module._wyd_field_my_attack(0), ac: Module._wyd_field_my_attack(1) };
+    });
+  }
+
+  // The inventory window with the real "i" key (OnKeyVisibleInven), page 0.
+  async openInventory() {
+    await this.closePanels();
+    await this.page.focus('#canvas');
+    await this.page.keyboard.press('i');
+    await this.until('inventory open', () => (Module._wyd_field_open_panels() & 128) !== 0, 10000);
+    await this.frames(3);
+    assert.equal(await this.eval(() => Module._wyd_field_inv_page()), 0, 'inventory not on page 0');
+  }
+
+  // Canvas center of an equip slot (place 0) or a carry cell (place 1) on the
+  // visible page, in page coordinates.
+  async cellPoint({ place, slot }) {
+    const [x, y, cw, ch] = await this.eval(([p, s]) => {
+      const c = document.getElementById('canvas');
+      const at = w => p === 0 ? Module._wyd_field_equip_cell_screen(s, w)
+        : Module._wyd_field_inv_cell_screen(Math.floor(s / 15), s % 15 % 5, Math.floor(s % 15 / 5), w);
+      return [at(0), at(1), c.width, c.height];
+    }, [place, slot]);
+    assert(x >= 0 && y >= 0, `${this.label}: cell ${place}/${slot} not on screen`);
+    const box = await this.page.locator('#canvas').boundingBox();
+    return [box.x + x * box.width / cw, box.y + y * box.height / ch];
+  }
+
+  async clickCell(where, button = 'left') {
+    const [x, y] = await this.cellPoint(where);
+    await this.page.mouse.move(x, y, { steps: 3 });
+    await this.frames(2);
+    await this.page.mouse.down({ button });
+    try { await this.frames(2); } finally { await this.page.mouse.up({ button }); }
+    await this.frames(2);
+  }
+
+  cursorItem() { return this.eval(() => Module._wyd_field_cursor_item()); }
+  outTranslated() { return this.eval(() => window.clientProbe().dialect.outTranslated); }
+
+  // The original gesture (SGrid.cpp): a click picks the item up onto the
+  // cursor, a click on the destination sends 0x0376. The runtime moves
+  // nothing itself; OnPacketSwapItem applies the server's echo.
+  async moveItem(from, to) {
+    const bag = await this.bag();
+    const expect = bag[from.place === 0 ? 'equip' : 'carry'][from.slot].index;
+    const sent0 = await this.outTranslated();
+    await this.clickCell(from);
+    const picked = await this.cursorItem();
+    if (picked === expect) await this.clickCell(to);
+    return { from, to, expect, picked, cursorAfter: await this.cursorItem(), swapsSent: (await this.outTranslated()) - sent0,
+      lastSent: '0x' + (await this.eval(() => window.clientProbe().socket.lastSentOpcode)).toString(16) };
+  }
 }
 
 function sanitizeGatewayLog(logs) {
@@ -653,7 +720,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea'].some(x => phases.has(x)) ? 25 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'potion', 'loot'].some(x => phases.has(x)) ? 25 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -1586,6 +1653,220 @@ async function main() {
       return { aTrip, bTrip, result: res, tried: tried.length,
         relogin: { before, after, persisted: true },
         panelsClosed: { A: a.panelsClosed ?? [], B: b.panelsClosed ?? [] } };
+    });
+
+    // Closes A (and B, after it saw A leave) and enters A's slot again: the
+    // server saved on disconnect; the new snapshot is what it persisted.
+    const reloginA = async (label, slot) => {
+      await a.healthy();
+      await a.close();
+      if (b?.context) {
+        await b.until('B loses A', id => Module._wyd_field_human_present(id) === 0, 30000, a.id);
+        await b.healthy();
+        ev.final_B = dialectSummary(await b.probe());
+        await b.close();
+      }
+      await sample('item relogin: before login');
+      a = await newSession(label, A);
+      await a.loginToSelect();
+      assert.equal((await a.pin()).result, 'lock1', 'relogin PIN rejected');
+      await a.enter(slot);
+      return a.bag();
+    };
+    const stripBag = bag => ({ equip: bag.equip, carry: bag.carry });
+
+    // Stage 5, slice 2: unequip and re-equip with the original click-to-pick
+    // gesture while B watches (0x036B), then a move the item cannot make.
+    // handler/item.go tradingItem decides; the client only shows its echo.
+    await step('equip', async () => {
+      await b.until('B sees A', id => Module._wyd_field_human_present(id) === 1, 30000, a.id);
+      const before = await a.bag();
+      const slot = [6, 7, 1, 2, 3, 4, 5].find(i => before.equip[i].index > 0);
+      assert(slot !== undefined, 'nothing equipped to move');
+      const free = before.carry.slice(0, 15).findIndex(it => it.index === 0);
+      assert(free >= 0, 'no free cell on carry page 0');
+      const other = before.carry.slice(0, 15).findIndex(it => it.index > 0);
+      const res = { slot, free, item: before.equip[slot].index, before };
+      r.equip = res;
+      const look0 = (await b.other(a.id)).look;
+      const lookOf = ([id, l, same]) => {
+        const now = Array.from({ length: 8 }, (_, p) => Module._wyd_field_human_look_mesh(id, p));
+        return (same ? now.every((v, i) => v === l[i]) : now.some((v, i) => v !== l[i])) && now;
+      };
+      await a.openInventory();
+      await a.shot('equip-open');
+      // 1. Unequip to the free cell.
+      res.unequip = await a.moveItem({ place: 0, slot }, { place: 1, slot: free });
+      await a.until('server echo of the unequip', ([s, f, i]) => Module._wyd_debug_my_item(0, s) === 0 &&
+        Module._wyd_debug_my_item(1, f) === i, 20000, [slot, free, res.item]);
+      await a.until('score recomputed', ([d, c]) => Module._wyd_field_my_attack(0) !== d ||
+        Module._wyd_field_my_attack(1) !== c, 15000, [before.damage, before.ac]).catch(() => false);
+      res.off = await a.bag();
+      const offLook = await b.until('B sees the unequip', lookOf, 20000, [a.id, look0, false]).catch(() => null);
+      await a.shot('equip-off');
+      await b.shot('equip-off');
+      // 2. Back to the same equip slot.
+      res.equip = await a.moveItem({ place: 1, slot: free }, { place: 0, slot });
+      await a.until('server echo of the re-equip', ([s, f, i]) => Module._wyd_debug_my_item(0, s) === i &&
+        Module._wyd_debug_my_item(1, f) === 0, 20000, [slot, free, res.item]);
+      await a.until('score recomputed with the item', ([d, c]) => Module._wyd_field_my_attack(0) !== d ||
+        Module._wyd_field_my_attack(1) !== c, 15000, [res.off.damage, res.off.ac]).catch(() => false);
+      res.on = await a.bag();
+      const onLook = await b.until('B sees the re-equip', lookOf, 20000, [a.id, look0, true]).catch(() => null);
+      res.observer = { look0, offLook, onLook, sawOff: !!offLook, sawOn: !!onLook };
+      await a.shot('equip-on');
+      // 3. A carry item that does not fit the slot (a starter potion).
+      assert(other >= 0, 'no carry item for the refused move');
+      const sent0 = await a.outTranslated();
+      const move = await a.moveItem({ place: 1, slot: other }, { place: 0, slot });
+      await sleep(3000);
+      // Put back what the cursor still holds, as a player would: click the
+      // origin cell (same slot: no packet), then ESC if it is still attached.
+      if (await a.cursorItem()) await a.clickCell({ place: 1, slot: other });
+      if (await a.cursorItem()) { await a.page.keyboard.press('Escape'); await a.frames(2); }
+      res.refused = { item: before.carry[other].index, move, swapsSent: (await a.outTranslated()) - sent0,
+        notice: await a.eval(() => Module._wyd_scene_message_visible() === 1 ?
+          Module.UTF8ToString(Module._wyd_scene_message_text()) : null),
+        cursor: await a.cursorItem(), bag: stripBag(await a.bag()) };
+      console.log(`    slot ${slot} item ${res.item}: damage ${before.damage}->${res.off.damage}->${res.on.damage}, ` +
+        `ac ${before.ac}->${res.off.ac}->${res.on.ac}; B saw off ${res.observer.sawOff} on ${res.observer.sawOn}; ` +
+        `refused move sent ${res.refused.swapsSent}`);
+      await a.shot('equip-refused');
+      await a.closePanels();
+      res.relogin = await reloginA('A-equip-relogin', 0);
+      checkEquip(res);
+      return res;
+    });
+
+    // Stage 5, slice 2: an HP potion by right click, with B watching A's HP.
+    // Gremlins barely scratch a leveled character (no grind ever rested below
+    // 50% HP) and regeneration refills it, so the damage comes from the proven
+    // death phase: the server revives A at the Armia spawn with HP 2, next to
+    // B. The server consumes and heals (item.go useHealPotion, hpmp.go tick);
+    // the runtime's local stack decrement is overwritten by the server's 0x0182.
+    await step('potion', async () => {
+      const res = { damage: 'death phase: revived with HP 2 at the Armia spawn' };
+      r.potion = res;
+      const bag0 = await a.bag();
+      res.slot = bag0.carry.slice(0, 15).findIndex(it => it.index === 401);
+      assert(res.slot >= 0, 'no HP potion (401) on carry page 0');
+      res.amount0 = itemAmount(bag0.carry[res.slot]);
+      await b.until('B sees A', id => Module._wyd_field_human_present(id) === 1, 30000, a.id);
+      const pre = await a.bag();
+      res.maxHp = pre.maxHp;
+      res.hpBefore = pre.hp;
+      assert(pre.hp < pre.maxHp, `no HP missing (${pre.hp}/${pre.maxHp}) after the respawn`);
+      const bHp0 = await b.eval(id => Module._wyd_field_human_hp(id), a.id);
+      await a.openInventory();
+      const amountAt = ([s]) => {
+        const v = [0, 1, 2].map(k => [Module._wyd_debug_my_item_ef(1, s, k, 0), Module._wyd_debug_my_item_ef(1, s, k, 1)]);
+        return v.find(([e]) => e === 61)?.[1] ?? (Module._wyd_debug_my_item(1, s) ? 1 : 0);
+      };
+      // 1. One use.
+      let sent0 = await a.outTranslated();
+      await a.clickCell({ place: 1, slot: res.slot }, 'right');
+      await a.until('server consumed one unit', ([s, n]) => {
+        const v = [0, 1, 2].map(k => [Module._wyd_debug_my_item_ef(1, s, k, 0), Module._wyd_debug_my_item_ef(1, s, k, 1)]);
+        return (v.find(([e]) => e === 61)?.[1] ?? 1) < n;
+      }, 15000, [res.slot, res.amount0]).catch(() => false);
+      await a.until('HP rises', h => Module._wyd_field_my_score(0) > h, 15000, pre.hp).catch(() => false);
+      // The server tick moves HP to the potion's ReqHp (up to 2000 per 1 s tick).
+      await a.until('HP full', () => Module._wyd_field_my_score(0) >= Module._wyd_field_my_score(1), 5000).catch(() => false);
+      const bagUse = await a.bag();
+      res.use = { usesSent: (await a.outTranslated()) - sent0, amount: itemAmount(bagUse.carry[res.slot]), hp: bagUse.hp };
+      const bHp1 = await b.until('B sees A healed', ([id, h]) => {
+        const v = Module._wyd_field_human_hp(id);
+        return v > h && v;
+      }, 20000, [a.id, bHp0]).catch(() => b.eval(id => Module._wyd_field_human_hp(id), a.id));
+      res.observer = { hpBefore: bHp0, hpAfter: bHp1 };
+      await a.shot('potion-used');
+      await b.shot('potion-observed');
+      // 2. Rapid double use: two right clicks inside one rendered frame.
+      sent0 = await a.outTranslated();
+      const [px, py] = await a.cellPoint({ place: 1, slot: res.slot });
+      await a.page.mouse.move(px, py, { steps: 3 });
+      await a.frames(2);
+      for (let i = 0; i < 2; i++) { await a.page.mouse.down({ button: 'right' }); await a.page.mouse.up({ button: 'right' }); }
+      await a.frames(3);
+      await sleep(4000);
+      const bagDouble = await a.bag();
+      res.double = { usesSent: (await a.outTranslated()) - sent0, amount: itemAmount(bagDouble.carry[res.slot]),
+        clientAmount: await a.eval(amountAt, [res.slot]), bag: stripBag(bagDouble) };
+      // 3. Right click on an empty cell: nothing to use.
+      const emptyCell = bagDouble.carry.slice(0, 15).findIndex(it => it.index === 0);
+      assert(emptyCell >= 0, 'no empty cell on carry page 0');
+      sent0 = await a.outTranslated();
+      await a.clickCell({ place: 1, slot: emptyCell }, 'right');
+      await sleep(3000);
+      res.empty = { cell: emptyCell, usesSent: (await a.outTranslated()) - sent0, bag: stripBag(await a.bag()) };
+      console.log(`    potion slot ${res.slot}: ${res.amount0}->${res.use.amount}->${res.double.amount}, ` +
+        `HP ${res.hpBefore}->${res.use.hp}, B saw ${bHp0}->${bHp1}, double sent ${res.double.usesSent}, empty sent ${res.empty.usesSent}`);
+      await a.closePanels();
+      await a.walk(0, 100);
+      res.beforeRelogin = await a.bag();
+      res.relogin = await reloginA('A-potion-relogin', 0);
+      checkPotion(res);
+      return res;
+    });
+
+    // Stage 5, slice 2: loot from real kills. At the locked revision drops go
+    // straight to the killer's carry (0x0182) and gold to Coin (0x0337)
+    // (mobkilled.go); ground items have no client broadcast (ADR 007).
+    await step('loot', async () => {
+      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      privateValues.push(name);
+      const slot = (await a.slots()).findIndex(x => x.name === name);
+      assert(slot >= 0, `class ${cls} character missing`);
+      await a.enter(slot);
+      const start = await a.bag();
+      const res = { class: cls, slot, start: { coin: start.coin, level: start.level, exp: start.exp }, kills: [] };
+      r.loot = res;
+      res.trip = await a.toGremlinField();
+      const end = Date.now() + 17 * 60000;
+      const tried = new Set();
+      let last = start;
+      const itemGain = bag => bag.carry.some((it, i) => itemAmount(it) > itemAmount(start.carry[i]));
+      while (Date.now() < end && res.kills.length < 25 && !(last.coin > start.coin && itemGain(last))) {
+        const s = await a.combat(0);
+        if (s.myDie === 1 || s.myHp <= 0) throw new Error('looting character died');
+        if (s.myHp < s.myMaxHp * 0.5) { await sleep(6000); continue; }
+        const mob = (await a.mobs()).find(m => m.name.trim() === 'Gremlin' && m.onScreen && m.hp > 0 && !tried.has(m.id));
+        if (!mob) { await a.walk(res.kills.length % 2 ? -160 : 160, 80); tried.clear(); continue; }
+        tried.add(mob.id);
+        const c0 = await a.combat(mob.id);
+        const bag0 = await a.bag();
+        let lastClick = 0;
+        const fightEnd = Date.now() + 60000;
+        while (Date.now() < fightEnd) {
+          const c = await a.combat(mob.id);
+          if (c.myDie === 1 || c.myHp <= 0 || !c.present || c.die === 1 || c.hp <= 0) break;
+          if (Date.now() - lastClick > 6000) { await a.clickHuman(mob.id); lastClick = Date.now(); }
+          await sleep(1000);
+        }
+        await sleep(2500);
+        const c1 = await a.combat(mob.id);
+        last = await a.bag();
+        if (c1.exp <= c0.exp) continue; // not a server-paid kill
+        const items = last.carry.map((it, i) => ({ slot: i, index: it.index, before: itemAmount(bag0.carry[i]), after: itemAmount(it) }))
+          .filter(g => g.before !== g.after);
+        res.kills.push({ id: mob.id, exp: [c0.exp, c1.exp], coin: [bag0.coin, last.coin], items });
+        console.log(`    kill ${res.kills.length}: coin ${bag0.coin}->${last.coin}, items ${JSON.stringify(items)}`);
+        await writeFile(join(OUT, 'evidence.json'), evidenceJson(ev));
+      }
+      res.coinGain = last.coin - start.coin;
+      res.itemGain = last.carry.map((it, i) => ({ slot: i, index: it.index, before: itemAmount(start.carry[i]), after: itemAmount(it) }))
+        .filter(g => g.after > g.before);
+      res.lost = last.carry.map((it, i) => ({ slot: i, index: it.index, was: start.carry[i].index,
+        before: itemAmount(start.carry[i]), after: itemAmount(it) }))
+        .filter(g => g.after < g.before || (g.was && g.index !== g.was));
+      await a.openInventory();
+      await a.shot('loot-inventory');
+      await a.closePanels();
+      await a.walk(0, 100);
+      res.end = await a.bag();
+      res.relogin = await reloginA('A-loot-relogin', slot);
+      checkLoot(res);
+      return res;
     });
 
     await step('concurrent', async () => {

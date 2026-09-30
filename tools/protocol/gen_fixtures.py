@@ -314,6 +314,40 @@ def attack(d: dict, opcode: int = 0x0367) -> bytearray:
     return b
 
 
+# Items (ADR 007). handler/item.go tradingItem echoes the request payload as
+# received: DestPlace, DestSlot, SrcPlace, SrcSlot (u8 @12..15), WarpID i32@16.
+SWAP_ECHO = {"id": 5, "place0": 0, "slot0": 6, "place1": 1, "slot1": 5, "warp": 0}
+SWAP_RANGE = dict(SWAP_ECHO, slot1=60)  # the runtime has 4 carry pages of 15
+# equipItem echo of MSG_UseItem (34 bytes): no runtime consumer.
+USE_ECHO = {"id": 5, "sourType": 1, "sourPos": 3, "destType": 0, "destPos": 6,
+            "gridX": 2100, "gridY": 2101, "warpId": 0}
+CARRY = {"id": 5, "coin": 1000350,
+         "items": {"0": {"index": 401, "eff": [[61, 119]]}, "1": {"index": 406, "eff": [[61, 120]]},
+                   "63": {"index": 3467, "eff": [[0, 0], [0, 0], [0, 0]]}}}
+
+
+def swap_item(d: dict) -> bytearray:
+    b = header(20, 0x0376, d["id"])
+    b[12:16] = bytes([d["place0"], d["slot0"], d["place1"], d["slot1"]])
+    struct.pack_into("<i", b, 16, d["warp"])
+    return b
+
+
+def use_item(d: dict) -> bytearray:
+    b = header(34, 0x0373, d["id"])
+    struct.pack_into("<iiiiHHH", b, 12, d["sourType"], d["sourPos"], d["destType"], d["destPos"],
+                     d["gridX"], d["gridY"], d["warpId"])
+    return b
+
+
+def update_carry(d: dict) -> bytearray:
+    b = header(528, 0x0185, d["id"])
+    for k, it in d["items"].items():
+        put_item(b, 12 + 8 * int(k), it)
+    struct.pack_into("<i", b, 524, d["coin"])
+    return b
+
+
 def standard_parm(opcode: int, ident: int, parm: int) -> bytearray:
     b = header(16, opcode, ident)
     struct.pack_into("<i", b, 12, parm)
@@ -367,6 +401,12 @@ OUT_ATTACK_MULTI = {"opcode": 0x0367, "id": 5, "posX": 2100, "posY": 2101, "targ
                     "dam": [[1000, -1], [1001, -1]] + [[0, 0]] * 11}
 
 
+# Runtime MSG_SwapItem / MSG_UseItem built by dialect_test.cpp (0xAB padding).
+OUT_SWAP = {"id": 5, "place0": 0, "slot0": 6, "place1": 1, "slot1": 5, "warp": 1234}
+OUT_USE = {"id": 5, "sourType": 1, "sourPos": 0, "destType": 0, "destPos": 0,
+           "gridX": 2100, "gridY": 2101, "warpId": 777}
+
+
 def out_attack(d: dict) -> bytearray:
     n = len(d["dam"])
     b = header(60 + 8 * n, d["opcode"], d["id"])
@@ -416,6 +456,10 @@ def main() -> int:
         "attack_mob": (attack(ATTACK_MOB), ATTACK_MOB),
         "attack_target_overflow": (attack(ATTACK_TARGET_OVER), ATTACK_TARGET_OVER),
         "attack_too_many": (attack(ATTACK_TOO_MANY), ATTACK_TOO_MANY),
+        "swap_item": (swap_item(SWAP_ECHO), SWAP_ECHO),
+        "swap_item_range": (swap_item(SWAP_RANGE), SWAP_RANGE),
+        "use_item": (use_item(USE_ECHO), USE_ECHO),
+        "update_carry": (update_carry(CARRY), CARRY),
     }
     outbound = {
         "account_login": (out_account_login(), dict(OUT_ACCOUNT, clientVersion=CLIENT_VERSION)),
@@ -424,6 +468,8 @@ def main() -> int:
         "account_secure": (out_account_secure(), OUT_SECURE),
         "attack_one": (out_attack(OUT_ATTACK_ONE), OUT_ATTACK_ONE),
         "attack_multi": (out_attack(OUT_ATTACK_MULTI), OUT_ATTACK_MULTI),
+        "swap_item": (swap_item(OUT_SWAP), OUT_SWAP),
+        "use_item": (use_item(OUT_USE), OUT_USE),
     }
     doc = {
         "generator": "tools/protocol/gen_fixtures.py",

@@ -81,6 +81,20 @@ static_assert(sizeof(STRUCT_ITEM) == 8 && sizeof(MSG_ShopList) == 236 && offseto
 static_assert(sizeof(MSG_Motion) == 20 && offsetof(MSG_Motion, Motion) == 12 && offsetof(MSG_Motion, Parm) == 14 &&
 	offsetof(MSG_Motion, Direction) == 16, "MSG_Motion");
 static_assert(offsetof(MSG_REQShopList, TargetID) == 12 && sizeof(MSG_REQShopList) == 16, "MSG_REQShopList");
+// Items (ADR 007). SwapItem (0x376, handler/item.go tradingItem): four u8 at
+// @12..15 on both sides; the server names them Dest/Src and the runtime
+// Sour/Dest, but the server swap is symmetric and echoes the payload as
+// received, so bytes map by position. Runtime TargetID u16@16 + padding ->
+// server WarpID i32@16. UseItem: runtime 36 (padding @34), server 34.
+static_assert(sizeof(MSG_SwapItem) == 20 && offsetof(MSG_SwapItem, SourType) == 12 &&
+	offsetof(MSG_SwapItem, SourPos) == 13 && offsetof(MSG_SwapItem, DestType) == 14 &&
+	offsetof(MSG_SwapItem, DestPos) == 15 && offsetof(MSG_SwapItem, TargetID) == 16, "MSG_SwapItem");
+static_assert(sizeof(MSG_UseItem) == 36 && offsetof(MSG_UseItem, SourType) == 12 &&
+	offsetof(MSG_UseItem, DestPos) == 24 && offsetof(MSG_UseItem, GridX) == 28 &&
+	offsetof(MSG_UseItem, GridY) == 30 && offsetof(MSG_UseItem, ItemID) == 32, "MSG_UseItem");
+// UpdateCarry (0x185, protocol/carry.go): Carry[64]@12 + Coin@524, identical.
+static_assert(sizeof(MSG_Carry) == 528 && offsetof(MSG_Carry, Carry) == 12 &&
+	offsetof(MSG_Carry, Coin) == 524, "MSG_Carry");
 static_assert(offsetof(MSG_ApplyBonus, BonusType) == 12 && offsetof(MSG_ApplyBonus, Detail) == 14 &&
 	offsetof(MSG_ApplyBonus, TargetID) == 16 && sizeof(MSG_ApplyBonus) == 20, "MSG_ApplyBonus");
 
@@ -101,6 +115,13 @@ constexpr int kUpdateScore = 152;
 constexpr int kSendAffect = 268;
 constexpr int kUpdateEquip = 60;
 constexpr int kSetHpDam = 20;
+constexpr int kSwapItem = 20;
+constexpr int kUseItemWire = 34;
+constexpr int kUpdateCarry = 528;
+// Slots the runtime grids can hold (TMFieldScene OnPacketSwapItem indexes
+// m_pGridInvList[pos/15] over 4 pages and the 16 server equip slots).
+constexpr int kEquipSlots = 16;
+constexpr int kCarryVisible = 60;
 // Attack: fixed part up to Dam[] @60, then N x {TargetID i32, Damage i32}.
 constexpr int kAttackFixed = 60;
 constexpr int kAttackDam = 8;
@@ -157,6 +178,9 @@ enum : unsigned short
 	OpREQShopList = 0x27B,
 	OpApplyBonus = 0x277,
 	OpMotion = 0x36A,
+	OpUseItem = 0x373,
+	OpSwapItem = 0x376,
+	OpUpdateCarry = 0x185,
 	OpAction2 = 0x368,
 	OpAction = 0x36C,
 	OpPing = 0x3A0,
@@ -671,6 +695,54 @@ int InMessageBoxOk(const char* w, char* out, int outCap, int* outSize)
 	return WYD_DIALECT_TRANSLATED;
 }
 
+bool ItemSlotVisible(int place, int slot)
+{
+	switch (place)
+	{
+	case 0: return slot < kEquipSlots;
+	case 1: return slot < kCarryVisible;
+	case 2: return slot < kCargoVisible;
+	default: return false;
+	}
+}
+
+// Echo of a slot swap: the runtime applies the move from this frame
+// (OnPacketSwapItem); it never predicts it locally.
+int InSwapItem(const char* w, char* out, int outCap, int* outSize)
+{
+	const int t0 = U8(w, 12), p0 = U8(w, 13), t1 = U8(w, 14), p1 = U8(w, 15);
+	if (!ItemSlotVisible(t0, p0) || !ItemSlotVisible(t1, p1))
+		return Fail(WYD_STAT_IN_DROP_RANGE, 0, OpSwapItem);
+	const std::uint32_t warp = U32(w, 16);
+	auto* m = Begin<MSG_SwapItem>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpSwapItem);
+	m->SourType = static_cast<char>(t0);
+	m->SourPos = static_cast<char>(p0);
+	m->DestType = static_cast<char>(t1);
+	m->DestPos = static_cast<char>(p1);
+	m->TargetID = NarrowUShort(warp);
+	return WYD_DIALECT_TRANSLATED;
+}
+
+// Echo of an equip-by-use (handler/item.go equipItem). The runtime has no
+// consumer for 0x373 and ignores it; it is delivered in the runtime's layout
+// so the frame is neither hidden nor misread.
+int InUseItem(const char* w, char* out, int outCap, int* outSize)
+{
+	auto* m = Begin<MSG_UseItem>(w, out, outCap, outSize);
+	if (!m)
+		return Fail(WYD_STAT_IN_DROP_SIZE, 0, OpUseItem);
+	m->SourType = I32(w, 12);
+	m->SourPos = I32(w, 16);
+	m->DestType = I32(w, 20);
+	m->DestPos = I32(w, 24);
+	m->GridX = U16(w, 28);
+	m->GridY = U16(w, 30);
+	m->ItemID = U16(w, 32);
+	return WYD_DIALECT_TRANSLATED;
+}
+
 int PassIfSize(int wireSize, int want, unsigned short op)
 {
 	if (wireSize != want)
@@ -744,6 +816,14 @@ int WydDialectInbound(const char* wire, int wireSize, char* out, int outCap, int
 		return PassIfSize(wireSize, static_cast<int>(sizeof(MSG_ShopList)), op);
 	case OpSendItem:
 		return PassIfSize(wireSize, 24, op);
+	case OpUpdateCarry: // same layout (static_assert above)
+		return PassIfSize(wireSize, kUpdateCarry, op);
+	case OpSwapItem:
+		return exact(kSwapItem) ? Translated(InSwapItem(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
+	case OpUseItem:
+		return exact(kUseItemWire) ? Translated(InUseItem(wire, out, outCap, outSize))
+			: Fail(WYD_STAT_IN_DROP_SIZE, 0, op);
 	case OpUpdateEtc:
 		return PassIfSize(wireSize, 48, op);
 	case OpAction:
@@ -909,6 +989,45 @@ int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int*
 		Count(WYD_STAT_OUT_ATTACK);
 		RecordCombat(1, out, n);
 		return OutDone(outSize, wireSize);
+	}
+	case OpSwapItem:
+	{
+		// Drag and drop between equip/carry/cargo cells (SGrid.cpp SwapItem).
+		if (msgSize != static_cast<int>(sizeof(MSG_SwapItem)) || outCap < kSwapItem)
+			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		const auto* in = reinterpret_cast<const MSG_SwapItem*>(msg);
+		const int t0 = static_cast<unsigned char>(in->SourType), p0 = static_cast<unsigned char>(in->SourPos);
+		const int t1 = static_cast<unsigned char>(in->DestType), p1 = static_cast<unsigned char>(in->DestPos);
+		if (!ItemSlotVisible(t0, p0) || !ItemSlotVisible(t1, p1))
+			return OutFail(WYD_STAT_OUT_DROP_RANGE, op);
+		std::memset(out, 0, kSwapItem);
+		std::memcpy(out, msg, kHeader);
+		out[12] = static_cast<char>(t0);
+		out[13] = static_cast<char>(p0);
+		out[14] = static_cast<char>(t1);
+		out[15] = static_cast<char>(p1);
+		Put32(out, 16, in->TargetID); // cargo NPC id, zero-extended; padding never sent
+		return OutDone(outSize, kSwapItem);
+	}
+	case OpUseItem:
+	{
+		// Right-click use/equip (TMFieldScene::UseItem). The server decides the
+		// outcome; the runtime's local stack decrement is corrected by 0x182.
+		if (msgSize != static_cast<int>(sizeof(MSG_UseItem)) || outCap < kUseItemWire)
+			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		const auto* in = reinterpret_cast<const MSG_UseItem*>(msg);
+		std::memset(out, 0, kUseItemWire);
+		std::memcpy(out, msg, kHeader);
+		out[0] = static_cast<char>(kUseItemWire);
+		out[1] = 0;
+		Put32(out, 12, static_cast<std::uint32_t>(in->SourType));
+		Put32(out, 16, static_cast<std::uint32_t>(in->SourPos));
+		Put32(out, 20, static_cast<std::uint32_t>(in->DestType));
+		Put32(out, 24, static_cast<std::uint32_t>(in->DestPos));
+		Put16(out, 28, in->GridX);
+		Put16(out, 30, in->GridY);
+		Put16(out, 32, in->ItemID);
+		return OutDone(outSize, kUseItemWire);
 	}
 	case OpRestart: // header only (TMFieldScene recall after death / town)
 		return OutPass(msgSize, kHeader, op);

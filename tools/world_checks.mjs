@@ -14,7 +14,8 @@ export function redactEvidence(value, secrets) {
 }
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
-  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'concurrent'];
+  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'castarea',
+  'equip', 'potion', 'loot', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -32,8 +33,17 @@ export function validateOptions(opt) {
     assert.deepEqual([...phases].sort(), ['castarea', 'enter', 'login', 'second'],
       'castarea runs only with login,enter,second');
   }
+  // Item phases (stage 5, slice 2) end with their own relogin, so each runs
+  // alone after the two sessions are in the Field.
+  if (phases.has('equip'))
+    assert.deepEqual([...phases].sort(), ['enter', 'equip', 'login', 'second'],
+      'equip runs only with login,enter,second');
+  // The potion needs real missing HP: the death phase revives A with HP 2.
+  if (phases.has('potion'))
+    assert.deepEqual([...phases].sort(), ['death', 'enter', 'login', 'potion', 'second'],
+      'potion runs only with login,enter,second,death');
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
-    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], concurrent: ['enter'] };
+    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], loot: ['login'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
     assert(phases.has(dep), `${name} requires ${dep}`);
   // death takes A through the portal and needs B waiting at the Armia spawn;
@@ -41,7 +51,7 @@ export function validateOptions(opt) {
   for (const other of ['mapchange', 'attack'])
     assert(!(phases.has('death') && phases.has(other)), `death cannot run with ${other}`);
   // grind enters the --class character itself, alone (one game page).
-  const own = ['login', 'grind', 'learn', 'cast'];
+  const own = ['login', 'grind', 'learn', 'cast', 'loot'];
   for (const p of own.slice(1)) {
     if (!phases.has(p)) continue;
     for (const other of phases)
@@ -214,4 +224,95 @@ export function checkCast(c) {
     assert(Array.isArray(c.hitMobs) && c.hitMobs.includes(c.target?.id), 'area cast: target not among the hit mobs');
     assert(c.hitMobs.length <= c.nearby, 'area cast: more hits than mobs in range');
   }
+}
+
+// ---- Stage 5, slice 2: items (ADR 007) ----
+// Every value below is what the client holds after the server's frames
+// (0x0114 snapshot, 0x0376 echo, 0x0182 slot, 0x0337 coin, 0x0336 score):
+// the harness compares observations, it never predicts an outcome.
+
+// EF_AMOUNT (61) carries the stack size; an item without it is one unit.
+export function itemAmount(it) {
+  if (!it?.index) return 0;
+  const amount = it.ef?.find(([e]) => e === 61);
+  return amount ? amount[1] : 1;
+}
+
+const slotKey = it => `${it.index}:${(it.ef ?? []).map(p => p.join('.')).join(',')}`;
+
+function sameSlots(a, b, what) {
+  assert.equal(a.length, b.length, `${what}: slot count differs`);
+  a.forEach((it, i) => assert.equal(slotKey(b[i]), slotKey(it), `${what}: slot ${i} differs`));
+}
+
+// Carry, equip and coin identical before logout and after the next login.
+export function checkInventoryRelogin(before, after) {
+  sameSlots(before.equip, after.equip, 'equip after relogin');
+  sameSlots(before.carry, after.carry, 'carry after relogin');
+  assert.equal(after.coin, before.coin, 'coin after relogin');
+  assert.equal(after.level, before.level, 'level after relogin');
+  assert.equal(after.exp, before.exp, 'exp after relogin');
+}
+
+// Unequip to a free carry cell and back, by the original click-to-pick
+// gesture (0x0376 each way); the server echoes, sends both slots and, for an
+// equip slot, UpdateEquip to the viewers and a recomputed score.
+export function checkEquip(e) {
+  const { slot, free } = e;
+  const item = e.before.equip[slot];
+  assert(item.index > 0, 'no equipped item to move');
+  assert.equal(e.before.carry[free].index, 0, 'destination cell not empty');
+  for (const [name, m] of [['unequip', e.unequip], ['equip', e.equip]]) {
+    assert.equal(m.picked, m.expect, `${name}: item not picked by the cursor`);
+    assert(m.swapsSent >= 1, `${name}: no 0x0376 left the client`);
+  }
+  assert.equal(e.off.equip[slot].index, 0, 'equip slot still holds the item after unequip');
+  assert.equal(slotKey(e.off.carry[free]), slotKey(item), 'item did not land in the carry cell');
+  sameSlots(e.before.equip, e.on.equip, 'equip after re-equip');
+  sameSlots(e.before.carry, e.on.carry, 'carry after re-equip');
+  // The login snapshot's CurrentScore is the class BaseMob template
+  // (protocol/mob.go EncodeCNFCharacterLoginRaw), so Damage/Ac before the
+  // first 0x0336 are not the character's: compare the server's two recomputes.
+  assert(e.on.damage !== e.off.damage || e.on.ac !== e.off.ac, 'server score equal with and without the item');
+  assert(e.observer.sawOff, 'B did not see the unequip (0x036B)');
+  assert(e.observer.sawOn, 'B did not see the re-equip');
+  // A move the item cannot make (potion onto the equip slot): whether the
+  // runtime blocks it or the server refuses it, nothing may change.
+  sameSlots(e.on.equip, e.refused.bag.equip, 'equip after refused move');
+  sameSlots(e.on.carry, e.refused.bag.carry, 'carry after refused move');
+  assert.equal(e.refused.cursor, 0, 'item left on the cursor after refused move');
+  checkInventoryRelogin(e.on, e.relogin);
+}
+
+// HP potion by right click (0x0373): the server consumes one unit (0x0182),
+// raises the target HP (0x0181) and the tick heals, seen by B as 0x0336.
+// A rapid double use may consume one or two units, never more, and the
+// client keeps exactly the server's count (verified again after relogin).
+export function checkPotion(p) {
+  assert(p.hpBefore < p.maxHp, 'no HP missing before the potion');
+  assert(p.use.usesSent >= 1, 'no 0x0373 left the client');
+  assert.equal(p.use.amount, p.amount0 - 1, 'server did not consume exactly one unit');
+  // Natural regeneration adds Level+30 per 10 s tick; a 200 potion must
+  // raise HP by more than one such tick (or fill it).
+  assert(p.use.hp - p.hpBefore > 39 || p.use.hp === p.maxHp, 'HP did not rise beyond regeneration after the potion');
+  assert(p.observer.hpAfter > p.observer.hpBefore, 'B did not see the heal');
+  const spent = p.use.amount - p.double.amount;
+  assert(spent >= 1 && spent <= 2, `double use consumed ${spent} units`);
+  assert(p.double.usesSent >= 1, 'double use sent nothing');
+  sameSlots(p.double.bag.equip, p.empty.bag.equip, 'equip after empty-cell use');
+  sameSlots(p.double.bag.carry, p.empty.bag.carry, 'carry after empty-cell use');
+  checkInventoryRelogin(p.beforeRelogin, p.relogin);
+  assert.equal(itemAmount(p.relogin.carry[p.slot]), p.double.amount, 'potion count differs after relogin');
+}
+
+// Loot from real kills: the server puts drops straight into the killer's
+// carry (0x0182) and gold into Coin (0x0337); nothing lands on the ground at
+// the locked revision. Carry may only gain, and coin may only rise.
+export function checkLoot(l) {
+  assert(l.kills.length > 0, 'no kill');
+  assert(l.coinGain > 0 || l.itemGain.length > 0, 'no loot after the kills');
+  for (const g of l.itemGain) assert(g.after > g.before, `slot ${g.slot} did not gain`);
+  assert.deepEqual(l.lost, [], 'carry lost items while looting');
+  assert(l.end.coin >= l.start.coin, 'coin fell while looting');
+  checkInventoryRelogin(l.end, l.relogin);
 }

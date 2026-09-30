@@ -645,6 +645,75 @@ static void TestCombatDiagnostics()
 	CHECK(WydCombatCount(0) == 0 && WydCombatValue(0, 0, 1) == 0);
 }
 
+static void TestItems()
+{
+	WydDialectResetStats();
+	int size = 0;
+	{
+		// Server echo of a swap: bytes 12..15 by position, WarpID -> TargetID.
+		const auto& m = Translate<MSG_SwapItem>(k_in_swap_item);
+		CHECK(m.Header.Type == 0x376 && m.Header.ID == 5 && m.Header.Size == 20);
+		CHECK(m.SourType == 0 && m.SourPos == 6 && m.DestType == 1 && m.DestPos == 5 && m.TargetID == 0);
+	}
+	CHECK(In(k_in_swap_item, &size, 19) == WYD_DIALECT_DROP);
+	CHECK(In(k_in_swap_item_range, &size) == WYD_DIALECT_DROP); // carry 60: no runtime page
+	CHECK(WydDialectStatValue(WYD_STAT_IN_DROP_RANGE) == 1);
+	{
+		const auto& m = Translate<MSG_UseItem>(k_in_use_item);
+		CHECK(m.Header.Type == 0x373 && m.Header.Size == 36);
+		CHECK(m.SourType == 1 && m.SourPos == 3 && m.DestType == 0 && m.DestPos == 6);
+		CHECK(m.GridX == 2100 && m.GridY == 2101 && m.ItemID == 0);
+	}
+	CHECK(In(k_in_use_item, &size, 36) == WYD_DIALECT_DROP); // runtime size is not the wire size
+	Passes(k_in_update_carry);
+	{
+		const auto* m = reinterpret_cast<const MSG_Carry*>(k_in_update_carry);
+		CHECK(m->Carry[0].sIndex == 401 && m->Carry[1].sIndex == 406 && m->Coin == 1000350);
+	}
+
+	char wire[64];
+	MSG_SwapItem s;
+	std::memset(&s, 0xAB, sizeof(s));
+	s.Header.Size = sizeof(s);
+	s.Header.KeyWord = 0;
+	s.Header.CheckSum = 0;
+	s.Header.Type = 0x376;
+	s.Header.ID = 5;
+	s.Header.Tick = 0x01020304;
+	s.SourType = 0;
+	s.SourPos = 6;
+	s.DestType = 1;
+	s.DestPos = 5;
+	s.TargetID = 1234;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&s), sizeof(s), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 20 && std::memcmp(wire, k_out_swap_item, 20) == 0); // padding @18 zeroed
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&s), 19, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	s.DestType = 3;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&s), sizeof(s), wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	s.DestType = 0;
+	s.DestPos = 16; // equip has 16 server slots
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&s), sizeof(s), wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_RANGE) == 2);
+
+	MSG_UseItem u;
+	std::memset(&u, 0xAB, sizeof(u));
+	u.Header = s.Header;
+	u.Header.Size = sizeof(u);
+	u.Header.Type = 0x373;
+	u.SourType = 1;
+	u.SourPos = 0;
+	u.DestType = 0;
+	u.DestPos = 0;
+	u.GridX = 2100;
+	u.GridY = 2101;
+	u.ItemID = 777;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&u), sizeof(u), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 34 && std::memcmp(wire, k_out_use_item, 34) == 0); // Size rewritten, padding not sent
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&u), 34, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_TRANSLATED) == 2);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_SIZE) == 2);
+}
+
 int main()
 {
 	TestAccountLogin();
@@ -656,6 +725,7 @@ int main()
 	TestOutbound();
 	TestAttack();
 	TestCombatDiagnostics();
+	TestItems();
 	std::printf("%d checks, %d failures\n", g_checks, g_failures);
 	return g_failures == 0 ? 0 : 1;
 }
