@@ -17,7 +17,7 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
 
 1. Etapa 5:
    - fatia A (01/10): venda, ouro no banco entre sessões, teleporte pago e casos de troca confirmados. Falta uma execução completa de `tradeedge` dentro do prazo, que agora é de 60 min; ela também vende os 3 itens 1774 que sobraram em B;
-   - PRs [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361) e [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362) implantados (`200f4824`). O ouro dos mobs foi confirmado em execução. Ficam em aberto: o HUD com dano 21 logo após o login e 23 ao reequipar a mesma arma (causa não determinada), e a diferença de nível entre a seleção e o mundo (`selCharWireLevel`, decisão do servidor);
+   - PRs [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361) e [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362) implantados (`200f4824`). O ouro dos mobs foi confirmado em execução. O HUD com dano 21 após o login e 23 ao reequipar tem causa encontrada: o `CreateMob` próprio leva o score cru, sem a arma. A correção está no PR [#363](https://github.com/Jean1dev/w2pp-OpenWYD/pull/363) do servidor (`19b235e`), sem merge. Fica em aberto a diferença de nível entre a seleção e o mundo (`selCharWireLevel`, decisão do servidor);
    - fatia 5: persistência após reinício controlado do servidor (exige combinar com o operador);
    - buff e cura (nível 11+ ou 16–20).
 
@@ -617,3 +617,4 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - **Dano após o login:** 21, que vira 23 ao reequipar a mesma arma, igual ao padrão de 30/09. Pela fonte, a fórmula do servidor é a mesma nas duas rotas. Causa não determinada, em aberto.
   - **HP/MP/atributos do #361:** a execução não distingue o efeito, porque template e valor calculado coincidem neste personagem; o efeito está confirmado em teste no PR.
 - **Evidência:** [fatia A](evidence/05-gameplay/2026-10-01-slice-a.md#depois-do-merge-e-deploy-dos-prs-361-e-362-0110-1954-2020-utc). Sem commit.
+- **Investigação do dano (mesma data, pedido do usuário):** a causa é o `CreateMob` próprio, montado por `createMobFrom` com campos crus e enviado depois do `UpdateScore` do login. Reproduzido em teste com o conteúdo real (19 / 17 / 19). Corrigido no PR [#363](https://github.com/Jean1dev/w2pp-OpenWYD/pull/363) (`19b235e`, teste `TestEnterWorldSelfCreateMobCarriesTheScore`, suíte do `tmserver` verde), sem merge.
