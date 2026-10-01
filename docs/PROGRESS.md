@@ -536,3 +536,11 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Limites:** log do servidor não coletado (Railway CLI sem login); cliente Windows pendente; só Chromium; "Nv 2"/HP 105 no HUD é hipótese ligada ao `0x0336` ausente após o login.
 - **Próximo passo:** o operador executa o roteiro Windows × web; com o Railway CLI autenticado, anexar o log sanitizado destas janelas (14:43–15:08 UTC).
 
+### 01/10/2026 — cliente Windows fecha ao entrar no Field
+
+- **Sintoma:** pelo launcher, login/PIN/seleção funcionam e o jogo fecha ao entrar; já ocorrera em 29/09.
+- **Confirmado em execução:** o Windows registra a falha de `wyd.exe` em `msmpeg2ac3dec.dll` (`0xc0000602`, offset `0x53ebc`), 1 s após `Init Field Scene::End`; mesma assinatura 3× em 29/09. O tm-server (Railway `2e532af`) completou a entrada no mundo sem erro e só viu EOF. Launcher e deploy do dia descartados.
+- **Hipótese:** liberação excessiva em `DS_SOUND_CHANNEL::CleanGraph` (`DirShow.cpp:200`) na troca de música ao entrar no Field.
+- **Contorno aplicado:** `Config[3]` (música) do `Config.bin` do operador de 20 para 0, com backup `Config.bin.bak-2026-10-01`. [Evidência](evidence/04-login-mundo/2026-10-01-windows-crash.md).
+- **Próximo passo:** operador entra de novo pelo launcher; se funcionar, seguir o roteiro Windows × web. Correção definitiva no cliente Windows é entrega separada.
+

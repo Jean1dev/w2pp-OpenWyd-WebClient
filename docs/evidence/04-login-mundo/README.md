@@ -78,6 +78,8 @@ Evidências sanitizadas: `2026-10-01-suite-0.json` (badpass/badpin), `-1..4.json
 
 ## 3. Roteiro manual para o cliente Windows 7662 (pendente)
 
+**01/10/2026:** pelo launcher, o cliente Windows fecha ao entrar no Field por falha do decodificador de áudio do Windows (`msmpeg2ac3dec.dll`, `0xc0000602`) na troca de música; contorno: música em 0 no `Config.bin`. Ver [2026-10-01-windows-crash.md](2026-10-01-windows-crash.md).
+
 Pré-requisitos: cliente 7662 do operador apontado para o mesmo tm-server e as contas A e B de `.env`.
 
 O `serverlist.bin` da cópia do operador (`Client-aws`, SHA-256 `ee979675…`) aponta todos os canais para `127.0.0.1:8281`; o `serverlist.txt` da mesma pasta (192.168.0.103) está desatualizado. **Confirmado em execução (29/09):** decodificado com a chave legada do `Basedef.cpp`. O tmserver responde ao `GET /serv00.htm` na porta de jogo (`world/edge.go`), então basta um relé TCP de loopback, sem regra de jogo, até o destino do operador:
