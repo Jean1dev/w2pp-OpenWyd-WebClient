@@ -68,6 +68,7 @@ def import_streaming(source):
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(payload)
             records.append({"path": target, "source_sha256": sha(payload),
+                            "output_sha256": sha(payload),
                             "bytes": len(payload), "delivery": "streamed",
                             "origin": "operator assets"})
     return records
@@ -80,6 +81,17 @@ def merge_streaming_manifest(streamed):
     manifest.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
 
+def validate_inputs(selected):
+    """Reject missing/invalid mandatory inputs before creating any output."""
+    for name, convert in (("ItemList.bin", convert_items), ("SkillData.bin", convert_skills)):
+        if name not in selected:
+            raise ValueError(f"required asset missing: {name}")
+        convert(selected[name].read_bytes())
+    font = selected["Tahoma.ttf"].read_bytes()
+    if len(font) < 12 or font[:4] not in (b"\x00\x01\x00\x00", b"OTTO", b"true"):
+        raise ValueError("font must be a non-empty TrueType/OpenType font")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--assets", required=True, type=Path)
@@ -88,6 +100,8 @@ def main():
                         help="refresh only the streamed set beside an existing dataset")
     args = parser.parse_args()
     source = args.assets.resolve(strict=True)
+    if not source.is_dir():
+        parser.error("--assets must be a directory")
     output = ROOT / "assets-local/runtime"
     if output.resolve().is_relative_to(source):
         parser.error("output must be outside the original asset directory")
@@ -95,8 +109,10 @@ def main():
         parser.error("assets-local/runtime already exists; use a fresh workspace or explicitly move the old dataset")
     if args.streaming_only and not output.exists():
         parser.error("assets-local/runtime is missing; run the full import first")
-    streamed = import_streaming(source)
     if args.streaming_only:
+        # Parse the existing manifest before writing streamed files.
+        json.loads((output.parent / "manifest.json").read_text(encoding="utf-8"))
+        streamed = import_streaming(source)
         merge_streaming_manifest(streamed)
         print(json.dumps({"streamed": len(streamed),
                           "bytes": sum(r["bytes"] for r in streamed)}))
@@ -129,8 +145,8 @@ def main():
     selected["Tahoma.ttf"] = args.font.resolve(strict=True)
     converters = {"ItemList.bin": convert_items, "SkillData.bin": convert_skills}
     # Validate table lengths before writing any output.
-    for name, convert in converters.items():
-        convert(selected[name].read_bytes())
+    validate_inputs(selected)
+    streamed = import_streaming(source)
     output.mkdir(parents=True)
     for target, path in sorted(selected.items()):
         original = path.read_bytes()
@@ -150,4 +166,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (OSError, ValueError) as error:
+        raise SystemExit(f"asset import failed: {error}") from None

@@ -1,6 +1,6 @@
 # Setup auditado — Windows / PowerShell
 
-Revisão: 28/09/2026. **Confirmado em execução:** compilação de 114 unidades C++ e link estrito do runtime em Emscripten 6.0.0, sem assets embutidos. Ainda não há cena executada no navegador nem conexão de jogo.
+Revisão da etapa 2: 01/10/2026. O importador já converte ItemList/SkillData 7662 e o runtime já possui cena offline e integração online. Os números de 28/09 abaixo são históricos; a reprodução atual está em [evidências da etapa 2](evidence/02-build/README.md).
 
 ## Ambiente e fontes
 
@@ -15,10 +15,12 @@ git -C external/server sparse-checkout set tmserver internal api dbserver binser
 
 git clone --filter=blob:none --sparse https://github.com/alanpetry/OpenWyd.git external/OpenWyd
 git -C external/OpenWyd checkout --detach beb9f69bdea6d81f70af14b5ce85ed064575bb26
-git -C external/OpenWyd sparse-checkout set Projects/TMProject Dependencies/Directx/Include webclient/client-wasm/compat webclient/client-wasm/config webclient/client-wasm/tools webclient/client-wasm/build/link webclient/tools webclient/server docker docs .github
+git -C external/OpenWyd sparse-checkout set Projects/TMProject Dependencies/Directx/Include webclient/app webclient/server webclient/client-wasm/compat webclient/client-wasm/config webclient/client-wasm/tools webclient/client-wasm/build/link webclient/tools docker docs .github
 ```
 
-O aplicativo de inspeção `webclient/app` foi lido separadamente na auditoria e não é requisito do build do runtime. `CommonFiles`, servidor C++ upstream e o bundle `v769ClientRelease` não são requisitos para compilar os objetos selecionados. O build requer os headers DirectX listados acima, além dos shims de compatibilidade.
+O aplicativo `webclient/app` é um inspetor de assets: frontend HTML/JS com WebGL2, WASM próprio e chamadas Fetch para `/api/manifest`, `/api/resolve` e `/api/assets/*`, atendidas por `webclient/server/app.py`. Ele não é o jogo integrado nem requisito do build do runtime escolhido. O runtime é `Projects/TMProject` compilado pelos scripts em `webclient/client-wasm/tools/` e iniciado por `webclient/client-wasm/build/link/startup_harness.html`; usa a bridge WASM de entrada/render/rede e assets fornecidos localmente. `CommonFiles`, servidor C++ upstream e bundle `v769ClientRelease` não são requisitos para compilar os objetos selecionados. O build requer os headers DirectX listados acima e os shims de compatibilidade.
+
+O proxy exploratório `webclient/server/wyd_tcp_proxy.py` faz ponte WebSocket↔TCP em bytes, mas aceita `host` e `port` da query por padrão. Serve para desenvolvimento controlado; não deve ser exposto. O gateway deste projeto escolhe destinos apenas da configuração do operador.
 
 Instalação local do SDK usada nesta sessão:
 
@@ -78,15 +80,29 @@ python tools/audit_assets.py --assets 'C:\Users\User\Documents\Client-aws\Client
 
 Saída 2 significa preflight incompleto, não erro de instalação do Python. O inventário tem 7.092 arquivos e hashes, 318.725.705 bytes, 20 caminhos/padrões ausentes, 2 padrões de derivados upstream e 5 arquivos vazios. Ausência no manifesto não prova que o runtime usa aquele arquivo; é preciso relacionar cada ausência com o consumidor. `ItemPrice.bin` tem fallback explícito; `Env/AttributeMap.dat` existe e é o caminho que `BASE_InitializeAttribute` realmente abre, embora o manifesto também peça uma cópia na raiz.
 
-**Incompatibilidade concreta de leitura:** o Alan pede 6500×164 = 1.066.000 bytes para ItemList; o arquivo fornecido tem 910.004. Para SkillData, pede 248×104 = 25.792, mas há 23.812 bytes. Não renomear/copiar e considerar os dados compatíveis. O formato legado de ItemList documentado no servidor é 6500×140 com 4 bytes finais, sem header inicial. A identificação semântica da cópia fornecida e a conversão ainda exigem teste independente.
+**Conversão implementada:** o Alan pede 6500×164 = 1.066.000 bytes para ItemList; o arquivo 7662 tem 910.004. Para SkillData, pede 248×104 = 25.792, mas há 23.812 bytes. `tools/import_local_assets.py` remove o trailer de quatro bytes, decodifica XOR 0x5A e adapta os registros antes de recodificar. Preserva a máscara de equipamento de 16 bits em 32 bits e zera os campos sem origem 7662. `tools/test_asset_conversion.py` verifica offsets, sinais, fronteiras, campos adicionais e rejeição de tamanhos inválidos com dados sintéticos. O trailer é descartado; não se afirma validação de checksum sem algoritmo confirmado.
 
-As wrappers shell upstream de build completo validam o manifesto e depois geram o atlas GDI. Este caminho requer os assets e uma toolchain MSVC/Windows SDK descoberta por `build_gdi_font_atlas.py` no layout `external/.tools/portable-msvc-v142-x86/msvc`, ausente nesta sessão. Há Visual Studio BuildTools instalado em outro layout; ele não foi adaptado/validado para esse gerador. Não baixar atlas/fontes comerciais para esconder a lacuna. O link `--dev` não depende desse atlas, mas a cena real depende de recursos de texto válidos.
+As wrappers shell upstream possuem um caminho de geração de atlas GDI, mas ele não é requisito do build `--dev` usado aqui. **Confirmado em fonte:** `EnsureFontRenderer` em `win32_emscripten_stubs.cpp` abre `/Tahoma.ttf` e inicializa `stb_truetype`; o importador fornece a fonte local em sua raiz virtual. Não é necessário instalar MSVC nem baixar atlas para esse caminho. Fonte e derivados permanecem locais e sujeitos à proveniência do operador.
 
 ## Próxima execução
 
-Concluir a revisão dos consumidores ainda pendentes na matriz; definir e testar loaders 7662 para ItemList/SkillData, mapear somente dados realmente necessários e resolver a geração local do atlas com proveniência. Em seguida, importar os assets em diretório ignorado e montar uma cena Field real. Antes de servir o harness, substituir credenciais persistidas/query string e destinos de rede de demonstração. Não abrir o harness upstream contra seus servidores públicos.
+Etapa 1 fechada em 01/10/2026 para os consumidores dos fluxos do marco inicial. Para reproduzir a etapa 2, aplicar os patches antes dos comandos de build acima, importar os assets e executar o smoke local. O harness upstream e o inspetor de assets não devem ser expostos com credenciais persistidas/query string ou destinos de rede de demonstração.
 
-O link usa WebGL 1–2 e crescimento de memória, sem flag de pthreads; não foi identificada exigência de SharedArrayBuffer nesse comando. Headers de hospedagem, smoke Chromium/Firefox, resolução e coordenadas da cena serão validados quando houver aplicação servida. Nenhuma URL de demo/deploy foi criada.
+```powershell
+python tools/apply_openwyd_patches.py
+python -m unittest discover -s tools -p test_asset_conversion.py -v
+# Compilar/linkar com os comandos acima, depois:
+python tools/import_local_assets.py --assets '<diretório autorizado>' --font C:\Windows\Fonts\tahoma.ttf
+npm ci
+npm run scene:package
+$env:SCENE_BROWSER = 'firefox'
+npm run scene
+Remove-Item Env:SCENE_BROWSER
+```
+
+O importador recusa um dataset existente e valida tabelas obrigatórias e assinatura básica da fonte antes de copiar músicas ou dados. Lacunas opcionais do manifesto ficam registradas, sem conteúdo fabricado. Para atualizar somente músicas, usar `--streaming-only`. O Playwright fixado em `package-lock.json` requer seus navegadores Chromium e Firefox instalados (`npx playwright install chromium firefox`). Evidências ficam em `.cache/scene-chromium/` e `.cache/scene-firefox/`.
+
+O link usa WebGL 1–2 e crescimento de memória, sem pthreads ou exigência de SharedArrayBuffer. Servir `.wasm` como `application/wasm`, `.js` como JavaScript e `.data` como `application/octet-stream`, na mesma origem. A página permite WASM por `script-src 'self' 'wasm-unsafe-eval'`; COOP/COEP não são necessários para esse build. O smoke usa localhost, viewport 1100×900 e canvas 800×600. HTTPS/WSS permanece necessário para o cliente conectado fora de loopback.
 
 ## Etapa 3 — protocolo, gateway e cliente conectado
 

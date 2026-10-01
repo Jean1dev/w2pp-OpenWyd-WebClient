@@ -39,6 +39,20 @@ Skips Go: `TestAuthGameLayout` (billing interno não validado) e `TestTransportV
 
 O primeiro download Go via Invoke-WebRequest foi interrompido sem progresso; curl baixou o arquivo oficial, hash foi conferido e Go executou com versão1.25.13. Uma chamada exploratória a em++.bat falhou porque a distribuição instalada oferece em++.exe; os builders usaram o executável correto. Os warnings de includes com capitalização Windows/D3D9 permanecem registrados nos logs locais. Comandos exploratórios com globs incompatíveis com PowerShell foram corrigidos nas consultas seguintes.
 
+## Fechamento da auditoria de consumidores — 01/10/2026
+
+**Confirmado em fonte:** os sparse checkouts foram restaurados nesta retomada em `external/OpenWyd` (`beb9f69bdea6d81f70af14b5ce85ed064575bb26`) e `external/server` (`98286fdf01202f503523e89d3e50b2183f00c36c`). O inventário foi regenerado com `python tools/audit_sources.py --out docs/evidence/01-auditoria/source-inventory.json`: 102 opcodes Go, 61 atribuições diretas de rotas e 69 declarações upstream. Loops e consumidores de cena são revisados separadamente; esses totais não são cobertura semântica.
+
+Revisados os dispatchers de `TMSelectServerScene`, `TMSelectCharScene`, `TMFieldScene` e `TMHuman`, além de `Basedef.h`, handlers e codecs relevantes do servidor. A matriz agora nomeia consumidores de logout/recusas, remoção de entidade, HP/MP, dano e affects, e distingue no Field os pacotes de item no chão. O runtime espera `MSG_CNFDropItem` e `MSG_CNFGetItem` com 28 bytes; o servidor fixado responde hoje com 16 bytes e não fornece `0x026E`, então esses fluxos seguem **bloqueados pelo servidor**, não pelo cliente. O layout medido do `MSG_CreateItem` é 32 bytes.
+
+O runtime C++ do jogo e `webclient/app` são produtos distintos: o app de inspeção usa HTML/JS, WebGL2, seu WASM e endpoints de manifest/resolve/assets; o jogo escolhido é `Projects/TMProject` compilado pelos scripts `webclient/client-wasm/tools/` e iniciado pelo `startup_harness.html`. O proxy de depuração `wyd_tcp_proxy.py` aceita host/porta da query por padrão e permanece inadequado para exposição. A sparse list de `tools/fetch_pinned.py` e os comandos de `docs/setup.md` agora incluem `webclient/app` e `webclient/server` para reproduzir essa distinção.
+
+**Confirmado em fonte:** o checkout do servidor tem padrão `ClientVersion=7640`; o Compose de produção passa explicitamente `12000`; o upstream TMProject transmite `1758` em login/retorno de servidor. A porta CPSock é 8281 (também no `TM_CONNECTION_PORT`); a porta 80 do Compose serve status HTTP. O serviço web oferece `CreateAccount` e `VerifyCredentials`, mas não ticket ou login do jogo; a sessão de jogo começa no fluxo CPSock.
+
+**Limites:** inspeção estática apenas nesta retomada. Não foram executados build, testes, login, captura do cliente Windows nem comparação de tela. Layouts de Clang não provam ABI de `cl.exe`. Loader de ItemList/SkillData e geração de atlas continuam trabalho da etapa 2; autotrade, loja premium, guilda, refino, quests e outras superfícies foram identificadas como fora do primeiro marco. Nenhum asset, binário ou fonte externa foi adicionado ao Git.
+
+Comandos executados nesta revisão: `python tools/fetch_pinned.py upstream`, `python tools/fetch_pinned.py server`, `git -C external/OpenWyd sparse-checkout add webclient/app webclient/server`, `git -C <checkout> rev-parse HEAD`, consultas `rg`/`Get-Content` nas fontes fixadas e `python tools/audit_sources.py --out docs/evidence/01-auditoria/source-inventory.json`. Os dois fetch precisaram de rede fora do sandbox. Nenhum comando de teste foi executado.
+
 ## Lacunas reais
 
 1. **Assets:** ItemList e SkillData são menores que os arrays lidos pelo Alan. Faltam fontes no diretório fornecido, derivados optimized-hd e outros padrões do manifesto. Parte das ausências é redundante/opcional; é preciso ligar cada uma ao consumidor antes de definir o pacote mínimo. Env/AttributeMap.dat já existe e é a localização aberta pelo runtime.

@@ -38,25 +38,25 @@ Comentários genéricos de `messages.go` dizem pack(1), enquanto codecs como sel
 | CNFNew/Delete S→C `0110/0112` | 856/844 | 920 | SELCHAR@16; 4 bytes padding após header | resultado confirmado, não antecipar criação/exclusão |
 | CharacterLogin C→S `0213` | 20/8 | 36 | Slot i32b0, Force i32b4; Alan acrescenta SecretCode[16] | enviar tamanho canônico mesmo que decoder Go aceite bytes extras |
 | CNFCharacterLogin S→C `0114` | 1832/1820 | 1728 | XY i16b0/2; MOB@16; Slot/ClientID/Weather Go@1040/1042/1044, Alan@1056/1058/1060; ShortSkill[16] Go@1046; extensões Alan diferentes | mapear cada campo efetivamente consumido; spawn real, equipamento, relogin |
-| CharacterLogout C→S `0215`; confirmação S→C `0116` | confirmação 12/0 | consumidor a revisar | `character.go` responde sem body após salvar/cancelar estados | retorno à seleção, cancelamento de trade e relogin |
-| Falhas S→C `0119/011A/011C/0FDF` | 12/0 | consumidor a revisar | `character.go`, `login.go`, `misc.go` enviam body nil; mapear recusas de personagem, sessão duplicada e PIN | não permanecer em UI de sucesso após erro |
+| CharacterLogout C→S `0215`; confirmação S→C `0116` | confirmação 12/0 | `TMFieldScene::OnPacketEvent` chama `OnPacketCNFCharacterLogout`; só muda para seleção se `Header.ID` for o personagem local | `character.go` responde sem body após salvar/cancelar estados; retorno à seleção e persistência têm prova na etapa 4; cancelamento de trade é parte do contrato legado |
+| Falhas S→C `0119/011A/011B/011C/011D/0FDF` | 12/0 | `TMSelectCharScene::OnPacketEvent`: `0119` mostra falha de login, `011A` mensagem de criação, `011B` falha de exclusão; `TMSelectServerScene` trata `011C/011D` como recusa de conta; `0FDF` reabre diálogo do PIN | os handlers Go enviam body vazio. `011B` ainda depende do PR #359; `011A` é o comportamento atual da senha de exclusão errada até merge/deploy. Conferir estado visual para cada recusa sem credenciais nas capturas |
 
 ## Mundo, combate e estado
 
 | Pacote / direção / opcode | Go T/B | Alan total | Campos / divergência | Teste necessário |
 |---|---:|---:|---|---|
 | CreateMob S→C `0364` | 232/220 | 236 | XY@12/14, ID@16, nome[16]@18; Equip u16[16]@34 vs [18]; Affect[32]@66 vs70; Guild@130 vs134; Score@136 vs140; CreateType@184 vs188; anct[16]@186 vs equip2[18]@190 | jogador e NPC, classe, HP, guild/refino, ID ≥1000; nome de jogador contém PK em bytes12..15 |
-| RemoveMob S→C `0165` | 16/4 | conferir consumidor | tipo i32b0; entidade no header.ID, ao contrário do spawn | morte, logout e saída de visão |
+| RemoveMob S→C `0165` | 16/4 | `TMHuman::OnPacketEvent` chama `OnPacketRemoveMob`; tipo i32b0 e entidade no `Header.ID`, ao contrário do spawn | morte, logout e saída de visão; remoção autoritativa |
 | Action C↔S `036C/0366/0368` | 52/40 | 52 | XY i16b0/2, Effect i32b4, Speed i32b8, Route[24]b12, TargetXY i16b36/38; Alan destino u16 | duas sessões, tick sincronizado, teleporte/ilusão; posição continua autoritativa |
 | Motion C↔S `036A` | 20/8 | 20 | Go motion/parm u16b0/2, NotUsed i32b4 zero; Alan short/short + Direction float32b4 | distinguir broadcast de efeito e direção recebida; animação sem resultado de combate local |
 | UpdateEquip S→C `036B` | 60/48 | 68 | Equip u16[16]b0, anct u8[16]b32 vs arrays18 | troca equipamento vista pela segunda sessão |
 | UpdateScore S→C `0336` | 152/140 | 152 | SCORE b0; critical/save b48/49; affect u16[32]b50; guild b114/116; resist[4]b118; HP/MP i32b124/128; Go Magic i32b132, cauda[4]b136; Alan Magic u16 e LearnedSkill | não sobrescrever skills com 0xCC da cauda Go; limites e buffs |
 | UpdateEtc S→C `0337` | 48/36 | 48 | Hold b0, Exp i64b4, Learn i64b12, bônus u16b20/22/24, Magic u16b26, Coin i32b28. Alan tem 2 máscaras u32 e padding no lugar de Magic | experiência >32 bits, gold e skill points |
 | Attack C↔S `0367/039D/039E` | `60+8N` / `48+8N`, N≤13 | 168/72/80 | HP i32b4; Exp i64b12; XY b22..28; attacker u16b30; progress b32; motion b34; critical b36; MP i32b40; skill i16b44; ReqMp i16b46; Dam[N] {target i32,damage i32}b48. Alan chama @16 de ReqMp e não declara ReqMp@58 | HP, miss/block negativos, um/dois/13 alvos; não ecoar dano predito como confirmado |
-| SetHpMp S→C `0181` | 28/16 | conferir consumidor | HP/MP/ReqHP/ReqMP i32b0/4/8/12 | dano, cura, morte e poção |
-| SetHpDam S→C `018A` | 20/8 | conferir consumidor | HP i32b0, dano i32b4 | HoT/DoT e sinal |
-| SendAffect S→C `03B9` | 268/256 | conferir consumidor | 32 entradas de 8 bytes em `affect.go` | tipo/valor/duração e expiração |
-| ReqTeleport/ChangeCity/Restart C→S `0290/0291/0289` | 12/0 suficiente para handlers | consumidor a revisar | handlers ignoram body; teleporte usa posição autoritativa; ChangeCity chama `villageAt`, que atualmente sempre retorna -1 | custo, cidade persistida, morte e relogin; registrar ChangeCity inoperante |
+| SetHpMp S→C `0181` | 28/16 | `TMHuman::OnPacketEvent` chama `OnPacketSetHpMp`; HP/MP/ReqHP/ReqMP i32b0/4/8/12 | dano, cura, morte e poção; valores do servidor prevalecem |
+| SetHpDam S→C `018A` | 20/8 | `TMHuman::OnPacketEvent` chama `OnPacketSetHpDam`; HP i32b0, dano i32b4 | HoT/DoT e sinal; não inferir o resultado da animação |
+| SendAffect S→C `03B9` | 268/256 | `TMHuman::OnPacketEvent` chama `OnPacketUpdateAffect`; 32 entradas de 8 bytes em `affect.go` | tipo/valor/duração e expiração |
+| ReqTeleport/ChangeCity/Restart C→S `0290/0291/0289` | 12/0 suficiente para handlers | `TMFieldScene` solicita `0290` no portal e `0289` no retorno à cidade; `0291` deriva a cidade da posição. Os handlers ignoram body útil; teleporte usa posição autoritativa | custo e cidade persistida; `villageAt` no servidor fixado atualmente retorna -1, portanto `0291` não deve ser anunciado como funcional |
 
 ## Itens, economia, chat e grupo
 
@@ -69,7 +69,7 @@ Comentários genéricos de `messages.go` dizem pack(1), enquanto codecs como sel
 | DropItem C→S `0272` | 28/16 | source type/pos/rotation i32b0/4/8, XY u16b12/14 | remover apenas após resposta válida |
 | GetItem C→S `0270` | 24/12 | Go ItemID i32b0, destType/pos i32b4/8, marcado UNVERIFIED; Alan total28: destType/pos@12/16, ItemID u16@20, XY@22/24 | dependência de backend; validar contra legado/captura antes de codec final |
 | CNFDrop/CNFGet S→C `0175/0171` | atual16/4 | `handler/item.go` envia apenas slot i32; Alan espera28 (source/pos/rotate/XY ou destType/pos/ITEM). Spawn do item no chão está explicitamente adiado; sem `0x026E` S→C | **bloqueado pelo servidor**: proposta de entrega separada na [ADR 007](decisions/007-inventory-dialect.md); `0272/0270/0175/0171/016F/026E` continuam descartados |
-| DeleteItem/SplitItem C→S `02E4/02E5` | 20/8;24/12 | Slot i32b0, SIndex i32b4; Split acrescenta Num i32b8; consumidor Alan ainda a revisar | limites, quantidade e operação repetida |
+| DeleteItem/SplitItem C→S `02E4/02E5` | 20/8;24/12 | `TMFieldScene` tem controles de remoção/divisão; wire structs carregam Slot i32b0, SIndex i32b4 e, para split, Num i32b8. O par ainda não está no dialeto instalado | limites, quantidade e operação repetida; codec só após confirmar handlers/semântica no Go fixado |
 | REQShopList C→S `027B` | mínimo14/2 aceito | handler lê Target u16b0; comentário do codec descreve total16 | distinguir mínimo aceito de layout canônico |
 | ShopList S→C `017C` | 236/224 | shopType i32b0; ITEM[27]b4; tax i32b220. Mapeamento carry NPC (i%9)+(i/9)*27 | 3 abas e preços autoritativos; não usar RMBShopList de 39 itens |
 | Buy/Sell C↔S `0379/037A` | mínimo18/6 aceito | target u16b0, posição NPC/tipo i16b2, posição própria i16b4; buy ecoa comprimento recebido e grava o ouro novo em b8 (@20). Runtime: `MSG_Buy` 24 (padding @18, Coin @20), `MSG_Sell` 20 (padding @18). **Buy traduzido por campo, Sell 20→18** ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)) | **Railway:** venda, compra, recusa sem ouro e clique repetido conferidos com o log do servidor ([fatia 3](evidence/05-gameplay/2026-09-30-shop-bank-chat.md)) |
@@ -88,15 +88,30 @@ Comentários genéricos de `messages.go` dizem pack(1), enquanto codecs como sel
 | SetShortSkill C→S `0378` | 32/20 mínimo | SkillBar[4]b0 e ShortSkill[16]b4; `skill.go` persiste/ecoará no login, sem resposta imediata | atualizar atalhos e relogar |
 | ApplyBonus C→S `0277` | 18/6 | tipo i16b0, detalhe i16b2, target u16b4; Alan estrutura total20 com padding | atributos/mastery, saldo de pontos e alvo inválido |
 
-## Cobertura restante e dependências
+## Fechamento da auditoria de consumidores (01/10/2026)
+
+Revisão dos consumidores fonte em OpenWyd `beb9f69bdea6d81f70af14b5ce85ed064575bb26` e handlers/protocolos do servidor `98286fdf01202f503523e89d3e50b2183f00c36c`. A tabela acima cobre os pacotes necessários à entrada, mundo e fatias de gameplay dentro do marco; consumidores foram conferidos em `TMSelectServerScene::OnPacketEvent`, `TMSelectCharScene::OnPacketEvent`, `TMFieldScene::OnPacketEvent`, `TMHuman::OnPacketEvent` e respectivos handlers de cenas. Os nomes citados são evidência de consumo em fonte, não prova de ABI/captura Windows.
+
+| Superfície encontrada no runtime | Consumidor e contrato conhecido | Estado para este cliente |
+|---|---|---|
+| `0165`, `0182`, `0185`, `0336`, `0337`, `0339`, `036B`, `03B9`, `0181`, `018A`, `0367/039D/039E`, `0333/0334` | `TMHuman::OnPacketEvent`; layouts/offsets e codecs do escopo estão detalhados acima | traduzido ou repassado com tamanho validado; hipóteses e dependências permanecem sinalizadas |
+| `010A`, `0114`, `0116`, `0119`–`011D`, `0FDE/0FDF` | cenas de servidor/personagem e Field; respostas de login, seleção, logout e PIN | fluxo principal integrado; recusas e `011B` dependem do PR #359 para paridade do servidor |
+| `026E`, `0175`, `0171`, `016F`, `0374` | `TMFieldScene::OnPacketEvent`: criação, confirmação, atualização e remoção de item no chão | bloqueado pela ausência do fluxo equivalente no servidor; não ativar com resposta sintética |
+| `01D0`, `0397`, `0398`, `03E8`, `0196` | loja premium/RMB, loja pessoal, compra em loja pessoal, recompra e fechamento | `01D0` não tem rota no Go; `0397/0398` têm handlers no servidor, mas não estão habilitados no dialeto cliente; fora do marco inicial |
+| `0363`, `0397`, `0383`–`0386`, `037F`, `037D`, `037E` | mob de loja pessoal, autotrade, troca e grupo | grupo coberto; troca aguarda PR #358; autotrade existe no servidor, mas não está habilitado/testado no cliente web |
+| `02E4`, `02E5`, `03A6`, `03C0`, `03C9`, `028B` e mensagens auxiliares de quest/refino/guilda | consumidores específicos de Field/UI e handlers de itens/quest; formatos têm dependências de dados ou regras além do primeiro marco | fora do escopo validado; inventário de opcode é pista, não autorização para passar pacote |
+
+`MSG_CNFDropItem` do runtime é 28 bytes: source type/slot/rotation e XY; `MSG_CNFGetItem` também é 28 bytes: destination type/slot e ITEM. Isso confirma que os pacotes de 16 bytes atualmente enviados pelo servidor não atendem ao consumidor original. `MSG_CreateItem` (0x026E) tem 32 bytes e é necessário para criar a entidade visual no chão. Estes tamanhos vêm do probe Clang sobre o `Basedef.h` fixado e não de uma captura do Windows 7662.
+
+## Dependências restantes
 
 Também é necessário adaptar **formatos de assets**, não só pacotes: o loader original lê arrays crus de STRUCT_ITEMLIST(164)×6500 e STRUCT_SPELL(104)×248 e aplica XOR 0x5A. Os arquivos do operador têm 910.004 e 23.812 bytes, insuficientes para essas leituras. A correspondência exata com os registros 7662 e a conversão de campos estão pendentes; não completar o buffer com zeros para mascarar a incompatibilidade. Ver [preflight de assets](evidence/01-auditoria/assets-summary.json).
 
-A matriz começa pelos fluxos do primeiro marco e expande os principais caminhos de gameplay, mas **não fecha ainda cada consumidor**. O inventário de opcodes e o dump completo de fields/sizeof permitem continuar sem perder os casos não mapeados. Permanecem revisão semântica/capturas de falhas, whisper, atalhos, teleporte, shop/party no Alan, autotrade, refinamentos e mensagens auxiliares visuais. Não habilitar um pacote só porque seu número aparece em ambos os inventários.
+O marco de auditoria fecha os consumidores dos fluxos necessários, mas não afirma paridade de todas as superfícies do runtime. Autotrade, refinamento, loja premium, guilda, quests e mensagens auxiliares ficam identificados como superfícies futuras, fora do primeiro marco. Capturas controladas do Windows ainda são necessárias para provar paridade do cliente 7662; não se substituem por layouts gerados pelo Clang.
 
 Dependências do servidor devem ser entregas separadas com testes: contrato de coleta e confirmações; spawn de item no chão; banco/UpdateCargoCoin; reconciliação entre padding legado e codecs atuais de trade/use/attack. A suspeita de tamanho57 confundido com opcode em CargoCoin é **hipótese fundamentada**, não correção aplicada.
 
-As cenas fazem casts diretos de mensagens (`TMFieldScene::OnPacket`, `TMHuman::OnPacketUpdateScore`). A etapa 3 instalou a tradução antes desses consumidores (`client/dialect/WydDialect.cpp`, ganchos em `CPSock::SendDialect` e `NewApp.cpp`). A etapa 1 permanece **Em andamento**; nenhuma prova multiplayer foi produzida.
+As cenas fazem casts diretos de mensagens (`TMFieldScene::OnPacket`, `TMHuman::OnPacketUpdateScore`). A etapa 3 instalou a tradução antes desses consumidores (`client/dialect/WydDialect.cpp`, ganchos em `CPSock::SendDialect` e `NewApp.cpp`). A etapa 1 está **Validada para auditoria documental dos fluxos do marco inicial**; nenhuma prova nova de multiplayer foi produzida nesta revisão.
 
 ## Tradução instalada no cliente (etapa 3)
 
