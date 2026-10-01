@@ -78,7 +78,7 @@ Evidências sanitizadas: `2026-10-01-suite-0.json` (badpass/badpin), `-1..4.json
 
 ## 3. Roteiro manual para o cliente Windows 7662 (pendente)
 
-**01/10/2026:** pelo launcher, o cliente Windows fecha ao entrar no Field por falha do decodificador de áudio do Windows (`msmpeg2ac3dec.dll`, `0xc0000602`) na troca de música; contorno: música em 0 no `Config.bin`. Ver [2026-10-01-windows-crash.md](2026-10-01-windows-crash.md).
+**01/10/2026:** pelo launcher, o cliente Windows fecha ao entrar no Field por falha do decodificador de áudio do Windows (`msmpeg2ac3dec.dll`, `0xc0000602`) na troca de música; contorno (música em 0 no `Config.bin`) confirmado: o operador entrou no jogo sem música. Ver [2026-10-01-windows-crash.md](2026-10-01-windows-crash.md).
 
 Pré-requisitos: cliente 7662 do operador apontado para o mesmo tm-server e as contas A e B de `.env`.
 

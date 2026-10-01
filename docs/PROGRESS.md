@@ -542,5 +542,6 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Confirmado em execução:** o Windows registra a falha de `wyd.exe` em `msmpeg2ac3dec.dll` (`0xc0000602`, offset `0x53ebc`), 1 s após `Init Field Scene::End`; mesma assinatura 3× em 29/09. O tm-server (Railway `2e532af`) completou a entrada no mundo sem erro e só viu EOF. Launcher e deploy do dia descartados.
 - **Hipótese:** liberação excessiva em `DS_SOUND_CHANNEL::CleanGraph` (`DirShow.cpp:200`) na troca de música ao entrar no Field.
 - **Contorno aplicado:** `Config[3]` (música) do `Config.bin` do operador de 20 para 0, com backup `Config.bin.bak-2026-10-01`. [Evidência](evidence/04-login-mundo/2026-10-01-windows-crash.md).
-- **Próximo passo:** operador entra de novo pelo launcher; se funcionar, seguir o roteiro Windows × web. Correção definitiva no cliente Windows é entrega separada.
+- **Confirmado em execução:** com o contorno, o operador entrou no jogo (13:10, −03:00); sem nova falha no Windows e entrada completa no log do tm-server.
+- **Próximo passo:** seguir o roteiro Windows × web com a música desligada. Correção definitiva no cliente Windows é entrega separada.
 

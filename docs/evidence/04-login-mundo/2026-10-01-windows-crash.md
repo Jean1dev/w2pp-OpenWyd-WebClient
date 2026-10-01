@@ -24,7 +24,7 @@ Relato do operador: abrindo o jogo pelo launcher (`wyd-plataforma/launcher`), o 
 
 `NewApp.cpp:601` só cria o gerenciador de música com `m_nMusic = Config.Config[3] > 0`, e `TMFieldScene.cpp:6946` pula a troca sem ele. No `Config.bin` do cliente do operador (`SaveUpdatAndConfig`: `short Version; short Config[14]`, 30 bytes), `Config[3]` (offset 8) estava em 20 e foi alterado para 0. Apenas esse byte mudou (`cmp`); o original ficou em `Config.bin.bak-2026-10-01` na mesma pasta. Equivale a zerar o volume de música nas opções do jogo.
 
-**Pendente:** o operador repetir a entrada no Field com o contorno. Se entrar, a causa (música) fica confirmada; o mecanismo exato (liberação excessiva vs. falha própria do decodificador ao montar o grafo) segue como hipótese.
+**Confirmado em execução (13:10, −03:00):** com a música em 0, o operador entrou no jogo pelo launcher com o mesmo personagem (slot 2, classe 3). O `WYD.log` registra `Init Field Scene::End` às 13:10:51; o tm-server enviou a entrada no mundo e 102 frames (50 `0x0364`, 44 `0x0165`), e a sessão terminou às 16:11:15 UTC por EOF, sem nova falha no log Application do Windows (a última continua sendo a das 12:59:21). A música na troca ao entrar no Field é a causa. O mecanismo exato (liberação excessiva vs. falha própria do decodificador ao montar o grafo) segue como hipótese.
 
 ## Correção definitiva (não feita)
 
