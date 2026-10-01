@@ -52,7 +52,10 @@ export function checkDelete(r) {
   assert(r.slot >= 0 && r.slot < 4, 'invalid slot');
   assert(r.before[r.slot].name, 'target slot empty before delete');
   assert.deepEqual(names(r.refused.slots), names(r.before), 'wrong password changed the list');
-  assert.notEqual(r.refused.lastRecvOpcode, 0x112, 'wrong password answered with CNFDeleteCharacter');
+  // DeleteCharacterFail, as the legacy ProcessDBMessage.cpp:641-649 and the
+  // server since 2e532afa (PR #359); 0x011A is the old create-failure reply.
+  assert.equal(r.refused.lastRecvOpcode, 0x11b, 'wrong password not answered with DeleteCharacterFail');
+  assert(r.refused.panelText, 'refusal message (string 20) not shown');
   assert.equal(r.deleted.lastRecvOpcode, 0x112, 'missing CNFDeleteCharacter');
   const expected = names(r.before).map((n, k) => k === r.slot ? '' : n);
   assert.deepEqual(names(r.deleted.slots), expected, 'delete removed the wrong slot');

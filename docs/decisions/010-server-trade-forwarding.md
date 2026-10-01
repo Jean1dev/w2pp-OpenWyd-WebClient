@@ -1,6 +1,6 @@
 # ADR 010 — Troca P2P: entrega no servidor e mapeamento no dialeto (etapa 5, fatia 4)
 
-Data: 30/09/2026. Estado: servidor e dialeto **confirmados em teste** local. Servidor no [PR #358](https://github.com/Jean1dev/w2pp-OpenWYD/pull/358), aberto, sem merge e **não publicado** no Railway. Troca **não executada online**. Substitui a parte "troca" da [ADR 009](009-party-dialect-and-trade-block.md).
+Data: 30/09/2026. Estado: servidor e dialeto **confirmados em teste** local. Servidor no [PR #358](https://github.com/Jean1dev/w2pp-OpenWYD/pull/358), aberto, sem merge e **não publicado** no Railway. Troca **não executada online**. **Revisão de 01/10/2026:** PR #358 integrado (`c2767a96`) e implantado com `2e532afa`; troca **confirmada em execução** no Railway ([evidência](../evidence/05-gameplay/2026-10-01-trade.md)). Substitui a parte "troca" da [ADR 009](009-party-dialect-and-trade-block.md).
 
 ## Contexto
 
@@ -73,7 +73,12 @@ O placeholder do servidor antigo (13 ou 21 bytes) é descartado por tamanho e nu
   9. troca de volta de B para A.
   As checagens puras ficam em `tools/trade_checks.mjs` (`checkTradeSwap`, `checkTradeReset`, `checkTradeEvidence`), com testes.
 
-## Pendente (bloqueado)
+## Revisão de 01/10/2026 — execução online
 
-- Publicar o servidor com o patch no Railway exige o operador (reinício do `tm-server`).
-- Depois disso: fase `trade` no harness com duas sessões (oferta, alteração que zera o check, confirmação bilateral, recusa por espaço, cancelamento, desconexão, relogin) e o roteiro Windows × web.
+- Publicação feita pelo operador: o deploy `5b9c73de` está em `2e532afa`.
+- A fase `trade` foi aprovada (execução 2): oferta, alteração que zera as confirmações, confirmação bilateral, cancelamento e relogin. A execução 1 expôs um defeito do harness: o original descarta o Enter na caixa 601, então o aceite agora usa o caminho do OK.
+- `patches/server/0001-trade-forwarding.patch` fica como registro histórico; o conteúdo agora está no upstream.
+
+## Pendente
+
+- Recusa por falta de espaço, desconexão no meio da troca e roteiro Windows × web.
