@@ -56,6 +56,22 @@ A tabela está em [compatibility.md](../../compatibility.md#tradução-acrescent
 - **Alerta `session out queue high`** (profundidade 32–37 de 64) aparece em cada entrada no mundo. É a rajada de cerca de 35 `CreateMob` enviada de uma vez, e não indica leitura lenta do cliente: nenhuma sessão foi derrubada.
 - **Capturas locais** ficam em `.cache/world/*.png`, fora do Git porque contêm assets e o nome da conta no campo ID. Os SHA-256 estão nos JSONs.
 
+### Suíte completa de 01/10/2026 (contas atuais)
+
+Comando: `npm run world -- --target reseau.proxy.rlwy.net:56950 --env-file .env`. WASM `tmproject_startup.1790812300295676400`, Railway `98286fdf`, `ClientVersion=12000`.
+
+- **Execução 1 (00:03–00:07 UTC):** `badpass,badpin` e `classes` 0 passaram. `classes` 1 reprovou por *timeout waiting for CNFNewCharacter*: nenhum `0x020f` chegou ao servidor.
+  - **Causa (confirmada em execução):** o nome derivado `A.char.slice(0, 12) + "c1"` tem 14 caracteres com o nome atual da conta A (12 caracteres, desde a troca de contas de 30/09), e a cena de seleção recusa o nome localmente.
+  - **Correção no harness:** o auxiliar `classChar` usa `slice(0, 10)`. Para nomes de até 10 caracteres, o resultado é o mesmo de antes.
+- **Execução 2 (00:08–00:17 UTC), interrompida pelo Claude Code por falta de memória** ao abrir B (`second`), com cerca de 1,5 GB livres. Não foi reiniciada, por instrução do Claude Code. Passaram:
+  - `badpass,badpin`;
+  - `classes` 0 (já existente) e 1, 2, 3, **criados agora nos slots 1–3 da conta A**, com relogin e persistência;
+  - `login` e `enter` do cenário `login,enter,second,move,logout`.
+
+  Não rodaram: `second,move,logout`, `mapchange` (o trajeto novo segue sem prova completa) e `concurrent`.
+
+Evidências sanitizadas: `2026-10-01-suite-0.json` (badpass/badpin), `-1..4.json` (classes 0–3), `-5.json` (cenário interrompido), e o log do servidor [`2026-10-01-suite-server.txt`](2026-10-01-suite-server.txt), com três `create char: OK`.
+
 ## 3. Roteiro manual para o cliente Windows 7662 (pendente)
 
 Pré-requisitos: cliente 7662 do operador apontado para o mesmo tm-server e as contas A e B de `.env`.

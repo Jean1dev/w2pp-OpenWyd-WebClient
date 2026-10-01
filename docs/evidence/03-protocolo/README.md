@@ -11,7 +11,8 @@ Revisões: servidor `98286fdf01202f503523e89d3e50b2183f00c36c`; OpenWyd `beb9f69
 | AccountLogin `020D` com ClientVersion 12000 | **confirmado em execução** no tmserver do Railway | log do servidor: `recv packet type=0x020d len=104`, `account login: OK` |
 | CNFAccountLogin `010A` (2008 bytes) → seleção de personagem | **confirmado em execução** com o servidor real; conta sem personagens | 2008 bytes recebidos e traduzidos, estado 5 (Select Character), sem fixture |
 | Conteúdo de SELCHAR e banco (4 slots, 128 itens, Exp > 32 bits) | **confirmado em execução** com fluxo roteirizado; **confirmado em teste unitário** | nomes lidos do runtime; 276 verificações campo a campo |
-| CNFNew/Delete, CNFCharacterLogin, CreateMob, AccountSecure (PIN), DeleteCharacter, CharacterLogin | **confirmado em teste unitário**; **sem prova ponta a ponta** | fixtures conferidas byte a byte contra os encoders Go |
+| CNFNew, CNFCharacterLogin, CreateMob, AccountSecure (PIN), CharacterLogin | **confirmado em teste unitário** e em execução nas etapas 4–5 | fixtures conferidas byte a byte contra os encoders Go |
+| DeleteCharacter `0211` → CNFDeleteCharacter `0112`; recusa `011A` | **confirmado em execução** no Railway (30/09) | [exclusão ponta a ponta](#exclusão-de-personagem-ponta-a-ponta-30092026) |
 | Criação/entrada de personagem, Field com servidor, duas sessões, relogin | **pendente (etapa 4)** | exige clique no modelo 3D e teclado de PIN; não executado |
 | Pacotes de gameplay (`UpdateScore`, `UpdateEtc`, `SendItem`, chat…) | **não mapeados**: descartados e contados | lista de opcodes descartados no probe |
 
@@ -80,3 +81,28 @@ Também executados: testes upstream `test_wasm_socket_bridge.py` (6 OK) e `test_
 - O controle de senha da cena guarda o texto até a cena ser destruída, e o vetor interno de envio do WebSocket libera memória sem apagá-la. Hoje a credencial fica transitória em memória, mas não é apagada em todos os pontos.
 - A mensagem de erro de login (`0x102` com o índice do aviso) chega à cena, que a ignora: o painel reabilita o login sem mostrar o motivo.
 - `CNFCharacterLogin`: `Quest`, `Rsv`, `LearnedSkill[1]`, `Ext1/Ext2`, `CurrentKill` e `TotalKill` ficam zerados, e o `Magic` do servidor é tratado como o `char Magic` do runtime (**hipótese**). Validar na etapa 4 com o servidor real.
+
+## Exclusão de personagem ponta a ponta (30/09/2026)
+
+Decisões na [ADR 011](../../decisions/011-delete-character-end-to-end.md). Railway `tm-server` (`98286fdf`, `ClientVersion=12000`), conta B. WASM `tmproject_startup.1790812300295676400` (SHA-256 `6c441b66…`), com os patches 0001–0021.
+
+```
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases delete
+python tools/capture_world_logs.py --since 2026-09-30T23:57:30Z --until 2026-10-01T00:00:20Z --out docs/evidence/03-protocolo/2026-09-30-delete-server.txt
+```
+
+**Aprovada na primeira execução** ([JSON](2026-09-30-delete.json), [log do servidor](2026-09-30-delete-server.txt)):
+
+1. Um personagem descartável foi criado no slot 1 (`create char: OK slot=1 total=2`) e estava presente depois de um relogin.
+2. Com a senha errada, o cliente enviou `0x0211`, e o log do servidor registra corpo de 32 bytes (44 − 12 de cabeçalho), o layout Go. O servidor respondeu `0x011A`, e a lista ficou intacta.
+3. Com a senha certa, foi enviado um novo `0x0211`. O servidor respondeu `0x0112`, só o slot 1 ficou vazio e o slot 0 foi preservado.
+4. No relogin, a lista é a mesma, com o mesmo nível no slot 0.
+
+A saúde de protocolo ficou limpa nas três sessões, sem descartes nem erros de página.
+
+**Divergência do servidor (confirmada em fonte e em execução):** o legado responde à recusa com `0x011B` (`_MSG_DeleteCharacterFail`). O servidor Go responde com `0x011A`, que o runtime exibe como falha de criação. A correção é uma entrega separada, o [PR #359](https://github.com/Jean1dev/w2pp-OpenWYD/pull/359), ainda não publicada.
+
+Limites:
+- Nenhuma captura do texto exibido. O painel tem 2 s de vida e a leitura foi feita depois de 3 s; o texto vem do fonte.
+- A automação abre a caixa e o painel pelos controles da cena, não por clique no botão desenhado.
+- Só Chromium headless.

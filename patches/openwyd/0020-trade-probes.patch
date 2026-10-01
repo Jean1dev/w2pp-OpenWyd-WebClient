@@ -1,0 +1,59 @@
+Trade window probes: read-only snapshots of the original trade panel and
+the rendered centers of the player-menu trade button (643) and my check
+(617). No probe sends packets or changes game state.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -24,6 +24,7 @@
+ 
+ #include <cstring>
+ #include <cstdio>
++#include <cstdlib>
+ 
+ #if defined(__EMSCRIPTEN__)
+ #include <emscripten/console.h>
+@@ -1091,7 +1092,8 @@
+ // (B_MONEY 65563, B_CARGO_MONEY 65688, B_IG_OK 65886): center as drawn, or -1.
+ extern "C" WYD_EXPORT int wyd_field_button_screen(unsigned int id, int which) {
+   TMFieldScene* f = WydField();
+-  if (!f || (id != 65563u && id != 65688u && id != 65886u && id != 641u && id != 475139u)) return -1;
++  if (!f || (id != 65563u && id != 65688u && id != 65886u && id != 641u && id != 475139u &&
++                id != 643u && id != 617u)) return -1;
+   auto* b = static_cast<SPanel*>(f->m_pControlContainer->FindControl(id));
+   if (!b || !b->IsVisible() || b->m_GCPanel.nWidth <= 0 || b->m_GCPanel.nHeight <= 0) return -1;
+   return static_cast<int>(which == 0 ? b->m_GCPanel.nPosX + b->m_GCPanel.nWidth / 2
+@@ -1147,3 +1149,33 @@
+   auto* f = WydField();
+   return f && f->m_pPGTPanel && f->m_pPGTPanel->IsVisible() ? f->m_dwOpID : 0;
+ }
++
++// Trade probes: snapshots of the original trade window, never input shortcuts.
++// Fields: 0 visible, 1 opponent, 2 my check (617), 3 opponent check (601),
++// 4 my money, 5 opponent money as drawn (603).
++extern "C" WYD_EXPORT int wyd_field_trade_value(int field) {
++  auto* f = WydField();
++  if (!f || !f->m_pTradePanel || !g_pObjectManager) return -1;
++  auto* c = f->m_pControlContainer;
++  switch (field) {
++    case 0: return f->m_pTradePanel->IsVisible() ? 1 : 0;
++    case 1: return static_cast<int>(g_pObjectManager->m_stTrade.OpponentID);
++    case 2: { auto* b = static_cast<SButton*>(c->FindControl(617u)); return b ? b->m_bSelected : -1; }
++    case 3: { auto* b = static_cast<SButton*>(c->FindControl(601u)); return b ? b->m_bSelected : -1; }
++    case 4: return g_pObjectManager->m_stTrade.TradeMoney;
++    case 5: { auto* t = static_cast<SText*>(c->FindControl(603u)); return t && t->GetText() ? std::atoi(t->GetText()) : -1; }
++  }
++  return -1;
++}
++// side 0: my offer grid (8448+k), 1: opponent grid (8192+k): item index or 0.
++// side 2: carry slot recorded for my offer k (-1 when empty).
++extern "C" WYD_EXPORT int wyd_field_trade_item(int side, int k) {
++  auto* f = WydField();
++  if (!f || !g_pObjectManager || k < 0 || k >= 15) return -1;
++  if (side == 2) return g_pObjectManager->m_stTrade.CarryPos[k];
++  if (side != 0 && side != 1) return -1;
++  auto* g = static_cast<SGridControl*>(f->m_pControlContainer->FindControl((side ? 8192u : 8448u) + k));
++  if (!g) return -1;
++  auto* it = g->GetItem(0, 0);
++  return it && it->m_pItem ? it->m_pItem->sIndex : 0;
++}

@@ -15,7 +15,7 @@ export function redactEvidence(value, secrets) {
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
   'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'castarea',
-  'equip', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'concurrent'];
+  'equip', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'trade', 'delete', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -45,7 +45,8 @@ export function validateOptions(opt) {
   // Slice 3: shop and bank are private to A and end with their own relogin;
   // chat needs B as the listener and includes the /city teleport commands.
   for (const [p, only] of [['shop', ['enter', 'login', 'shop']], ['bank', ['bank', 'enter', 'login']],
-    ['chat', ['chat', 'enter', 'login', 'second']], ['party', ['enter', 'login', 'party', 'second']]]) {
+    ['chat', ['chat', 'enter', 'login', 'second']], ['party', ['enter', 'login', 'party', 'second']],
+    ['trade', ['enter', 'login', 'second', 'trade']], ['delete', ['delete']]]) {
     if (phases.has(p)) assert.deepEqual([...phases].sort(), only, `${p} runs only with ${only.join(',')}`);
   }
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],

@@ -40,7 +40,7 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 | Teleporte: portal (etapa 4) e comandos `/azran` e `/armia` | **confirmado em execução** | `chat command` + `teleport` no log; B deixa de ver A e volta a vê-la |
 | Teleporte pago por NPC, chat de grupo/guilda | pendente | não exercitados |
 | Grupo | aprovado | recusa, aceite, clique repetido, saída, expulsão, desconexão de membro e de líder, e relogin com inventário preservado; execução 6 no Railway ([fatia 4](2026-09-30-party.md)) |
-| Troca | bloqueada | servidor corrigido e testado localmente, dialeto mapeado; falta publicar o patch do servidor ([ADR 010](../../decisions/010-server-trade-forwarding.md)) |
+| Troca | bloqueada | servidor corrigido e testado, no [PR #358](https://github.com/Jean1dev/w2pp-OpenWYD/pull/358) (sem merge nem deploy); dialeto mapeado; fase `trade` e probes (patch 0020) preparados, não executados online ([ADR 010](../../decisions/010-server-trade-forwarding.md)) |
 | Persistência após reinício | pendente | fatia 5 |
 
 ## Execuções de 29/09/2026 (cenário `login,enter,second,attack`)

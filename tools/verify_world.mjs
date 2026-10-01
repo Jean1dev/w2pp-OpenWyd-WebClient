@@ -21,6 +21,8 @@
 //   castarea  TK hits two Gremlins in one result, B observes, then A relogs
 //   cast      the --class character assigns its learned skill (hover + Shift+1) and casts it on a Gremlin
 //   death     A dies to the Armia Field Trolls, returns to town (box 11, 0x03AE/0x0289); B at the spawn sees it
+//   trade     A trades an item and gold to B by the original window; refusal, check reset, cancel, relogin, return
+//   delete    B creates a throwaway character, a wrong password is refused, the right one deletes it; relogin
 //   concurrent A's account logs in a second time while A is in the Field
 //
 // Credentials come from W2PP_TEST_{ACCOUNT,PASSWORD,PIN,CHAR}[2] (env or --env-file)
@@ -37,6 +39,7 @@ import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { areaPair, checkAreaAttempt } from './area_checks.mjs';
 import { checkParty, checkPartyEvidence } from './party_checks.mjs';
+import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
   checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkChat, itemAmount } from './world_checks.mjs';
 
@@ -638,16 +641,17 @@ class Session {
     }));
   }
 
-  async partyButton(id) {
+  async uiButton(id) {
     await this.frames(2);
     const p = await this.eval(id => [Module._wyd_field_button_screen(id, 0), Module._wyd_field_button_screen(id, 1)], id);
-    assert(p.every(n => n >= 0), `party control ${id} not visible`);
+    assert(p.every(n => n >= 0), `${this.label}: control ${id} not visible`);
     await this.clickCanvas(...p);
   }
 
-  async inviteParty(other) {
+  // Hover B and open its player menu (Ctrl + right click), as a player would.
+  async openPlayerMenu(other, tag) {
     await this.closePanels();
-    await this.until('party target visible', id => Module._wyd_field_human_present(id) === 1, 30000, other.id);
+    await this.until(`${tag} target visible`, id => Module._wyd_field_human_present(id) === 1, 30000, other.id);
     // NPCs crowd the spawn; approach B so its pick volume is on screen and unobstructed.
     const seen = await this.other(other.id), me = await this.me();
     if (Math.hypot(seen.x - me.x, seen.y - me.y) > 3)
@@ -668,14 +672,17 @@ class Session {
         if (picked) break;
       }
       if (!picked) {
-        await this.shot('party-pick-failed');
-        throw new Error(`party target not picked: ${JSON.stringify({ me: await this.me(), other: await this.other(other.id),
+        await this.shot(`${tag}-pick-failed`);
+        throw new Error(`${tag} target not picked: ${JSON.stringify({ me: await this.me(), other: await this.other(other.id),
           screen: await this.eval(i => [Module._wyd_field_human_screen(i, 0), Module._wyd_field_human_screen(i, 1)], other.id),
           hover: await this.eval(() => Module._wyd_field_hover_human_id()) })}`);
       }
     } finally { if (ctrl) await this.page.keyboard.up('Control'); }
     await this.until('player menu', id => Module._wyd_field_party_menu_target() === id, 15000, other.id);
-    await this.partyButton(641);
+  }
+  async inviteParty(other) {
+    await this.openPlayerMenu(other, 'party');
+    await this.uiButton(641);
     await other.until('party invitation', id => Module._wyd_field_party_count() === 1 &&
       Module._wyd_field_party_value(0, 0) === id && Module._wyd_field_party_value(0, 1) === 1, 30000, this.id);
   }
@@ -702,6 +709,24 @@ class Session {
     const rows = await this.party();
     checkParty(rows, ids, leader);
     return rows;
+  }
+
+  // The original trade window as drawn: fields of patch 0020.
+  trade() {
+    return this.eval(() => ({
+      visible: Module._wyd_field_trade_value(0), opponent: Module._wyd_field_trade_value(1),
+      myCheck: Module._wyd_field_trade_value(2), opCheck: Module._wyd_field_trade_value(3),
+      myMoney: Module._wyd_field_trade_value(4), opMoney: Module._wyd_field_trade_value(5),
+      my: Array.from({ length: 15 }, (_, k) => Module._wyd_field_trade_item(0, k)),
+      op: Array.from({ length: 15 }, (_, k) => Module._wyd_field_trade_item(1, k)),
+      carryPos: Array.from({ length: 15 }, (_, k) => Module._wyd_field_trade_item(2, k)),
+    }));
+  }
+  // Player menu -> Trade (643). The partner gets box 601 from the forwarded 0x0383.
+  async requestTrade(other) {
+    await this.openPlayerMenu(other, 'trade');
+    await this.uiButton(643);
+    await other.until('trade request box', () => Module._wyd_scene_msgbox_message() === 601, 30000);
   }
 
   // The inventory window with the real "i" key (OnKeyVisibleInven), page 0.
@@ -914,6 +939,9 @@ async function main() {
     pin: env[`W2PP_TEST_PIN${sfx}`], char: env[`W2PP_TEST_CHAR${sfx}`],
   });
   const A = credsOf(''), B = credsOf('2');
+  // The other classes live on A as <name>c<class>. Names have at most 12
+  // characters: the selection scene refuses longer ones locally, without a packet.
+  const classChar = c => c === 0 ? A.char : `${A.char.slice(0, 10)}c${c}`;
   for (const [k, c] of [['A', A], ['B', B]])
     if (!c.account || !c.password || !c.pin || !c.char) throw new Error(`credentials for ${k} incomplete in env`);
   const cls = Number.parseInt(opt.class, 10);
@@ -945,7 +973,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party'].some(x => phases.has(x)) ? 25 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'trade'].some(x => phases.has(x)) ? 25 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -996,7 +1024,8 @@ async function main() {
 
   let a, b;
   try {
-    if (phases.has('party')) assert(freemem() >= 2 * 1024 ** 3, 'party requires 2 GiB free before opening A/B');
+    for (const two of ['party', 'trade'])
+      if (phases.has(two)) assert(freemem() >= 2 * 1024 ** 3, `${two} requires 2 GiB free before opening A/B`);
     gw = await startGateway(await freePort(), opt.target);
     browser = await chromium.launch({ headless: !opt.headed });
     await step('badpass', async () => {
@@ -1045,7 +1074,7 @@ async function main() {
     await step('classes', async () => {
       const results = [];
       // One class per invocation (--class), preserving the other characters.
-      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      const name = classChar(cls);
       privateValues.push(name);
       let s = await newSession(`class${cls}`, A);
       await s.loginToSelect();
@@ -1092,6 +1121,76 @@ async function main() {
         me: { ...me, name: mask(name) }, relogin: { ...relogin, name: mask(name) }, persisted: true,
         previewResources: 'flat saved score; excludes equipment attribute HP/MP (CharacterSaveFor)' });
       return { classes: results };
+    });
+
+    // Stage 3: DeleteCharacter end to end. Only a throwaway character created
+    // here is deleted; B's configured character is never touched.
+    await step('delete', async () => {
+      const res = {};
+      const name = `${B.char.slice(0, 8)}del${Date.now() % 1000}`.slice(0, 12);
+      const wrong = (B.password[0] === 'x' ? 'y' : 'x') + B.password.slice(1);
+      privateValues.push(name, wrong);
+      const select = async label => {
+        const s = await newSession(label, B);
+        await s.loginToSelect();
+        const pin = await s.pin();
+        assert(pin.already || pin.result === 'lock1', `${label}: PIN rejected`);
+        return s;
+      };
+      const listed = async s => (await s.slots()).map(x => ({ name: x.name, level: x.level }));
+      const del = async (s, slot, password) => {
+        assert.equal(await s.eval(k => Module._wyd_debug_selchar_open_delete(k), slot), 1, 'delete box refused');
+        await s.shot('delete-box');
+        assert.equal(await s.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'delete box OK refused');
+        await s.until('password panel', () => Module._wyd_selchar_delete_panel_visible() === 1, 10000);
+        const frames0 = (await s.probe()).dialect.inboundFrames;
+        assert.equal(await s.eval(p => Module.ccall('wyd_debug_selchar_delete', 'number', ['string'], [p]), password), 1,
+          'delete control refused');
+        assert.equal(await s.lastSent(), 0x211, 'DeleteCharacter not sent');
+        const op = await s.until('delete reply', f0 => {
+          const p = window.clientProbe(), o = p.socket.lastRecvOpcode;
+          return p.dialect.inboundFrames > f0 && (o === 0x112 || o === 0x11a || o === 0x11b) ? o : 0;
+        }, 30000, frames0);
+        await sleep(3000);
+        const panel = await s.eval(() => Module._wyd_scene_message_visible() === 1 ?
+          Module.UTF8ToString(Module._wyd_scene_message_text()) : '');
+        return { lastRecvOpcode: op, panelText: panel };
+      };
+      let s = await select('B-delete');
+      let slots = await listed(s);
+      let slot = slots.findIndex(x => x.name === name);
+      if (slot < 0) {
+        assert(slots.some(x => !x.name), 'no empty slot on B; nothing is deleted to make room');
+        await s.create(name, 0);
+        slots = await listed(s);
+        slot = slots.findIndex(x => x.name === name);
+        res.created = true;
+      }
+      assert(slot >= 0 && slots[slot].name !== B.char, 'throwaway character missing');
+      await s.healthy(); await s.close();
+      // Persisted before it is deleted.
+      s = await select('B-delete-relogin');
+      res.before = await listed(s);
+      assert.equal(res.before[slot].name, name, 'throwaway character not persisted');
+      res.slot = slot;
+      const refused = await del(s, slot, wrong);
+      await s.shot('delete-refused');
+      res.refused = { ...refused, slots: await listed(s) };
+      const deleted = await del(s, slot, B.password);
+      await s.shot('delete-done');
+      res.deleted = { ...deleted, slots: await listed(s) };
+      await s.healthy(); await s.close();
+      s = await select('B-delete-final');
+      res.relogin = await listed(s);
+      await s.shot('delete-final');
+      await s.healthy(); await s.close();
+      checkDelete(res);
+      const hide = l => l.map(x => ({ filled: !!x.name, target: x.name === name, level: x.level }));
+      const hex = o => '0x' + o.toString(16);
+      return { created: !!res.created, slot, before: hide(res.before),
+        refused: { lastRecvOpcode: hex(res.refused.lastRecvOpcode), panelText: res.refused.panelText, slots: hide(res.refused.slots) },
+        deleted: { lastRecvOpcode: hex(res.deleted.lastRecvOpcode), slots: hide(res.deleted.slots) },
+        relogin: hide(res.relogin) };
     });
 
     await step('login', async () => {
@@ -1172,7 +1271,7 @@ async function main() {
       if (!pin.already && pin.result !== 'lock1') throw new Error(`PIN rejected (${pin.result})`);
       let slots = await b.slots();
       if (!slots[0].name) {
-        assert(!phases.has('attack') && !phases.has('castarea') && !phases.has('party'), 'scenario requires an existing B character');
+        assert(!phases.has('attack') && !phases.has('castarea') && !phases.has('party') && !phases.has('trade'), 'scenario requires an existing B character');
         await b.create(B.char, cls); slots = await b.slots();
       }
       const me = await b.enter(0);
@@ -1282,7 +1381,7 @@ async function main() {
     // deriveSkillBonus: level*3). Level-ups are the server's (mobkilled.go);
     // progress persists, so a phase cut by the deadline resumes on the next run.
     await step('grind', async () => {
-      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      const name = classChar(cls);
       privateValues.push(name);
       const slot = (await a.slots()).findIndex(x => x.name === name);
       assert(slot >= 0, `class ${cls} character missing`);
@@ -1374,7 +1473,7 @@ async function main() {
       const plan = PLANS[cls];
       assert(plan, `no learn plan for class ${cls}`);
       const inClass = i => i >= 5000 + cls * 24 && i < 5024 + cls * 24;
-      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      const name = classChar(cls);
       privateValues.push(name);
       const enterOwn = async s => {
         const slot = (await s.slots()).findIndex(x => x.name === name);
@@ -1619,7 +1718,7 @@ async function main() {
       };
       const plan = PLANS[cls];
       assert(plan, `no cast plan for class ${cls}`);
-      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      const name = classChar(cls);
       privateValues.push(name);
       if ((await a.eval(() => Module._wyd_get_game_state())) !== 0) {
         const slot = (await a.slots()).findIndex(x => x.name === name);
@@ -2069,7 +2168,7 @@ async function main() {
     // straight to the killer's carry (0x0182) and gold to Coin (0x0337)
     // (mobkilled.go); ground items have no client broadcast (ADR 007).
     await step('loot', async () => {
-      const name = cls === 0 ? A.char : `${A.char.slice(0, 12)}c${cls}`;
+      const name = classChar(cls);
       privateValues.push(name);
       const slot = (await a.slots()).findIndex(x => x.name === name);
       assert(slot >= 0, `class ${cls} character missing`);
@@ -2304,13 +2403,13 @@ async function main() {
       await a.inviteParty(b);
       await b.shot('party-invitation');
       assert.equal(await b.eval(id => Module._wyd_field_party_member(id), a.id), 0, 'invitation prematurely joined');
-      await b.partyButton(475139);
+      await b.uiButton(475139);
       res.refused = await empty();
       res.accepted = await joinParty();
       await a.shot('party-accepted'); await b.shot('party-accepted');
       await b.partyRow(a.id); await b.partyRow(a.id);
       res.repeated = await pair();
-      await b.partyButton(475139);
+      await b.uiButton(475139);
       res.left = await empty();
       await joinParty();
       await a.partyRow(b.id, true);
@@ -2329,12 +2428,115 @@ async function main() {
       a = await reconnect('A-party-relogin', A);
       await a.waitParty([], 0);
       await joinParty();
-      await b.partyButton(475139); await empty();
+      await b.uiButton(475139); await empty();
       assert.deepEqual(await inventory(a), beforeA, 'A changed after relogin');
       assert.deepEqual(await inventory(b), beforeB, 'B changed during party tests');
       res.inventoryPreserved = true;
       await a.shot('party-final'); await b.shot('party-final');
       checkPartyEvidence(res);
+      return res;
+    });
+
+    // Stage 5 slice 4: P2P trade by the original window (needs the server PR
+    // that forwards 0x0383; ADR 010). Every result is read from the server's
+    // 0x0185/0x0384, never from the local offer.
+    await step('trade', async () => {
+      const res = {}; r.trade = res;
+      const snap = async s => { const v = await s.bag(); return { equip: v.equip, carry: v.carry, coin: v.coin }; };
+      const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+      const reconnect = async (label, creds) => {
+        const s = await newSession(label, creds);
+        await s.loginToSelect(); const pin = await s.pin();
+        assert(pin.already || pin.result === 'lock1', 'trade relogin PIN rejected');
+        await s.enter(0); return s;
+      };
+      const closed = s => s.until('trade window closed', () => Module._wyd_field_trade_value(0) === 0, 30000);
+      const open = async (from, to) => {
+        await from.requestTrade(to);
+        await to.page.locator('#canvas').press('Enter'); await to.frames(2);
+        await from.until('trade window', id => Module._wyd_field_trade_value(0) === 1 && Module._wyd_field_trade_value(1) === id, 30000, to.id);
+        await to.until('trade window', id => Module._wyd_field_trade_value(0) === 1 && Module._wyd_field_trade_value(1) === id, 30000, from.id);
+      };
+      const pickSlot = async s => {
+        const v = await s.bag();
+        const k = [13, 14, ...Array.from({ length: 13 }, (_, i) => i)].find(i => v.carry[i].index > 0);
+        assert(k !== undefined, `${s.label}: no item on inventory page 0 to trade`);
+        return k;
+      };
+      const offer = async (from, to, slot) => {
+        const index = (await from.bag()).carry[slot].index;
+        await from.clickCell({ place: 1, slot });
+        await from.until('own offer', i => Module._wyd_field_trade_item(0, 0) === i, 15000, index);
+        const takerSees = await to.until('forwarded offer', i => Module._wyd_field_trade_item(1, 0) === i && i, 30000, index);
+        return { item: index, takerSees, carryPos: (await from.trade()).carryPos[0] };
+      };
+      // A check is shown to the partner, unless it was the second one: then the
+      // server swaps at once and closes both windows.
+      const check = async (s, other) => {
+        await sleep(2100); // the window refuses a check within 2 s of the last change
+        await s.uiButton(617);
+        await other.until('partner check or swap', () => Module._wyd_field_trade_value(3) === 1 ||
+          Module._wyd_field_trade_value(0) === 0, 30000);
+      };
+      // Both checks: the server swaps, sends 0x0185 to both and closes both windows.
+      const complete = async (first, second) => {
+        await check(first, second);
+        if ((await second.trade()).visible === 1) { await sleep(2100); await second.uiButton(617); }
+        await closed(first); await closed(second);
+        await sleep(2000);
+      };
+      await a.closePanels(); await b.closePanels();
+      const a0 = await snap(a), b0 = await snap(b);
+      // 1. Refusal: B cancels box 601 with ESC. Nothing is sent, nothing opens.
+      await a.requestTrade(b);
+      await b.shot('trade-request');
+      await b.page.locator('#canvas').press('Escape'); await b.frames(2);
+      await sleep(3000);
+      res.refused = { aWindow: (await a.trade()).visible, bWindow: (await b.trade()).visible };
+      res.refused.unchanged = res.refused.aWindow === 0 && res.refused.bWindow === 0 &&
+        same(await snap(a), a0) && same(await snap(b), b0);
+      // 2. Accepted: A offers an item and gold; B's check is reset by the gold.
+      const slot = await pickSlot(a);
+      res.gold = Math.min(a0.coin, 10);
+      await open(a, b);
+      res.forward = await offer(a, b, slot);
+      await a.shot('trade-offer'); await b.shot('trade-offer');
+      await check(b, a);
+      assert.equal((await a.trade()).opCheck, 1, 'B check not shown to A');
+      if (res.gold > 0) {
+        res.goldSent = await a.goldBox(65563, res.gold);
+        await b.until('forwarded gold', g => Module._wyd_field_trade_value(5) === g, 30000, res.gold);
+        await a.until('check reset', () => Module._wyd_field_trade_value(3) === 0, 15000);
+        res.reset = { a: await a.trade(), b: await b.trade() };
+        checkTradeReset(res.reset.a, res.reset.b);
+      }
+      await complete(a, b);
+      const a1 = await snap(a), b1 = await snap(b);
+      res.swap = checkTradeSwap({ giverBefore: a0, giverAfter: a1, takerBefore: b0, takerAfter: b1, slot, gold: res.gold });
+      await a.shot('trade-done'); await b.shot('trade-done');
+      // 3. Relogin: both sides as the server saved them.
+      await a.healthy(); await a.close(); await b.healthy(); await b.close();
+      a = await reconnect('A-trade-relogin', A);
+      b = await reconnect('B-trade-relogin', B);
+      assert.deepEqual(await snap(a), a1, 'A changed after relogin');
+      assert.deepEqual(await snap(b), b1, 'B changed after relogin');
+      res.relogin = true;
+      // 4. Cancel: an open trade with an offer, closed by A with ESC -> 0x0384 to both.
+      await open(a, b);
+      await offer(a, b, await pickSlot(a));
+      await a.page.locator('#canvas').press('Escape'); await a.frames(2);
+      await closed(a); await closed(b);
+      await sleep(2000);
+      res.cancelled = { unchanged: same(await snap(a), a1) && same(await snap(b), b1) };
+      // 5. Return trade: B gives the item back, no gold (restores the accounts).
+      assert(res.swap.takerSlot < 15, 'received item not on inventory page 0');
+      await open(b, a);
+      await offer(b, a, res.swap.takerSlot);
+      await complete(b, a);
+      const a2 = await snap(a), b2 = await snap(b);
+      res.back = checkTradeSwap({ giverBefore: b1, giverAfter: b2, takerBefore: a1, takerAfter: a2, slot: res.swap.takerSlot });
+      await a.shot('trade-final'); await b.shot('trade-final');
+      checkTradeEvidence(res);
       return res;
     });
 
