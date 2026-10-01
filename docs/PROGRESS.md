@@ -7,7 +7,7 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 1 Auditoria | Validada (consumidores dos fluxos do primeiro marco revisados em fonte; loaders 7662 e paridade Windows continuam para etapa 2/6) | [Fontes, layouts, build, assets e revisão dos consumidores](evidence/01-auditoria/README.md) |
 | 2 Build e cena | Validada (01/10: build limpo, importador com testes sintéticos e cena Field/Select Server em Chromium e Firefox; Field é fixture offline; Safari não testado) | [Cena real no navegador](evidence/02-build/README.md), [reprodução de 01/10](evidence/02-build/2026-10-01-reproduction.md) |
 | 3 Protocolo | Em andamento (DeleteCharacter aprovado ponta a ponta em 30/09; recusa chega como `011A`, correção no PR #359) | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
-| 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
+| 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
 | 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo aprovado; troca no PR #358 do servidor, com fase `trade` preparada e não executada; faltam buff/cura e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
@@ -21,8 +21,7 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - buff e cura (nível 11+ ou 16–20), teleporte pago por NPC e ouro guardado no banco entre sessões.
 
    Rodar os cenários online em processos separados. Antes de abrir A e B, confirmar ≥ 2 GB livres: órfãos `tail`/`grep`, Docker e Chrome em segundo plano custaram ~1,3 GB nesta sessão ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
-2. Etapa 4 — fechar:
-   - rodar os cenários restantes da suíte em processos separados: `login,enter,second,move,logout`, `login,enter,second,mapchange` e `login,enter,concurrent`. Em 01/10, `badpass,badpin` e `classes` 0–3 passaram, e a execução foi interrompida por memória ao abrir B;
+2. Etapa 4 — fechar (os cenários de duas sessões passaram em 01/10, [evidência](evidence/04-login-mundo/2026-10-01-two-sessions.md)):
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
    - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
 3. Etapa 8 — confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
@@ -527,3 +526,29 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Verificação:** Go 1.25.13 local (zip oficial, SHA-256 conferido, em `.cache/toolchains`); `go vet ./...`; teste de desligamento 50/50 em < 1 s; `go test -count=10 ./...` duas vezes sem falhas. `-race` não executado localmente (sem cgo/gcc); fica para a CI.
 - **Segundo defeito (achado pelo `-race` da CI no PR #13, `TestConnectionLimits`):** `g.active.Add(1)` só rodava depois de `websocket.Accept`, que sequestra a conexão; daí em diante `http.Server.Shutdown` não espera o handler, e `Wait()` podia correr com o `Add` e retornar enquanto um relay ainda abria. Agora o handler é contado antes do upgrade. `go test -count=10 ./...` local sem falhas; `-race` só na CI (Docker local parado).
 - **Limite:** navegador que não responde ao frame de fechamento ainda atrasa o desligamento em até 5 s por relay, dentro dos 10 s do processo.
+
+### 01/10/2026 — etapa 4: cenários de duas sessões
+
+- **Pedido:** seguir para a etapa 4.
+- **Contas:** o `.env` com as contas anteriores não estava neste worktree; com autorização do usuário, duas contas novas foram criadas no portal do operador (`tools/create_test_account.mjs`), com credenciais só no `.env` ignorado.
+- **Confirmado em execução (Railway `98286fdf`, `ClientVersion=12000`):** `login,create,enter,second,move,logout`, `login,enter,second,mapchange` e `login,enter,concurrent`, um processo cada, todos `ok`, zero erros de página e zero pacotes descartados. Movimento bidirecional confirmado pelo servidor; logout/relogin com despawn e respawn vistos por B; troca de mapa para Armia Field; login duplicado aceito conforme o backend fixado.
+- **Arquivos:** `docs/evidence/04-login-mundo/2026-10-01-two-sessions.md`, três JSONs sanitizados (conferidos contra todos os valores do `.env`), README da etapa 4 e este progresso.
+- **Limites:** log do servidor não coletado (Railway CLI sem login); cliente Windows pendente; só Chromium; "Nv 2"/HP 105 no HUD é hipótese ligada ao `0x0336` ausente após o login.
+- **Próximo passo:** o operador executa o roteiro Windows × web; com o Railway CLI autenticado, anexar o log sanitizado destas janelas (14:43–15:08 UTC).
+
+### 01/10/2026 — cliente Windows fecha ao entrar no Field
+
+- **Sintoma:** pelo launcher, login/PIN/seleção funcionam e o jogo fecha ao entrar; já ocorrera em 29/09.
+- **Confirmado em execução:** o Windows registra a falha de `wyd.exe` em `msmpeg2ac3dec.dll` (`0xc0000602`, offset `0x53ebc`), 1 s após `Init Field Scene::End`; mesma assinatura 3× em 29/09. O tm-server (Railway `2e532af`) completou a entrada no mundo sem erro e só viu EOF. Launcher e deploy do dia descartados.
+- **Hipótese:** liberação excessiva em `DS_SOUND_CHANNEL::CleanGraph` (`DirShow.cpp:200`) na troca de música ao entrar no Field.
+- **Contorno aplicado:** `Config[3]` (música) do `Config.bin` do operador de 20 para 0, com backup `Config.bin.bak-2026-10-01`. [Evidência](evidence/04-login-mundo/2026-10-01-windows-crash.md).
+- **Confirmado em execução:** com o contorno, o operador entrou no jogo (13:10, −03:00); sem nova falha no Windows e entrada completa no log do tm-server.
+- **Próximo passo:** seguir o roteiro Windows × web com a música desligada. Correção definitiva no cliente Windows é entrega separada.
+
+### 01/10/2026 — Windows × web
+
+- **Execução manual do operador:** cliente Windows 7662 pelo launcher (música desligada) e cliente web por `npm run dev`, no tm-server Railway `2e532af`.
+- **Confirmado em execução (log do tm-server) e pelo operador:** sessões identificadas pelo horário do `WYD.log` e pela sondagem do launcher; ambos no mundo de 16:14:53 a 16:15:19 UTC; movimento repassado e visto nos dois sentidos; chat Windows → web; despawn do web entregue ao Windows (`0x0165`); sem erro nem `version mismatch`. [Evidência](evidence/04-login-mundo/2026-10-01-windows-web.md).
+- **Não coberto:** relogin do Windows com o web observando; capturas da comparação visual.
+- **Próximo passo:** repetir com os dois no mundo, fechar e reabrir o Windows; com isso a etapa 4 pode ser validada.
+
