@@ -9,14 +9,14 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 3 Protocolo | Validada (01/10: vetores, streaming adversarial, login real e DeleteCharacter com recusa `0x011B` no Railway `2e532afa`; login real no tm-server do operador, não numa stack local) | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
 | 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; faltam buff/cura e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
-| 6 Paridade | Pendente | — |
+| 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
 | 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
 
 ## Próxima ação
 
 1. Etapa 5:
-   - fatia A (01/10): venda, ouro no banco entre sessões, teleporte pago e casos de troca confirmados. Falta uma execução completa de `tradeedge` dentro do prazo, que agora é de 60 min; ela também vende os 3 itens 1774 que sobraram em B;
+   - fatia A (01/10): venda, ouro no banco entre sessões, teleporte pago e casos de troca confirmados. A execução 4 de `tradeedge` (01/10, 21:04) rodou todos os passos: aviso "Nao ha espaco no inventario." confirmado online e B limpo. Só a regra final reprovou, porque B começou cheio de sobra; regra corrigida e JSON reavaliado offline;
    - PRs [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361) e [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362) implantados (`200f4824`). O ouro dos mobs foi confirmado em execução. O HUD com dano 21 após o login e 23 ao reequipar tem causa encontrada: o `CreateMob` próprio leva o score cru, sem a arma. A correção está no PR [#363](https://github.com/Jean1dev/w2pp-OpenWYD/pull/363) do servidor (`19b235e`), sem merge. Fica em aberto a diferença de nível entre a seleção e o mundo (`selCharWireLevel`, decisão do servidor);
    - fatia 5: persistência após reinício controlado do servidor (exige combinar com o operador);
    - buff e cura (nível 11+ ou 16–20).
@@ -618,3 +618,19 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - **HP/MP/atributos do #361:** a execução não distingue o efeito, porque template e valor calculado coincidem neste personagem; o efeito está confirmado em teste no PR.
 - **Evidência:** [fatia A](evidence/05-gameplay/2026-10-01-slice-a.md#depois-do-merge-e-deploy-dos-prs-361-e-362-0110-1954-2020-utc). Sem commit.
 - **Investigação do dano (mesma data, pedido do usuário):** a causa é o `CreateMob` próprio, montado por `createMobFrom` com campos crus e enviado depois do `UpdateScore` do login. Reproduzido em teste com o conteúdo real (19 / 17 / 19). Corrigido no PR [#363](https://github.com/Jean1dev/w2pp-OpenWYD/pull/363) (`19b235e`, teste `TestEnterWorldSelfCreateMobCarriesTheScore`, suíte do `tmserver` verde), sem merge.
+
+### 01/10/2026 — enquanto o PR #363 aguarda: `tradeedge` e linha de base da etapa 6
+
+- **`tradeedge`:**
+  - execução 3: A preso nos canteiros a leste do spawn; correção: rota `ARMIA_EAST` antes de se aproximar de B;
+  - execução 4: todos os passos rodaram. Troca desfeita com a bolsa cheia, com o texto "Nao ha espaco no inventario." visto online. Desconexão de A no meio da troca sem nenhuma mudança. Limpeza de 26 itens. Só a regra final reprovou, porque B começou cheio; `checkTradeEdge` foi corrigida, o JSON reavaliado offline passa e `world:checks` fica em 33/0.
+- **Etapa 6:**
+  - `tools/measure_scene.mjs` e `npm run measure` (instrumentação externa de `FS.open` e `_wyd_tick_client`);
+  - [linha de base](evidence/06-paridade/README.md) em Chromium headless, com renderização por software:
+    - pronto em 4,4 s a frio e 1,4 s com cache; primeiro quadro em 18,8 s e 15,5 s;
+    - 309 MiB a frio e 4,4 MiB com cache;
+    - heap JS de 527 MiB e WASM de 180 MiB;
+    - CPU do jogo de ~11 ms por quadro, mas ~410 ms entre quadros (renderização por software);
+    - a cena abre 50,5 de 305 MiB do pacote.
+  - Opções para o preload registradas, a decidir em ADR. O passo mais barato é investigar os ~220 MiB de heap JS além do tamanho do pacote.
+- Sem commit.

@@ -15,6 +15,7 @@
     "client:stream": "python tools/build_local_scene.py --page-only && node tools/verify_client_stream.mjs",
     "dev": "node tools/dev_railway.mjs",
     "world:checks": "node --test tools/world_checks.test.mjs tools/area_checks.test.mjs tools/party_checks.test.mjs tools/trade_checks.test.mjs",
-    "world": "node tools/verify_world_suite.mjs"
+    "world": "node tools/verify_world_suite.mjs",
+    "measure": "python tools/build_local_scene.py --page-only && node tools/measure_scene.mjs"
   }
 }

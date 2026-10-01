@@ -45,6 +45,13 @@ test('trade edge: no room rolls back, a disconnect cancels, the filler is sold b
   const pre = { ...r, b0: bag({ 0: 400, 1: 1774 }, 1000), fill: { ...r.fill, freeBefore: 28, preexisting: [1],
     bought: Array.from({ length: 28 }, (_, k) => k + 2) }, cleanup: { sold: 29, b: bag({ 0: 400 }, 1000 - 28 * 300 + 29 * 75) } };
   checkTradeEdge(pre);
+  // B already full of leftover filler: nothing bought, all of it sold back.
+  const full30 = bag(fullCarry, 1000);
+  const leftover = { ...r, b0: full30, bFull: full30, fill: { ...r.fill, freeBefore: 0, bought: [],
+    preexisting: Array.from({ length: 29 }, (_, k) => k + 1) }, full: { ...r.full, b: full30 }, drop: { ...r.drop, b: full30 },
+    cleanup: { sold: 29, b: bag({ 0: 400 }, 1000 + 29 * 75) } };
+  checkTradeEdge(leftover);
+  assert.throws(() => checkTradeEdge({ ...leftover, fill: { ...leftover.fill, preexisting: [] } }));
   assert.throws(() => checkTradeEdge({ ...pre, cleanup: { sold: 28, b: bag({ 0: 400, 1: 1774 }, 1000 - 28 * 225) } }));
   for (const bad of [{ fill: { ...r.fill, freeAfter: 1 } }, { full: { ...r.full, b: b0 } }, { full: { ...r.full, a: bag({}, 100) } },
     { drop: { ...r.drop, bClosed: false } }, { drop: { ...r.drop, a: bag({}, 100) } }, { drop: { ...r.drop, b: bag({ 0: 400, 1: 412 }, 0) } },

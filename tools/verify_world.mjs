@@ -2697,6 +2697,9 @@ async function main() {
       await b.page.locator('#canvas').press('Escape'); await b.frames(2);
       // 2. A offers an item; both check; the server has no room on B and rolls back.
       await a.closePanels(); await b.closePanels();
+      // B is at the shop: A takes the street route there (a straight walk stalls
+      // on the raised planters east of the spawn), then closes in.
+      for (const [x, y] of ARMIA_EAST) await a.walkTo(x, y, { near: 2, stallOk: true });
       const bAt = await b.me();
       await a.walkTo(bAt.x, bAt.y, { near: 3, maxClicks: 15, stallOk: true });
       const slot = await pickSlot(a);

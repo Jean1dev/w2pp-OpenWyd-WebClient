@@ -58,7 +58,8 @@ export function sellPrice(price) {
 // the filler bought to fill B is sold back.
 export function checkTradeEdge(r) {
   const n = r.fill.bought.length, pre = r.fill.preexisting ?? [];
-  assert(n > 0 && n === r.fill.freeBefore, `bought ${n} of ${r.fill.freeBefore} free slots`);
+  // B may start full with filler an interrupted run left: then nothing is bought.
+  assert(n === r.fill.freeBefore && n + pre.length > 0, `bought ${n} of ${r.fill.freeBefore} free slots`);
   assert(r.fill.bought.every(x => x >= 0 && x < 30), 'filler outside the 30 base slots');
   assert.equal(r.fill.freeAfter, 0, 'B still has room');
   assert.equal(r.full.offer.takerSees, r.full.offer.item, 'full: offer not forwarded');
