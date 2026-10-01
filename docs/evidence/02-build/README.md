@@ -2,6 +2,8 @@
 
 ## Estado observado
 
+**Reprodução de 01/10/2026:** build limpo, importação e cena aprovados em Chromium e Firefox; etapa 2 **Validada**. Detalhes, hashes e limites em [2026-10-01-reproduction.md](2026-10-01-reproduction.md).
+
 **Confirmado em execução:** a página própria (`web/local-scene.*`) inicializa o runtime WASM do Alan, monta os assets do operador e renderiza duas cenas originais em WebGL2, sem conexão ao servidor. A cena Field é identificada pelo próprio runtime — mapa 16,16, personagem `OpenWYD` classe 1 em 2096,5/2092,5, HP 320/320 — e responde a mouse e teclado: o clique no terreno alterou o destino de rota para 2094,5/2090,5 e a consulta de terreno devolveu o ponto 2092,25/0/2088,25. Zero erros GL, zero erros de página e zero requisições falhas nas duas cenas.
 
 **Confirmado em execução:** a cena Field usa a *fixture offline* do runtime (`wyd_field_debug_fixture_used = 1`), não um mapa entregue pelo servidor. Isto não é paridade de mundo; é a cena real do cliente com dados locais enquanto o protocolo não existe.
@@ -64,7 +66,7 @@ npm run scene:package   # reempacota o dataset (file_packager) antes de verifica
 
 `tools/probe_missing_assets.mjs` lista os caminhos distintos que o runtime tentou abrir e não achou, por cena, em `.cache/missing-assets.json`.
 
-`tools/verify_local_scene.mjs` sobe o próprio servidor estático em porta efêmera sobre `.cache/local-scene`, de modo que a verificação não depende de servidor externo nem pode medir uma cópia velha da página. `SCENE_ORIGIN` aponta para um site já hospedado; `SCENE_FRAMES` e `SCENE_DEADLINE_MS` ajustam o orçamento de quadros.
+`tools/verify_local_scene.mjs` sobe o próprio servidor estático em porta efêmera sobre `.cache/local-scene`, de modo que a verificação não depende de servidor externo nem pode medir uma cópia velha da página. `SCENE_ORIGIN` aponta para um site já hospedado; `SCENE_FRAMES` e `SCENE_DEADLINE_MS` ajustam o orçamento de quadros. `SCENE_BROWSER=firefox` troca o navegador (padrão `chromium`); as evidências ficam em `.cache/scene-<navegador>/`.
 
 Importação dos assets, incluindo a música transmitida sob demanda:
 

@@ -4,6 +4,8 @@ Preparado em 28/09/2026. Atualizar datas e SHAs quando revalidar.
 
 Revalidado em execução em 28/09/2026: checkouts separados em `external/server` (`98286fdf01202f503523e89d3e50b2183f00c36c`) e `external/OpenWyd` (`beb9f69bdea6d81f70af14b5ce85ed064575bb26`). Consulte [dependências e proveniência](dependencies.md), `dependencies.lock.json` e [evidências](evidence/01-auditoria/README.md). A pasta de assets foi indicada pelo operador e apenas inventariada; os caminhos absolutos históricos não são pré-requisitos do projeto.
 
+Revisão de consumidores em 01/10/2026 refeita contra os mesmos SHAs. O sparse checkout do upstream para reproduzir a distinção de produto inclui `webclient/app` e `webclient/server`; o primeiro é inspetor de assets e o segundo fornece a API de desenvolvimento e proxy experimental, nenhum deles é requisito do runtime C++ integrado.
+
 ## Servidor de destino
 
 - Repositório: https://github.com/Jean1dev/w2pp-OpenWYD

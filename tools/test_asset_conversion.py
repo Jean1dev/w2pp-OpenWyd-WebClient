@@ -1,11 +1,72 @@
 """Independent offset checks for 7662 presentation table conversion."""
 import struct
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from import_local_assets import convert_items, convert_skills
+import import_local_assets
+from import_local_assets import convert_items, convert_skills, validate_inputs
 
 
 class ConversionTest(unittest.TestCase):
+    def test_first_and_last_item(self):
+        source = bytearray(6500 * 140)
+        for index in (0, 6499):
+            offset = index * 140
+            source[offset:offset + 64] = bytes(range(64))
+            struct.pack_into('<i', source, offset + 128, -2147483648)
+            struct.pack_into('<hHhh', source, offset + 132, -32768, 65535, -32768, 32767)
+        result = bytes(v ^ 90 for v in convert_items(bytes(v ^ 90 for v in source) + bytes(4)))
+        for index in (0, 6499):
+            offset = index * 164
+            self.assertEqual(result[offset:offset + 134], source[index * 140:index * 140 + 134])
+            self.assertEqual(struct.unpack_from('<hIhh', result, offset + 134), (0, 65535, -32768, 32767))
+            self.assertEqual(result[offset + 144:offset + 164], bytes(20))
+
+    def test_first_and_last_skill(self):
+        source = bytearray(248 * 96)
+        for index in (0, 247):
+            source[index * 96:(index + 1) * 96] = bytes(range(96))
+        result = bytes(v ^ 90 for v in convert_skills(bytes(v ^ 90 for v in source) + bytes(4)))
+        for index in (0, 247):
+            self.assertEqual(result[index * 104:index * 104 + 96], bytes(range(96)))
+            self.assertEqual(result[index * 104 + 96:(index + 1) * 104], bytes(8))
+
+    def test_required_inputs(self):
+        with TemporaryDirectory() as directory:
+            selected = {}
+            with self.assertRaisesRegex(ValueError, 'required asset missing: ItemList'):
+                validate_inputs(selected)
+            for name, size in [('ItemList.bin', 910004), ('SkillData.bin', 23812)]:
+                path = Path(directory) / name
+                path.write_bytes(bytes(size))
+                selected[name] = path
+            font = Path(directory) / 'font.ttf'
+            font.write_bytes(b'not a font')
+            selected['Tahoma.ttf'] = font
+            with self.assertRaisesRegex(ValueError, 'font must'):
+                validate_inputs(selected)
+
+    def test_invalid_table_does_not_copy_music_or_create_dataset(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'source'
+            (source / 'music').mkdir(parents=True)
+            (source / 'music/test.mp3').write_bytes(b'synthetic music')
+            (source / 'ItemList.bin').write_bytes(b'truncated')
+            manifest = root / 'external/OpenWyd/webclient/client-wasm/config/startup-preload-manifest.txt'
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text('v769ClientRelease/ItemList.bin@/ItemList.bin\n', encoding='utf-8')
+            font = source / 'font.ttf'
+            font.write_bytes(b'\x00\x01\x00\x00' + bytes(8))
+            with patch.object(import_local_assets, 'ROOT', root), patch('sys.argv', [
+                'import_local_assets.py', '--assets', str(source), '--font', str(font)
+            ]):
+                with self.assertRaisesRegex(ValueError, 'ItemList requires'):
+                    import_local_assets.main()
+            self.assertFalse((root / 'assets-local').exists())
+
     def test_item_offsets_and_bitmask(self):
         decoded = bytearray(6500 * 140)
         decoded[140:144] = b"Name"
