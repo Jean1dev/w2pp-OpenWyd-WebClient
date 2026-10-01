@@ -634,3 +634,4 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
     - a cena abre 50,5 de 305 MiB do pacote.
   - Opções para o preload registradas, a decidir em ADR. O passo mais barato é investigar os ~220 MiB de heap JS além do tamanho do pacote.
 - Sem commit.
+- **Memória (etapa 6, mesma data):** os 527 MiB do `performance.memory` são o pacote (305 MiB) mais o WASM (180 MiB), contados como backing store de `ArrayBuffer`. Os objetos JS somam ~4 MiB depois da coleta, não há cópia do pacote e os "220 MiB extras" eram o WASM. Por processo, com uma página: renderer 654 MiB, browser 140, GPU 137, utilitários 105 (1.036 no total). Carregar sob demanda economizaria até ~255 MiB por página; a escolha da abordagem fica para uma ADR.
