@@ -16,7 +16,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SERVER = ROOT / "external/server"
-PKG_DIR = SERVER / "tmserver/internal/protocol"
 OVERLAY_SRC = ROOT / "tools/protocol/overlay"
 GO = ROOT / ".cache/toolchains/go/bin" / ("go.exe" if os.name == "nt" else "go")
 
@@ -27,11 +26,14 @@ def main() -> int:
     ap.add_argument("--dialect", type=Path,
                     default=ROOT / "docs/evidence/03-protocolo/fixtures/dialect.json")
     ap.add_argument("--run", default="TestExt", help="go test -run pattern")
+    ap.add_argument("--server", type=Path, default=SERVER, help="server checkout (read-only)")
     args = ap.parse_args()
+    server = args.server.resolve()
+    pkg_dir = server / "tmserver/internal/protocol"
 
     replace = {}
     for src in sorted(OVERLAY_SRC.glob("*_test.go")):
-        target = PKG_DIR / src.name
+        target = pkg_dir / src.name
         if target.exists():
             raise SystemExit(f"refusing to shadow an existing server file: {target}")
         replace[str(target)] = str(src)
@@ -46,7 +48,7 @@ def main() -> int:
     cmd = [go, "test", "-count=1", f"-overlay={overlay}", "-run", args.run, "-v",
            "./tmserver/internal/protocol"]
     print("+", " ".join(cmd), flush=True)
-    return subprocess.call(cmd, cwd=SERVER, env=env)
+    return subprocess.call(cmd, cwd=server, env=env)
 
 
 if __name__ == "__main__":

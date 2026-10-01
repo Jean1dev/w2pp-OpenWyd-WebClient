@@ -30,8 +30,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: gateway/go.sum
@@ -49,19 +49,19 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Pinned server + upstream checkouts (CPSock table sources)
         run: |
           python tools/fetch_pinned.py server
           python tools/fetch_pinned.py upstream
-      - name: world_checks unit tests
-        run: node --test tools/world_checks.test.mjs
+      - name: Harness rule unit tests
+        run: node --test 'tools/*.test.mjs'
       - name: Harness scripts parse
         run: node --check tools/verify_world.mjs && node --check tools/verify_world_suite.mjs
       - name: Vectors and dialect fixtures are reproducible
@@ -76,12 +76,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Pinned server + upstream checkouts
@@ -101,7 +101,7 @@ jobs:
     timeout-minutes: 20
     container: emscripten/emsdk:6.0.0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Pinned upstream checkout + patches
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -116,10 +116,10 @@ jobs:
     timeout-minutes: 60
     needs: [gateway, dialect]
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
       - name: Build (no push)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true

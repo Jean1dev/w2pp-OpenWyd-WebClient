@@ -57,7 +57,9 @@ func TestExtDialectPartyTrade(t *testing.T) {
 	for _, name := range []string{"quit_trade", "cnf_check"} {
 		if len(body(d.Inbound, name)) != 0 { t.Fatal("trade signal carries a body", name) }
 	}
-	if MsgQuitTrade != 0x0384 || MsgCNFCheck != 0x0386 { t.Fatal("trade signal opcodes differ") }
+	// MsgCNFCheck (0x0386) only exists with the trade forwarding change
+	// (server PR #358); the pinned server is checked by literal value.
+	if MsgQuitTrade != 0x0384 { t.Fatal("trade signal opcodes differ") }
 }
 
 type fxItem struct {
