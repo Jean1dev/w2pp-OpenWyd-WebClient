@@ -148,6 +148,11 @@ func (g *Gateway) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer g.release(ip)
+	// Count the relay before the upgrade hijacks the connection: from then on
+	// http.Server.Shutdown no longer waits for this handler, so a later Add
+	// could race Wait and let shutdown return while a relay is starting.
+	g.active.Add(1)
+	defer g.active.Done()
 
 	// Dial before upgrading so an unreachable server is a plain HTTP error.
 	dctx, cancel := context.WithTimeout(r.Context(), g.cfg.Limits.DialTimeout.Std())
@@ -170,12 +175,8 @@ func (g *Gateway) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	g.active.Add(1)
 	g.live.Add(1)
-	defer func() {
-		g.live.Add(-1)
-		g.active.Done()
-	}()
+	defer g.live.Add(-1)
 	g.run(ch, ip, ws, tcp)
 }
 
