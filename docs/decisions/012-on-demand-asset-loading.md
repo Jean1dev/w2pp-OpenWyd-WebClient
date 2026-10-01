@@ -1,6 +1,6 @@
 # ADR 012: Carregamento de assets sob demanda (etapa 6)
 
-Data: 01/10/2026. Estado: **proposta**, aguardando decisão do operador. Nada foi implementado.
+Data: 01/10/2026. Estado: **opção 5 rejeitada pelo operador; o preload integral continua** (revisão abaixo). Nada foi implementado.
 
 ## Contexto
 
@@ -58,3 +58,14 @@ Restrição técnica (confirmada em fonte): o runtime lê arquivos com `fopen` s
 
 1. Aceitar a opção 5 como direção, com a fase A primeiro.
 2. Aceitar os custos acima: XHR síncrono obsoleto, travadas em conteúdo raro e falha offline de arquivos frios até haver Service Worker.
+
+## Revisão de 01/10/2026: decisão do operador
+
+**A opção 5 foi rejeitada.** Motivo do operador: num jogo online, travadas não são toleradas e fazem os jogadores desistirem.
+
+**Consequência técnica (confirmada em fonte):** qualquer leitura pela rede feita no momento do `fopen` trava o laço do jogo durante o download. Isso vale para a opção 5, para Asyncify (opção 2) e para um Worker que busque pela rede (opção 3). Só não trava a leitura de dados já locais.
+
+**Decisão:**
+1. **O preload integral continua.** Como no cliente Windows, todos os arquivos estão na máquina antes da partida, e nenhum vem da rede durante o jogo. Custo aceito: ~1 GB por aba no Chromium.
+2. **O problema de memória do harness com duas sessões (issue #6) se resolve fora do jogo**, rodando os cenários online numa máquina com mais RAM. O runtime não muda por causa dele.
+3. **Direção futura, só se a memória pesar para jogadores** (dispositivos com pouca RAM): o laço do jogo num Worker, com o pacote gravado no armazenamento local do navegador (OPFS) no primeiro acesso e lido de forma síncrona do disco local (`FileSystemSyncAccessHandle`), sem rede durante a partida. Exige ADR própria, medição de latência de leitura e o mesmo critério: nenhuma travada perceptível.

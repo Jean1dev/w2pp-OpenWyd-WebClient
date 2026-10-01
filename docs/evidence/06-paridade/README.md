@@ -55,7 +55,7 @@ A lista de caminhos não é versionada, porque o manifesto completo de assets fi
 - Modelos e animações de mobs e NPCs são abertos quando a entidade aparece (`CreateMob`), a qualquer momento da sessão.
 - Uma busca pela rede no momento do `fopen` exige Asyncify, ou o laço principal num Worker (leitura síncrona, `OffscreenCanvas`), ou um sistema de arquivos com acesso síncrono (WASMFS com OPFS, também só em Worker).
 
-Opções avaliadas; a recomendação está na [ADR 012](../../decisions/012-on-demand-asset-loading.md) (proposta):
+Opções avaliadas na [ADR 012](../../decisions/012-on-demand-asset-loading.md). Decisão de 01/10: **o preload integral continua**, porque leitura pela rede durante o jogo trava o quadro; ver a revisão da ADR.
 1. **Pacotes por região, com pré-busca nas transições conhecidas** (login no Field, `0x0290`, teleporte por comando), mantendo `Mesh` comum preloaded. Reduz `UI`/`Env`/`Sound`, mas não resolve `Mesh`, que vem de entidades dinâmicas.
 2. **Asyncify só nos caminhos de leitura de asset.** Busca sob demanda com cache em IndexedDB. Custa tamanho e desempenho do WASM, e mexe no build.
 3. **Laço do jogo num Worker**, com arquivos sob demanda (síncronos no Worker) e WebGL por `OffscreenCanvas`. É a mudança estrutural maior; resolve memória e travamentos de carga.
