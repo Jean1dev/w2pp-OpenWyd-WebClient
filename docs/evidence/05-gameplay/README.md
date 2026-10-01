@@ -28,19 +28,22 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 | Score do login = template BaseMob | divergência do servidor (confirmada em fonte) | [inventário](2026-09-30-inventory.md#primeira-execução-reprovada-pela-regra-não-pelo-cliente); proposta: `sendScore` depois do login |
 | Poção (uso, clique repetido, célula vazia, B vê a cura, relogin) | **confirmado em execução** | [inventário](2026-09-30-inventory.md#poção--aprovada-railway-execução-8): respawn com HP 41, uso com HP 80 → 130, 117→116 pelo servidor, B vê 130, clique duplo consome 2 (→114), célula vazia não envia nada, relogin idêntico; três `0x0373` no log do servidor |
 | Loot dos Gremlins no carry, relogin | **confirmado em execução** | [inventário](2026-09-30-inventory.md#loot--aprovado-railway-sem-ouro-por-defeito-do-servidor): 25 abates, 8 itens nos slots 13–20 via `0x0182`, relogin idêntico |
-| Ouro dos mobs (`0x0337`) | **bloqueado pelo servidor** (confirmado em fonte e em execução) | `SpawnMobAt` não copia o `Coin` do template, então `GoldDrop` sempre dá 0; 0 de ouro em 25 abates |
+| Ouro dos mobs (`0x0337`) | **confirmado em execução** (servidor `200f4824`, PR #362) | 7 de 23 Gremlins deram ouro, de 256 a 292, dentro da faixa do legado [248, 296] ([fatia A](2026-10-01-slice-a.md#ouro-dos-mobs-362-loginloot---class-0-confirmado-em-execução)) |
 | Drop e coleta no chão | **bloqueado pelo servidor** | sem `0x026E`, CNF placeholder de 16 bytes, sem decay; proposta na ADR 007 |
 | Dialeto `0379/037A/0387/0388/0339/0333/0334` | confirmado em teste e em execução | C++ com 545 verificações; overlay Go com os encoders reais ([ADR 008](../../decisions/008-shop-cargo-chat-dialect.md)); no Railway, corpo de 128 no `0x0333` e de 146 no `0x0334` (padding não enviado) |
 | Loja NPC: vender, comprar, recusa sem ouro, clique repetido, relogin | **confirmado em execução** | [fatia 3](2026-09-30-shop-bank-chat.md#loja-aki-merchant-1--aprovada-execução-2): `sell ok gain=75`, `buy ok price=300`, `buy denied` sem mudança, `buy resync` sem duplicar, relogin idêntico |
 | Clique segurado na loja | comportamento original (confirmado em fonte e em execução) | 513 por nível a cada quadro + trava de 500 ms: dois quadros segurados compram duas vezes, e as duas são cobradas |
 | Banco: item de ida e volta, depósito, saque, saque e depósito acima do saldo, relogin | **confirmado em execução** | [fatia 3](2026-09-30-shop-bank-chat.md#banco-guarda-carga-merchant-2--aprovado-execução-3): `0x0376` nos dois sentidos, `cargo deposit/withdraw` de 100 conferidos com o `0x0339` do cliente, recusas sem mudança |
-| `0x0339` ouro do banco @12 | hipótese sustentada | 0 → 100 → 0 bate com o log; ouro guardado entre sessões não exercitado |
+| `0x0339` ouro do banco @12 | **confirmado em execução** | 74 de ouro guardados sobrevivem ao relogin, iguais ao log `cargo deposit`/`withdraw` ([fatia A](2026-10-01-slice-a.md#ouro-guardado-no-banco-entre-sessões-loginenterbank-aprovado)) |
 | Chat: fala vista por B, sussurro recebido, sussurro para offline | **confirmado em execução** | [fatia 3](2026-09-30-shop-bank-chat.md#chat-e-teleporte--aprovados-execução-2): B mostra a fala; o sussurro chega sem o 1º caractere (runtime); offline → `0x0102` |
 | Sussurro com o nome do remetente | lacuna do servidor (confirmada em fonte, não observada) | `chat.go:71` repassa `MobName` = destinatário ([ADR 008](../../decisions/008-shop-cargo-chat-dialect.md)) |
 | Teleporte: portal (etapa 4) e comandos `/azran` e `/armia` | **confirmado em execução** | `chat command` + `teleport` no log; B deixa de ver A e volta a vê-la |
-| Teleporte pago por NPC, chat de grupo/guilda | pendente | não exercitados |
+| Teleporte pago (portal Armia → Noatum, 700) | **confirmado em execução** | cobra exatamente 700 e leva a Noatum; com 500 de ouro, `0x0290` sem teleporte e sem cobrança; o relogin mantém só a cobrança ([fatia A](2026-10-01-slice-a.md#teleporte-pago-armia--noatum-loginenterpaidteleport-aprovado)) |
+| Chat de grupo/guilda | pendente | não exercitado |
+| Venda de item sem preço | comportamento do servidor (confirmado em fonte e em execução) | o item 4144 tem `Price` 0 e rende `price/4 = 0`; o harness vende só item com preço ≥ 4 ([fatia A](2026-10-01-slice-a.md#venda-loginentershop-aprovada)) |
 | Grupo | aprovado | recusa, aceite, clique repetido, saída, expulsão, desconexão de membro e de líder, e relogin com inventário preservado; execução 6 no Railway ([fatia 4](2026-09-30-party.md)) |
 | Troca | **confirmado em execução** | recusa, oferta encaminhada, reset das confirmações por mudança de ouro, troca de item e ouro, relogin, cancelamento (`0x0384`) e troca de volta; servidor `2e532afa` com o PR #358 ([fatia 4, troca](2026-10-01-trade.md)) |
+| Troca: bolsa cheia e desconexão no meio | **confirmado em execução** | o servidor desfaz a troca sem mover nada (aviso 31); a desconexão de A fecha a janela de B sem mudança; limpeza da fase incompleta por prazo ([fatia A](2026-10-01-slice-a.md#casos-de-troca-loginentersecondtradeedge)) |
 | Persistência após reinício | pendente | fatia 5 |
 
 ## Execuções de 29/09/2026 (cenário `login,enter,second,attack`)

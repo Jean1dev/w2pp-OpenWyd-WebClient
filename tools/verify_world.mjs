@@ -39,9 +39,9 @@ import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { areaPair, checkAreaAttempt } from './area_checks.mjs';
 import { checkParty, checkPartyEvidence } from './party_checks.mjs';
-import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkDelete } from './trade_checks.mjs';
+import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkChat, itemAmount } from './world_checks.mjs';
+  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -806,6 +806,21 @@ class Session {
     await this.frames(3);
   }
 
+  // Hold the left button on a canvas point until done() or ms elapse (the
+  // original shop buys again every frame the button stays down, 500 ms lock).
+  async holdCanvas(x, y, done, ms) {
+    const box = await this.page.locator('#canvas').boundingBox();
+    const cw = await this.eval(() => [document.getElementById('canvas').width, document.getElementById('canvas').height]);
+    await this.page.mouse.move(box.x + x * box.width / cw[0], box.y + y * box.height / cw[1], { steps: 3 });
+    await this.frames(2);
+    await this.page.mouse.down();
+    try {
+      const end = Date.now() + ms;
+      while (Date.now() < end && !(await done())) await sleep(500);
+    } finally { await this.page.mouse.up(); }
+    await this.frames(3);
+  }
+
   lastSent() { return this.eval(() => window.clientProbe().socket.lastSentOpcode); }
   outCount() { return this.eval(() => { const d = window.clientProbe().dialect; return d.outPass + d.outTranslated; }); }
 
@@ -973,7 +988,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'trade'].some(x => phases.has(x)) ? 25 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'trade', 'paidteleport'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') ? 60 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -1228,7 +1243,14 @@ async function main() {
       const p = await a.probe();
       if (p.field.fixture !== 0) throw new Error('offline fixture used');
       if (me.name !== A.char) throw new Error('own name differs from the created character');
-      return { me: { ...me, name: mask(me.name) }, dialect: dialectSummary(p), glErrors: p.glErrorTotal };
+      // The HUD score right after entry (login snapshot 0x0114, then 0x0336)
+      // next to the selection preview of the same character. The Go server
+      // sends the preview level one lower (login.go selCharWireLevel).
+      const v = await a.bag();
+      const score = { level: v.level, hp: v.hp, maxHp: v.maxHp, mp: v.mp, maxMp: v.maxMp, damage: v.damage, ac: v.ac };
+      const pv = a.preview ?? {};
+      const preview = { level: pv.level, hp: pv.hp, maxHp: pv.maxHp, mp: pv.mp, maxMp: pv.maxMp };
+      return { me: { ...me, name: mask(me.name) }, score, preview, dialect: dialectSummary(p), glErrors: p.glErrorTotal };
     });
 
     // Visual check of item data: the inventory icons come from ItemList/itemicon
@@ -2250,8 +2272,12 @@ async function main() {
       // 1. Sell a looted item from carry page 0 (not the potions): pick it
       // up, drop it on the shop grid, confirm box 890 (SGrid SellItem).
       const bag0 = await a.bag();
-      const candidates = bag0.carry.slice(0, 15).map((it, k) => ({ ...it, k })).filter(it => it.index > 0 && it.index !== 401);
-      assert(candidates.length > 0, 'nothing to sell on carry page 0');
+      // Only items worth gold: the server pays Price/4 (shop.go sell), so an item
+      // priced under 4 (e.g. 4144, Price 0) sells for nothing.
+      const priced = await a.eval(ids => ids.map(i => Module._wyd_item_price(i)), bag0.carry.slice(0, 15).map(it => it.index));
+      const candidates = bag0.carry.slice(0, 15).map((it, k) => ({ ...it, k }))
+        .filter(it => it.index > 0 && it.index !== 401 && priced[it.k] >= 4);
+      assert(candidates.length > 0, 'nothing worth gold to sell on carry page 0');
       const sold = candidates.at(-1);
       res.sell = { slot: sold.k, item: sold.index, clientPrice: await a.eval(i => Module._wyd_item_price(i), sold.index),
         coinBefore: bag0.coin };
@@ -2372,14 +2398,96 @@ async function main() {
       await a.shot('cargo-done');
       await a.page.locator('#canvas').press('Escape');
       await a.frames(2);
+      const openCargo = () => a.openNpc(/^guarda[ _]carga$/i, ARMIA_EAST, 'cargo window', () => Module._wyd_field_cargo_visible() === 1);
+      if ((await a.eval(() => Module._wyd_field_cargo_visible())) !== 1) { await openCargo(); await sleep(2000); }
+      // 6. Gold kept in the cargo across the relogin (0x0339 @12 with a non-zero
+      // balance), then withdrawn again so the account ends as it started.
+      res.keep = { amount: Math.max(1, Math.min(37, c4.coin)) };
+      res.keep.sent = await a.goldBox(65563, res.keep.amount);
+      await a.until('kept deposit applied', c => Module._wyd_field_my_score(5) !== c, 10000, c4.coin).catch(() => false);
+      await sleep(1500);
+      Object.assign(res.keep, await a.cargo().then(c => ({ coin: c.coin, cargo: c.cargo })));
+      await a.page.locator('#canvas').press('Escape');
+      await a.frames(2);
       // Relogin, then open the cargo again: both gold pools as the server keeps them.
       res.beforeRelogin = await a.bag();
       await reloginA('A-bank-relogin', 0);
-      res.reopen = await a.openNpc(/^guarda[ _]carga$/i, ARMIA_EAST, 'cargo window', () => Module._wyd_field_cargo_visible() === 1);
+      res.reopen = await openCargo();
       await sleep(2000);
       const c5 = await a.cargo();
       res.relogin = { coin: c5.coin, cargo: c5.cargo, item: c5.items[free] };
+      console.log(`    kept ${res.keep.amount}: ${res.keep.coin}/${res.keep.cargo} -> relogin ${c5.coin}/${c5.cargo}`);
+      res.restore = { sent: await a.goldBox(65688, res.keep.amount) };
+      await a.until('kept gold withdrawn', c => Module._wyd_field_my_score(5) !== c, 10000, c5.coin).catch(() => false);
+      await sleep(1500);
+      Object.assign(res.restore, await a.cargo().then(c => ({ coin: c.coin, cargo: c.cargo })));
       checkBank(res);
+      return res;
+    });
+
+    // Stage 5, slice A: the paid city portal (teleport.go, Armia -> Noatum for
+    // 700). The client shows box 16 with the price and sends 0x0290 on OK
+    // without checking gold; the server charges or refuses in silence.
+    await step('paidteleport', async () => {
+      const res = {}; r.paidteleport = res;
+      const PRICE = 700, NOATUM = [1045, 1725];
+      // Inside the 4x4 origin block 2116..2119 x 2100..2103 (teleport.go).
+      const tile = async () => {
+        await a.closePanels();
+        return a.walkTo(2117.5, 2101.5, { near: 0.8, maxClicks: 12, stallOk: true,
+          stopWhen: () => a.eval(() => Module._wyd_scene_msgbox_message() === 16) });
+      };
+      const attempt = async label => {
+        const coinBefore = (await a.bag()).coin;
+        await tile();
+        await a.until(`${label} portal box`, () => Module._wyd_scene_msgbox_message() === 16, 20000);
+        const at = await a.me();
+        await a.shot(`paid-${label}`);
+        assert.equal(await a.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'portal OK refused');
+        await a.frames(2);
+        const lastSent = await a.lastSent();
+        await a.until(`${label} teleport`, ([x, y]) => Math.hypot(Module._wyd_field_myhuman_x() - x,
+          Module._wyd_field_myhuman_y() - y) > 50, 20000, [at.x, at.y]).catch(() => false);
+        await sleep(3000);
+        const to = await a.me();
+        return { at: [at.x, at.y], lastSent, to: [to.x, to.y], moved: Math.hypot(to.x - at.x, to.y - at.y),
+          coinBefore, coinAfter: (await a.bag()).coin };
+      };
+      // 1. Paid: A has the 700.
+      res.paid = await attempt('paid');
+      res.paid.nearNoatum = Math.hypot(res.paid.to[0] - NOATUM[0], res.paid.to[1] - NOATUM[1]) <= 4;
+      console.log(`    paid: ${res.paid.at} -> ${res.paid.to}, gold ${res.paid.coinBefore}->${res.paid.coinAfter}`);
+      // 2. Back to Armia by the free city command.
+      const p0 = await a.me();
+      res.back = await a.say('/armia');
+      await a.until('back in Armia', ([x, y]) => Math.hypot(Module._wyd_field_myhuman_x() - x,
+        Module._wyd_field_myhuman_y() - y) > 50, 30000, [p0.x, p0.y]);
+      await sleep(3000);
+      // 3. Refused: keep only 500 on A (the rest in the cargo), then try again.
+      const cargoOpen = () => a.openNpc(/^guarda[ _]carga$/i, ARMIA_EAST, 'cargo window', () => Module._wyd_field_cargo_visible() === 1);
+      await cargoOpen(); await sleep(2000); await a.ensureInventory();
+      const c0 = await a.cargo();
+      res.parked = { amount: c0.coin - 500 };
+      assert(res.parked.amount > 0, 'A has 500 gold or less');
+      res.parked.sent = await a.goldBox(65563, res.parked.amount);
+      await a.until('parked', c => Module._wyd_field_my_score(5) !== c, 10000, c0.coin).catch(() => false);
+      await sleep(1500);
+      res.parked.coin = (await a.cargo()).coin;
+      await a.page.locator('#canvas').press('Escape'); await a.frames(2);
+      res.refused = await attempt('refused');
+      console.log(`    refused: ${res.refused.at} -> ${res.refused.to}, gold ${res.refused.coinBefore}->${res.refused.coinAfter}`);
+      // 4. Take the gold back, then relogin: the 700 stays spent, nothing else.
+      await cargoOpen(); await sleep(2000); await a.ensureInventory();
+      const c1 = await a.cargo();
+      res.restore = { sent: await a.goldBox(65688, res.parked.amount) };
+      await a.until('restored', c => Module._wyd_field_my_score(5) !== c, 10000, c1.coin).catch(() => false);
+      await sleep(1500);
+      res.restore.coin = (await a.cargo()).coin;
+      await a.page.locator('#canvas').press('Escape'); await a.frames(2);
+      await reloginA('A-paid-relogin', 0);
+      res.relogin = { coin: (await a.bag()).coin };
+      await a.healthy();
+      checkPaidTeleport(res, PRICE);
       return res;
     });
 
@@ -2439,57 +2547,59 @@ async function main() {
       return res;
     });
 
+    // Trade helpers shared by the trade and tradeedge phases.
+    const snap = async s => { const v = await s.bag(); return { equip: v.equip, carry: v.carry, coin: v.coin }; };
+    const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+    const reconnect = async (label, creds) => {
+      const s = await newSession(label, creds);
+      await s.loginToSelect(); const pin = await s.pin();
+      assert(pin.already || pin.result === 'lock1', 'trade relogin PIN rejected');
+      await s.enter(0); return s;
+    };
+    const closed = s => s.until('trade window closed', () => Module._wyd_field_trade_value(0) === 0, 30000);
+    const open = async (from, to) => {
+      await from.requestTrade(to);
+      // The original swallows Enter on box 601 (TMFieldScene::OnCharEvent), so a
+      // player accepts with a click on OK; the automation export does what that click does.
+      assert.equal(await to.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'trade box OK refused');
+      await to.frames(2);
+      await from.until('trade window', id => Module._wyd_field_trade_value(0) === 1 && Module._wyd_field_trade_value(1) === id, 30000, to.id);
+      await to.until('trade window', id => Module._wyd_field_trade_value(0) === 1 && Module._wyd_field_trade_value(1) === id, 30000, from.id);
+    };
+    const pickSlot = async s => {
+      const v = await s.bag();
+      const k = [13, 14, ...Array.from({ length: 13 }, (_, i) => i)].find(i => v.carry[i].index > 0);
+      assert(k !== undefined, `${s.label}: no item on inventory page 0 to trade`);
+      return k;
+    };
+    const offer = async (from, to, slot) => {
+      const index = (await from.bag()).carry[slot].index;
+      await from.clickCell({ place: 1, slot });
+      await from.until('own offer', i => Module._wyd_field_trade_item(0, 0) === i, 15000, index);
+      const takerSees = await to.until('forwarded offer', i => Module._wyd_field_trade_item(1, 0) === i && i, 30000, index);
+      return { item: index, takerSees, carryPos: (await from.trade()).carryPos[0] };
+    };
+    // A check is shown to the partner, unless it was the second one: then the
+    // server swaps at once and closes both windows.
+    const check = async (s, other) => {
+      await sleep(2100); // the window refuses a check within 2 s of the last change
+      await s.uiButton(617);
+      await other.until('partner check or swap', () => Module._wyd_field_trade_value(3) === 1 ||
+        Module._wyd_field_trade_value(0) === 0, 30000);
+    };
+    // Both checks: the server swaps, sends 0x0185 to both and closes both windows.
+    const complete = async (first, second) => {
+      await check(first, second);
+      if ((await second.trade()).visible === 1) { await sleep(2100); await second.uiButton(617); }
+      await closed(first); await closed(second);
+      await sleep(2000);
+    };
+
     // Stage 5 slice 4: P2P trade by the original window (needs the server PR
     // that forwards 0x0383; ADR 010). Every result is read from the server's
     // 0x0185/0x0384, never from the local offer.
     await step('trade', async () => {
       const res = {}; r.trade = res;
-      const snap = async s => { const v = await s.bag(); return { equip: v.equip, carry: v.carry, coin: v.coin }; };
-      const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
-      const reconnect = async (label, creds) => {
-        const s = await newSession(label, creds);
-        await s.loginToSelect(); const pin = await s.pin();
-        assert(pin.already || pin.result === 'lock1', 'trade relogin PIN rejected');
-        await s.enter(0); return s;
-      };
-      const closed = s => s.until('trade window closed', () => Module._wyd_field_trade_value(0) === 0, 30000);
-      const open = async (from, to) => {
-        await from.requestTrade(to);
-        // The original swallows Enter on box 601 (TMFieldScene::OnCharEvent), so a
-        // player accepts with a click on OK; the automation export does what that click does.
-        assert.equal(await to.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'trade box OK refused');
-        await to.frames(2);
-        await from.until('trade window', id => Module._wyd_field_trade_value(0) === 1 && Module._wyd_field_trade_value(1) === id, 30000, to.id);
-        await to.until('trade window', id => Module._wyd_field_trade_value(0) === 1 && Module._wyd_field_trade_value(1) === id, 30000, from.id);
-      };
-      const pickSlot = async s => {
-        const v = await s.bag();
-        const k = [13, 14, ...Array.from({ length: 13 }, (_, i) => i)].find(i => v.carry[i].index > 0);
-        assert(k !== undefined, `${s.label}: no item on inventory page 0 to trade`);
-        return k;
-      };
-      const offer = async (from, to, slot) => {
-        const index = (await from.bag()).carry[slot].index;
-        await from.clickCell({ place: 1, slot });
-        await from.until('own offer', i => Module._wyd_field_trade_item(0, 0) === i, 15000, index);
-        const takerSees = await to.until('forwarded offer', i => Module._wyd_field_trade_item(1, 0) === i && i, 30000, index);
-        return { item: index, takerSees, carryPos: (await from.trade()).carryPos[0] };
-      };
-      // A check is shown to the partner, unless it was the second one: then the
-      // server swaps at once and closes both windows.
-      const check = async (s, other) => {
-        await sleep(2100); // the window refuses a check within 2 s of the last change
-        await s.uiButton(617);
-        await other.until('partner check or swap', () => Module._wyd_field_trade_value(3) === 1 ||
-          Module._wyd_field_trade_value(0) === 0, 30000);
-      };
-      // Both checks: the server swaps, sends 0x0185 to both and closes both windows.
-      const complete = async (first, second) => {
-        await check(first, second);
-        if ((await second.trade()).visible === 1) { await sleep(2100); await second.uiButton(617); }
-        await closed(first); await closed(second);
-        await sleep(2000);
-      };
       await a.closePanels(); await b.closePanels();
       const a0 = await snap(a), b0 = await snap(b);
       // 1. Refusal: B cancels box 601 with ESC. Nothing is sent, nothing opens.
@@ -2543,6 +2653,105 @@ async function main() {
       await a.shot('trade-final'); await b.shot('trade-final');
       checkTradeEvidence(res);
       return res;
+    });
+
+    // Stage 5, slice A: trade edge cases. A full carry on the taker makes the
+    // server roll the swap back (executeSwap, NoticeNoEmptySlot); a side that
+    // disconnects mid-trade cancels it for the other (CloseUser -> RemoveTrade).
+    await step('tradeedge', async () => {
+      const res = {}; r.tradeedge = res;
+      const invPage = async (s, n) => {
+        await s.ensureInventory().catch(() => {});
+        if ((await s.eval(() => Module._wyd_field_inv_page())) === n) return;
+        await s.uiButton(67076 + n);
+        await s.until(`inventory page ${n}`, k => Module._wyd_field_inv_page() === k, 10000, n);
+        await s.frames(3);
+      };
+      const shopOpen = s => s.openNpc(/^aki$/i, ARMIA_EAST, 'shop window', () => Module._wyd_field_shop_visible() === 1);
+      const a0 = await snap(a), b0 = await snap(b);
+      // 1. Fill B's 30 carry slots with the cheapest shop item.
+      await shopOpen(b); await b.ensureInventory(); await b.frames(3);
+      const cells = await b.shopCells();
+      const cheap = cells.filter(c => c.price > 0).sort((p, q) => p.price - q.price)[0];
+      assert(cheap, 'the shop lists no priced item');
+      const freeB = b0.carry.slice(0, 30).filter(it => it.index === 0).length;
+      res.fill = { item: cheap.item, price: cheap.price, freeBefore: freeB, bought: [] };
+      // The client buys into a free cell of the page on screen (myPos), so each
+      // page is filled with the button held on the shop cell.
+      const freeOn = page => b.eval(pg => { let n = 0; for (let x = pg * 15; x < pg * 15 + 15; x++)
+        if (Module._wyd_debug_my_item(1, x) === 0) n++; return n; }, page);
+      for (const page of [0, 1]) {
+        await invPage(b, page);
+        if ((await freeOn(page)) === 0) continue;
+        await b.holdCanvas(cheap.sx, cheap.sy, async () => (await freeOn(page)) === 0, 90000);
+        await sleep(2000);
+      }
+      await invPage(b, 0);
+      const filled = await snap(b);
+      res.fill.bought = filled.carry.map((it, x) => it.index === cheap.item && b0.carry[x].index === 0 ? x : -1).filter(x => x >= 0);
+      // Filler left by an interrupted earlier run is sold back too.
+      res.fill.preexisting = b0.carry.map((it, x) => it.index === cheap.item ? x : -1).filter(x => x >= 0);
+      const bFull = await snap(b); res.bFull = bFull;
+      res.fill.freeAfter = bFull.carry.slice(0, 30).filter(it => it.index === 0).length;
+      console.log(`    B bought ${res.fill.bought.length} x ${cheap.item}; free ${freeB} -> ${res.fill.freeAfter}`);
+      await b.page.locator('#canvas').press('Escape'); await b.frames(2);
+      // 2. A offers an item; both check; the server has no room on B and rolls back.
+      await a.closePanels(); await b.closePanels();
+      // B is at the shop: A takes the street route there (a straight walk stalls
+      // on the raised planters east of the spawn), then closes in.
+      for (const [x, y] of ARMIA_EAST) await a.walkTo(x, y, { near: 2, stallOk: true });
+      const bAt = await b.me();
+      await a.walkTo(bAt.x, bAt.y, { near: 3, maxClicks: 15, stallOk: true });
+      const slot = await pickSlot(a);
+      await open(a, b);
+      res.full = { offer: await offer(a, b, slot) };
+      await check(a, b);
+      if ((await b.trade()).visible === 1) { await sleep(2100); await b.uiButton(617); }
+      await closed(a); await closed(b);
+      res.full.bMessage = await b.until('no-room notice', () => Module._wyd_scene_message_visible() === 1 ?
+        Module.UTF8ToString(Module._wyd_scene_message_text()) : '', 4000).catch(() => '');
+      await sleep(2000);
+      res.full.a = await snap(a); res.full.b = await snap(b);
+      await b.shot('trade-full');
+      // 3. Disconnect mid-trade: A offers, B checks, A's page goes away.
+      await open(a, b);
+      res.drop = { offer: await offer(a, b, slot) };
+      await check(b, a);
+      res.drop.aSawCheck = (await a.trade()).opCheck === 1;
+      await a.close();
+      res.drop.bClosed = (await closed(b).catch(() => false)) === true;
+      await sleep(2000);
+      res.drop.b = await snap(b);
+      a = await reconnect('A-tradeedge-relogin', A);
+      res.drop.a = await snap(a);
+      // The cleanup is B's alone (~45 s per sale at software-rendered frame
+      // rates): A leaves now to spare the host's memory.
+      await a.healthy(); await a.close();
+      // 4. B sells the filler back (both pages), so the account ends as it began.
+      await shopOpen(b); await sleep(1500);
+      const drop = (await b.shopCells())[0];
+      res.cleanup = { sold: 0 };
+      for (const x of [...res.fill.bought, ...res.fill.preexisting].sort((p, q) => p - q)) {
+        await invPage(b, Math.floor(x / 15));
+        await b.clickCell({ place: 1, slot: x });
+        await b.clickCanvas(drop.sx, drop.sy);
+        if ((await b.eval(() => Module._wyd_scene_msgbox_message())) === 890)
+          assert.equal(await b.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'sell OK refused');
+        if (await b.until('sold', k => Module._wyd_debug_my_item(1, k) === 0, 10000, x).catch(() => false)) res.cleanup.sold++;
+        await sleep(600);
+      }
+      await invPage(b, 0);
+      await b.page.locator('#canvas').press('Escape'); await b.frames(2);
+      await sleep(1500);
+      res.cleanup.b = await snap(b);
+      await b.healthy();
+      checkTradeEdge({ a0, b0, ...res, sellPrice: sellPrice(cheap.price) });
+      const hide = v => ({ coin: v.coin, items: v.carry.filter(it => it.index).length });
+      return { fill: res.fill, full: { offer: res.full.offer, bMessage: res.full.bMessage, a: hide(res.full.a), b: hide(res.full.b) },
+        drop: { offer: res.drop.offer, aSawCheck: res.drop.aSawCheck, bClosed: res.drop.bClosed, a: hide(res.drop.a), b: hide(res.drop.b) },
+        cleanup: { sold: res.cleanup.sold, b: hide(res.cleanup.b) }, before: { a: hide(a0), b: hide(b0) },
+        unchanged: { fullA: JSON.stringify(res.full.a) === JSON.stringify(a0), fullB: JSON.stringify(res.full.b) === JSON.stringify(res.bFull),
+          dropA: JSON.stringify(res.drop.a) === JSON.stringify(a0), dropB: JSON.stringify(res.drop.b) === JSON.stringify(res.bFull) } };
     });
 
     await step('chat', async () => {

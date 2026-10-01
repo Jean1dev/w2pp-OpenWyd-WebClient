@@ -327,6 +327,8 @@ static void TestInWorld()
 		CHECK(std::strcmp(m.String, "Senha incorreta.") == 0);
 		const auto& u = Translate<MSG_MessagePanel>(k_in_notice_unknown);
 		CHECK(std::strcmp(u.String, "Aviso do servidor (999).") == 0);
+		const auto& r = Translate<MSG_MessagePanel>(k_in_notice_no_empty_slot);
+		CHECK(std::strcmp(r.String, "Nao ha espaco no inventario.") == 0);
 	}
 	// Distinct dropped opcodes: 0x336 (level overflow + short frame) and the five
 	// truncated pass-through frames.

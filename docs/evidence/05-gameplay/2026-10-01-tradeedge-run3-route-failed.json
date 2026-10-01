@@ -1,0 +1,1784 @@
+{
+ "when": "2026-10-01T20:43:37.509Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "enter",
+  "second",
+  "tradeedge"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 4
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 32765,
+   "at": "2026-10-01T20:44:11.220Z"
+  },
+  "enter": {
+   "ok": true,
+   "me": {
+    "id": 1,
+    "name": "Web*******",
+    "x": 2096.5,
+    "y": 2097.5,
+    "hp": 117,
+    "maxHp": 117,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "score": {
+    "level": 5,
+    "hp": 117,
+    "maxHp": 117,
+    "mp": 109,
+    "maxMp": 109,
+    "damage": 25,
+    "ac": 36
+   },
+   "preview": {
+    "level": 4,
+    "hp": 117,
+    "maxHp": 112,
+    "mp": 109,
+    "maxMp": 104
+   },
+   "dialect": {
+    "inTranslated": 34,
+    "inPass": 2,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 36,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "glErrors": 0,
+   "ms": 23697,
+   "at": "2026-10-01T20:44:42.749Z"
+  },
+  "second": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "me": {
+    "id": 2,
+    "name": "Web*******",
+    "x": 2094.5,
+    "y": 2105.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 37,
+    "inPass": 3,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 40,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "ms": 157245,
+   "at": "2026-10-01T20:47:26.409Z"
+  },
+  "tradeedge": {
+   "fill": {
+    "item": 1774,
+    "price": 300,
+    "freeBefore": 23,
+    "bought": [
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "preexisting": [
+     27,
+     28,
+     29
+    ],
+    "freeAfter": 0
+   },
+   "bFull": {
+    "equip": [
+     {
+      "index": 1,
+      "ef": [
+       [
+        43,
+        0
+       ],
+       [
+        98,
+        1
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1103,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1115,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1127,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1139,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1151,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 861,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "carry": [
+     {
+      "index": 401,
+      "ef": [
+       [
+        61,
+        120
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 406,
+      "ef": [
+       [
+        61,
+        120
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 4130,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 4144,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 1774,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "index": 0,
+      "ef": [
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ],
+       [
+        0,
+        0
+       ]
+      ]
+     }
+    ],
+    "coin": 987035
+   },
+   "ok": false,
+   "error": "A: timeout waiting for trade target visible",
+   "ms": 775076,
+   "at": "2026-10-01T21:00:28.835Z"
+  }
+ },
+ "ok": false,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "cc5017f7934badd408dce42047c46e883635c94e",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-10-01T20:44:11.660Z",
+   "freeMiB": 2096,
+   "totalMiB": 8014,
+   "browserMiB": 1060,
+   "pages": {
+    "A": {
+     "wasmMiB": 150,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end enter",
+   "at": "2026-10-01T20:44:43.483Z",
+   "freeMiB": 1969,
+   "totalMiB": 8014,
+   "browserMiB": 1181,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end second",
+   "at": "2026-10-01T20:47:27.501Z",
+   "freeMiB": 1191,
+   "totalMiB": 8014,
+   "browserMiB": 2140,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 497
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  },
+  {
+   "point": "end tradeedge",
+   "at": "2026-10-01T21:00:29.822Z",
+   "freeMiB": 1432,
+   "totalMiB": 8014,
+   "browserMiB": 2128,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 497
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "field",
+   "file": ".cache/world/2026-10-01T20-43-37-499Z/A-field.png",
+   "sha256": "e32e6e42366b949234363f97a19b3af7c497c82d46b877dbe74d51a125f1d808"
+  },
+  {
+   "name": "field",
+   "file": ".cache/world/2026-10-01T20-43-37-499Z/B-field.png",
+   "sha256": "9fbdf379bf5d3ecf8488d07760c57d32387b79a42f47c3ae4b37e53cb9f46f2b"
+  }
+ ],
+ "error": "A: timeout waiting for trade target visible",
+ "final_A": {
+  "inTranslated": 58,
+  "inPass": 56,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 16,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 114,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "final_B": {
+  "inTranslated": 62,
+  "inPass": 127,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 28,
+  "outPass": 22,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 189,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "B": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-10-01T17:43:38.1727634-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-10-01T17:44:04.1429444-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-01T17:46:22.5279407-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-01T18:00:36.8509625-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 848,
+   "bytes_down": 17824
+  },
+  {
+   "time": "2026-10-01T18:00:36.8509625-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 1764,
+   "bytes_down": 21032
+  }
+ ]
+}

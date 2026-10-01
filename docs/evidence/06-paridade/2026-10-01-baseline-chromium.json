@@ -1,0 +1,141 @@
+{
+ "when": "2026-10-01T21:01:29.043Z",
+ "browser": "chromium",
+ "version": "139.0.7258.5",
+ "viewport": "1100x900 (canvas 800x600)",
+ "headless": true,
+ "runs": [
+  {
+   "label": "cold",
+   "wallMs": 85642,
+   "readyMs": 4413,
+   "firstFrameMs": 18754,
+   "servedBytes": 324370124,
+   "memory": {
+    "jsHeapMiB": 527.4,
+    "wasmHeapMiB": 180
+   },
+   "frames": {
+    "sampledSeconds": 60,
+    "count": 157,
+    "fps": 2.62,
+    "tickMs": {
+     "p50": 10.4,
+     "p95": 13,
+     "p99": 16.1
+    },
+    "intervalMs": {
+     "p50": 412.1,
+     "p95": 433.6,
+     "p99": 448
+    }
+   },
+   "files": {
+    "packageFiles": 7093,
+    "packageMiB": 305,
+    "opened": 1182,
+    "openedMiB": 50.5,
+    "openedOutsidePackage": 17
+   },
+   "errors": [],
+   "probe": {
+    "state": 0,
+    "fieldFixture": 1,
+    "webgl2": 1,
+    "glErrorTotal": 0,
+    "drawCalls": 80942
+   }
+  },
+  {
+   "label": "warm",
+   "wallMs": 82576,
+   "readyMs": 1371,
+   "firstFrameMs": 15485,
+   "servedBytes": 4567183,
+   "memory": {
+    "jsHeapMiB": 527.4,
+    "wasmHeapMiB": 180
+   },
+   "frames": {
+    "sampledSeconds": 60,
+    "count": 160,
+    "fps": 2.67,
+    "tickMs": {
+     "p50": 11,
+     "p95": 16,
+     "p99": 19.9
+    },
+    "intervalMs": {
+     "p50": 390.9,
+     "p95": 419.3,
+     "p99": 461
+    }
+   },
+   "files": {
+    "packageFiles": 7093,
+    "packageMiB": 305,
+    "opened": 1182,
+    "openedMiB": 50.5,
+    "openedOutsidePackage": 17
+   },
+   "errors": [],
+   "probe": {
+    "state": 0,
+    "fieldFixture": 1,
+    "webgl2": 1,
+    "glErrorTotal": 0,
+    "drawCalls": 82532
+   }
+  }
+ ],
+ "openedByDir": {
+  "mesh": {
+   "openedFiles": 1039,
+   "files": 5357,
+   "openedMiB": 36.1,
+   "MiB": 174.5
+  },
+  "ui": {
+   "openedFiles": 29,
+   "files": 339,
+   "openedMiB": 2.9,
+   "MiB": 70.9
+  },
+  "sound": {
+   "openedFiles": 9,
+   "files": 351,
+   "openedMiB": 5.3,
+   "MiB": 36.3
+  },
+  "env": {
+   "openedFiles": 41,
+   "files": 521,
+   "openedMiB": 1.6,
+   "MiB": 13.2
+  },
+  "effect": {
+   "openedFiles": 33,
+   "files": 467,
+   "openedMiB": 0.5,
+   "MiB": 3.8
+  },
+  "nui": {
+   "openedFiles": 2,
+   "files": 8,
+   "openedMiB": 1.1,
+   "MiB": 3.2
+  },
+  "(raiz)": {
+   "openedFiles": 17,
+   "files": 32,
+   "openedMiB": 3.1,
+   "MiB": 3.1
+  },
+  "shader": {
+   "openedFiles": 12,
+   "files": 18,
+   "openedMiB": 0.0,
+   "MiB": 0.0
+  }
+ }
+}

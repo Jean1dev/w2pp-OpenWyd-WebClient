@@ -8,28 +8,30 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Validada (01/10: build limpo, importador com testes sintéticos e cena Field/Select Server em Chromium e Firefox; Field é fixture offline; Safari não testado) | [Cena real no navegador](evidence/02-build/README.md), [reprodução de 01/10](evidence/02-build/2026-10-01-reproduction.md) |
 | 3 Protocolo | Validada (01/10: vetores, streaming adversarial, login real e DeleteCharacter com recusa `0x011B` no Railway `2e532afa`; login real no tm-server do operador, não numa stack local) | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; faltam buff/cura e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
-| 6 Paridade | Pendente | — |
+| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; faltam buff/cura e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
+| 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
 | 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
 
 ## Próxima ação
 
 1. Etapa 5:
-   - fatia 4, troca: aprovada em 01/10. Faltam recusa por falta de espaço e desconexão no meio da troca;
+   - fatia A (01/10): venda, ouro no banco entre sessões, teleporte pago e casos de troca confirmados. A execução 4 de `tradeedge` (01/10, 21:04) rodou todos os passos: aviso "Nao ha espaco no inventario." confirmado online e B limpo. Só a regra final reprovou, porque B começou cheio de sobra; regra corrigida e JSON reavaliado offline;
+   - PRs [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361) e [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362) implantados (`200f4824`). O ouro dos mobs foi confirmado em execução. O HUD com dano 21 após o login e 23 ao reequipar tem causa encontrada: o `CreateMob` próprio leva o score cru, sem a arma. A correção está no PR [#363](https://github.com/Jean1dev/w2pp-OpenWYD/pull/363) do servidor (`19b235e`), sem merge. Fica em aberto a diferença de nível entre a seleção e o mundo (`selCharWireLevel`, decisão do servidor);
    - fatia 5: persistência após reinício controlado do servidor (exige combinar com o operador);
-   - buff e cura (nível 11+ ou 16–20), teleporte pago por NPC e ouro guardado no banco entre sessões.
+   - buff e cura (nível 11+ ou 16–20).
 
    Rodar os cenários online em processos separados. Antes de abrir A e B, confirmar ≥ 2 GB livres: órfãos `tail`/`grep`, Docker e Chrome em segundo plano custaram ~1,3 GB nesta sessão ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar (os cenários de duas sessões passaram em 01/10, [evidência](evidence/04-login-mundo/2026-10-01-two-sessions.md)):
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
    - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
 3. Etapa 8 — confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
-4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6. Investigar por que a venda do item 4144 não rendeu ouro com A em 1.000.000 (fase `shop`, 01/10; causa não verificada).
+4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6.
 5. Servidor, entregas separadas (não feitas):
    - itens no chão: `0x026E`, CNF de 28 bytes, decay e dono ([ADR 007](decisions/007-inventory-dialect.md));
-   - enviar `0x0336` depois do login, porque o CurrentScore do snapshot é o template da classe;
-   - copiar o `Coin` do template para o mob em `SpawnMobAt`, porque hoje nenhum mob dá ouro;
+   - score do login: PR [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361), aberto. O `0x0336` já era enviado; a divergência era o snapshot `0x0114` levar o score do template, enquanto o legado manda o `MOB` depois de `GetCurrentScore`;
+   - ouro dos mobs: PR [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362), aberto. `SpawnMobAt` passa a copiar o `Coin` @28;
+   - aviso na recusa do teleporte pago (o original avisa, o Go fica em silêncio);
    - sussurro: gravar o nome de quem envia e reproduzir a reescrita legada; enviar aviso nas recusas de compra, venda, banco e teleporte; confirmar o layout de 57 bytes do `0x0339` ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
 6. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
 
@@ -568,3 +570,68 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Falhas registradas:** a troca 1 reprovou por defeito do harness (Enter na caixa 601), corrigido. `login,enter,shop` reprovou com "sale did not raise gold": A já tinha 1.000.000 de ouro (contas de 01/10), e a venda do item 4144 não rendeu ouro. Causa não verificada. Essa execução comprou dois itens 1774 para A.
 - **Limites:** o aceite da caixa 601 e o OK da exclusão usam exports de automação; só Chromium headless; nenhum cliente Windows nesta sessão; recusa por falta de espaço e desconexão no meio da troca não exercitadas; capturas com nomes ficam só no `.cache`. Sem commit, push ou deploy.
 - **Próximo passo:** relogin do cliente Windows pelo operador (fecha a etapa 4); na etapa 5, buff/cura, reinício controlado e a falha de venda com 1.000.000 de ouro.
+
+### 01/10/2026 — etapa 5, fatia A, e PRs do servidor (score do login e ouro dos mobs)
+
+- **Pedido do usuário:** fatia A (venda, teleporte pago, ouro no banco entre sessões e casos de troca) e os PRs 1 e 2 do servidor. Com autorização, foram encerrados processos que ocupavam memória: o resto do Chrome, o OneDriveSetup, `tail`/`grep` órfãos e o CapCut.
+- **Servidor (entregas separadas, sem merge nem deploy):** clone limpo `external/server-pr` em `2e532afa`.
+  - **PR [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361):** `OverlayLoginScores` grava `BaseScore` (estado persistido) e `CurrentScore` (`computeScore`) no snapshot com template, como `ProcessDBMessage.cpp:812-821`. O item registrado antes ("enviar `0x0336`") estava errado, porque `enterWorldView` já envia o `0x0336`.
+  - **PR [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362):** `ParseMobBasics` lê o `Coin` @28 (`Basedef.h:556`; o Gremlin tem 50), e `SpawnMobAt` o copia. Uma morte de mob com `Coin` passa a fazer o `rand()` de ouro, como o legado.
+  - Os testes novos dos dois PRs falham sem a correção. `go test ./tmserver/...` e `go vet` limpos localmente; sem `-race`, que roda na CI.
+- **Cliente:**
+  - `tools/verify_world.mjs`: venda só de item com preço; ouro guardado no `bank`; fases `paidteleport` e `tradeedge`; helpers de troca compartilhados; `holdCanvas`.
+  - `tools/world_checks{,.test}.mjs`: `checkBank` e `checkPaidTeleport`.
+  - `tools/trade_checks{,.test}.mjs`: `checkTradeEdge` e `sellPrice`.
+  - `patches/openwyd/0022-inventory-page-buttons.patch`.
+  - `client/dialect/WydDialect.cpp`: avisos 16–33.
+  - Fixture `notice_no_empty_slot` em `gen_fixtures.py`, `dialect_test.cpp` e no overlay Go.
+  - ADRs 008 e 010 (revisões), checklist e [evidência da fatia A](evidence/05-gameplay/2026-10-01-slice-a.md).
+- **Confirmado em teste:**
+  - `world:checks` 33/0, `protocol:dialect` 803/0, `protocol:vectors` verde;
+  - `client:stream` e `scene` verdes;
+  - WASM `tmproject_startup.1790883428920400700` (SHA-256 `8c562869…`), 115 objetos certificados, 0 indefinidos.
+- **Confirmado em execução (Railway `2e532afa`):**
+  - `shop`: a venda do 1774 rende 75;
+  - `bank`: 74 de ouro no banco sobrevivem ao relogin;
+  - `paidteleport`: cobra exatamente 700 e leva a Noatum; com 500 de ouro, recusa sem cobrar; o relogin mantém só a cobrança;
+  - `tradeedge`, execução 2: a bolsa cheia desfaz a troca (aviso 31) e a desconexão no meio da troca fecha a janela de B, as duas sem mudar nada.
+- **Falhas e limites:**
+  - **`bank`:** a primeira execução foi interrompida pelo Claude Code por falta de memória e deixou 37 de ouro no banco de A.
+  - **`tradeedge`:**
+    - execução 1: defeitos do harness (destino da compra na página visível; A fora da visão de B); deixou 4 itens 1774 em B;
+    - execução 2: estourou o prazo de 40 min na limpeza (~46 s por venda); ficaram 3 itens 1774 em B (slots 27–29).
+  - **Online:** as execuções usaram o WASM `…1790876556349708400`, que ainda não tinha a tabela de avisos estendida.
+  - Sem commit nem push nesta sessão.
+- **Próximo passo:** merge e deploy dos PRs #361/#362 pelo operador, e então conferir o score do login e o `loot` com ouro. Uma `tradeedge` completa (60 min). Relogin do cliente Windows (etapa 4).
+
+### 01/10/2026 — conferência dos PRs #361 e #362 no Railway
+
+- **Deploy:** `tm-server` com o commit `200f4824`, `SUCCESS` às 19:53 UTC; inclui o #361 (`307ac2ab`).
+- **Harness:** a fase `enter` registra o score do HUD e a prévia da seleção (`tools/verify_world.mjs`).
+- **Confirmado em execução:**
+  - `loot`: 7 de 23 Gremlins deram ouro, de 256 a 292, na faixa do legado;
+  - `equip`: aprovada de novo;
+  - `login,enter`: o HUD mostra nível 1, HP 105/105, dano 21.
+- **Achados:**
+  - **Nível (confirmado em fonte):** o "Nv 2" do HUD vem do nível interno em base 1 do servidor. A seleção envia `level − 1` (commit `2a2c4a4`), o mundo envia o valor sem ajuste. A hipótese anterior, de que vinha do template, estava errada.
+  - **Dano após o login:** 21, que vira 23 ao reequipar a mesma arma, igual ao padrão de 30/09. Pela fonte, a fórmula do servidor é a mesma nas duas rotas. Causa não determinada, em aberto.
+  - **HP/MP/atributos do #361:** a execução não distingue o efeito, porque template e valor calculado coincidem neste personagem; o efeito está confirmado em teste no PR.
+- **Evidência:** [fatia A](evidence/05-gameplay/2026-10-01-slice-a.md#depois-do-merge-e-deploy-dos-prs-361-e-362-0110-1954-2020-utc). Sem commit.
+- **Investigação do dano (mesma data, pedido do usuário):** a causa é o `CreateMob` próprio, montado por `createMobFrom` com campos crus e enviado depois do `UpdateScore` do login. Reproduzido em teste com o conteúdo real (19 / 17 / 19). Corrigido no PR [#363](https://github.com/Jean1dev/w2pp-OpenWYD/pull/363) (`19b235e`, teste `TestEnterWorldSelfCreateMobCarriesTheScore`, suíte do `tmserver` verde), sem merge.
+
+### 01/10/2026 — enquanto o PR #363 aguarda: `tradeedge` e linha de base da etapa 6
+
+- **`tradeedge`:**
+  - execução 3: A preso nos canteiros a leste do spawn; correção: rota `ARMIA_EAST` antes de se aproximar de B;
+  - execução 4: todos os passos rodaram. Troca desfeita com a bolsa cheia, com o texto "Nao ha espaco no inventario." visto online. Desconexão de A no meio da troca sem nenhuma mudança. Limpeza de 26 itens. Só a regra final reprovou, porque B começou cheio; `checkTradeEdge` foi corrigida, o JSON reavaliado offline passa e `world:checks` fica em 33/0.
+- **Etapa 6:**
+  - `tools/measure_scene.mjs` e `npm run measure` (instrumentação externa de `FS.open` e `_wyd_tick_client`);
+  - [linha de base](evidence/06-paridade/README.md) em Chromium headless, com renderização por software:
+    - pronto em 4,4 s a frio e 1,4 s com cache; primeiro quadro em 18,8 s e 15,5 s;
+    - 309 MiB a frio e 4,4 MiB com cache;
+    - heap JS de 527 MiB e WASM de 180 MiB;
+    - CPU do jogo de ~11 ms por quadro, mas ~410 ms entre quadros (renderização por software);
+    - a cena abre 50,5 de 305 MiB do pacote.
+  - Opções para o preload registradas, a decidir em ADR. O passo mais barato é investigar os ~220 MiB de heap JS além do tamanho do pacote.
+- Sem commit.
+- **Memória (etapa 6, mesma data):** os 527 MiB do `performance.memory` são o pacote (305 MiB) mais o WASM (180 MiB), contados como backing store de `ArrayBuffer`. Os objetos JS somam ~4 MiB depois da coleta, não há cópia do pacote e os "220 MiB extras" eram o WASM. Por processo, com uma página: renderer 654 MiB, browser 140, GPU 137, utilitários 105 (1.036 no total). Carregar sob demanda economizaria até ~255 MiB por página; a escolha da abordagem fica para uma ADR.

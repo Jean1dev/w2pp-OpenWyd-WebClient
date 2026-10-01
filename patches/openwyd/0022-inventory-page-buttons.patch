@@ -1,0 +1,17 @@
+Inventory page buttons (67076..67079, TMFieldScene m_pInvPageBtn1..4) in the
+read-only button-center probe, so the harness can switch carry pages with a
+real click. No probe sends packets or changes game state.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+index da963e8..b78c70c 100644
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -1093,7 +1093,7 @@ extern "C" WYD_EXPORT const char* wyd_field_chat_line(int k) {
+ extern "C" WYD_EXPORT int wyd_field_button_screen(unsigned int id, int which) {
+   TMFieldScene* f = WydField();
+   if (!f || (id != 65563u && id != 65688u && id != 65886u && id != 641u && id != 475139u &&
+-                id != 643u && id != 617u)) return -1;
++                id != 643u && id != 617u && (id < 67076u || id > 67079u))) return -1;
+   auto* b = static_cast<SPanel*>(f->m_pControlContainer->FindControl(id));
+   if (!b || !b->IsVisible() || b->m_GCPanel.nWidth <= 0 || b->m_GCPanel.nHeight <= 0) return -1;
+   return static_cast<int>(which == 0 ? b->m_GCPanel.nPosX + b->m_GCPanel.nWidth / 2

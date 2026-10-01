@@ -81,4 +81,6 @@ O placeholder do servidor antigo (13 ou 21 bytes) é descartado por tamanho e nu
 
 ## Pendente
 
-- Recusa por falta de espaço, desconexão no meio da troca e roteiro Windows × web.
+- Roteiro Windows × web.
+
+Revisão de 01/10/2026 (fatia A): a recusa por falta de espaço e a desconexão no meio da troca foram confirmadas em execução ([evidência](../evidence/05-gameplay/2026-10-01-slice-a.md#casos-de-troca-loginentersecondtradeedge)).
