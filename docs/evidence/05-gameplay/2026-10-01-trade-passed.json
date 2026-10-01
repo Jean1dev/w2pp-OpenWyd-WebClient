@@ -1,0 +1,564 @@
+{
+ "when": "2026-10-01T16:50:44.806Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "enter",
+  "second",
+  "trade"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 28748,
+   "at": "2026-10-01T16:51:15.215Z"
+  },
+  "enter": {
+   "ok": true,
+   "me": {
+    "id": 1,
+    "name": "Web*******",
+    "x": 2096.5,
+    "y": 2097.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 34,
+    "inPass": 2,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 36,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "glErrors": 0,
+   "ms": 20633,
+   "at": "2026-10-01T16:51:41.705Z"
+  },
+  "second": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "me": {
+    "id": 2,
+    "name": "Web*******",
+    "x": 2098.5,
+    "y": 2104.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 36,
+    "inPass": 3,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 39,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "ms": 157441,
+   "at": "2026-10-01T16:54:25.490Z"
+  },
+  "trade": {
+   "ok": true,
+   "refused": {
+    "aWindow": 0,
+    "bWindow": 0,
+    "unchanged": true
+   },
+   "gold": 10,
+   "forward": {
+    "item": 401,
+    "takerSees": 401,
+    "carryPos": 0
+   },
+   "goldSent": 1,
+   "reset": {
+    "a": {
+     "visible": 1,
+     "opponent": 2,
+     "myCheck": 0,
+     "opCheck": 0,
+     "myMoney": 10,
+     "opMoney": 0,
+     "my": [
+      401,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "op": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "carryPos": [
+      0,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1
+     ]
+    },
+    "b": {
+     "visible": 1,
+     "opponent": 1,
+     "myCheck": 0,
+     "opCheck": 0,
+     "myMoney": 0,
+     "opMoney": 10,
+     "my": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "op": [
+      401,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "carryPos": [
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1
+     ]
+    }
+   },
+   "swap": {
+    "takerSlot": 4
+   },
+   "relogin": true,
+   "cancelled": {
+    "unchanged": true
+   },
+   "back": {
+    "takerSlot": 0
+   },
+   "ms": 978518,
+   "at": "2026-10-01T17:10:57.083Z"
+  }
+ },
+ "ok": true,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "fd0176b173b46485d396300dd569720fba3c04a2",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-10-01T16:51:15.633Z",
+   "freeMiB": 1646,
+   "totalMiB": 8014,
+   "browserMiB": 1042,
+   "pages": {
+    "A": {
+     "wasmMiB": 150,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end enter",
+   "at": "2026-10-01T16:51:42.395Z",
+   "freeMiB": 1562,
+   "totalMiB": 8014,
+   "browserMiB": 1177,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end second",
+   "at": "2026-10-01T16:54:26.687Z",
+   "freeMiB": 858,
+   "totalMiB": 8014,
+   "browserMiB": 2046,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 497
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  },
+  {
+   "point": "end trade",
+   "at": "2026-10-01T17:10:58.467Z",
+   "freeMiB": 782,
+   "totalMiB": 8014,
+   "browserMiB": 2160,
+   "pages": {
+    "A-trade-relogin": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    },
+    "B-trade-relogin": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "field",
+   "file": ".cache/world/2026-10-01T16-50-44-796Z/A-field.png",
+   "sha256": "b177d393b523abe37ab5fca9b19196b4019653f4f94cf2f34b4a4d7910584ac6"
+  },
+  {
+   "name": "trade-offer",
+   "file": ".cache/world/2026-10-01T16-50-44-796Z/A-trade-offer.png",
+   "sha256": "16811baf572577b39466a29c9e7fb732dde7842a78be6492439990027156ef50"
+  },
+  {
+   "name": "trade-done",
+   "file": ".cache/world/2026-10-01T16-50-44-796Z/A-trade-done.png",
+   "sha256": "40b90e1e2935cd022018f2e54ab950aac530011ad0144abde6a1f39f0efb6df4"
+  },
+  {
+   "name": "field",
+   "file": ".cache/world/2026-10-01T16-50-44-796Z/B-field.png",
+   "sha256": "b915cc441cf8f43bb2adb297e34fa12e84989fedf4de4a403b27b8d0c00c7e5c"
+  },
+  {
+   "name": "trade-request",
+   "file": ".cache/world/2026-10-01T16-50-44-796Z/B-trade-request.png",
+   "sha256": "4470b42681962d36d5e9ce0bf14389ef3e5a422183d616a5198a68ea6f55378a"
+  },
+  {
+   "name": "trade-offer",
+   "file": ".cache/world/2026-10-01T16-50-44-796Z/B-trade-offer.png",
+   "sha256": "b2c21da83262cab92e9a709f0dbd7daaedd9740d97139805740008b88eb300d5"
+  },
+  {
+   "name": "trade-done",
+   "file": ".cache/world/2026-10-01T16-50-44-796Z/B-trade-done.png",
+   "sha256": "138a1683ff1f25d7866fada0f2c73cb459c4a4b672ff52c7099dd4c25fe5031e"
+  },
+  {
+   "name": "trade-final",
+   "file": ".cache/world/2026-10-01T16-50-44-796Z/A-trade-relogin-trade-final.png",
+   "sha256": "f9955f27285fe528e37f9cdd464f247142d5df0cfdb238010ed6105a1817581d"
+  },
+  {
+   "name": "trade-final",
+   "file": ".cache/world/2026-10-01T16-50-44-796Z/B-trade-relogin-trade-final.png",
+   "sha256": "890e53ea6459483fffbc8d452401eef83e159b139d36610abf4b0cfbcabad013"
+  }
+ ],
+ "final_A-trade-relogin": {
+  "inTranslated": 41,
+  "inPass": 8,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 7,
+  "outPass": 5,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 49,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "final_B-trade-relogin": {
+  "inTranslated": 38,
+  "inPass": 9,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 7,
+  "outPass": 2,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 47,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "B": [],
+  "A-trade-relogin": [],
+  "B-trade-relogin": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-10-01T13:50:46.3609859-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-10-01T13:51:07.0051578-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-01T13:53:21.1904547-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-01T14:01:14.6665675-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 1074,
+   "bytes_down": 12552
+  },
+  {
+   "time": "2026-10-01T14:01:15.1588689-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 662,
+   "bytes_down": 13134
+  },
+  {
+   "time": "2026-10-01T14:01:30.3404472-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-01T14:03:07.6341059-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-01T14:11:09.9929717-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 932,
+   "bytes_down": 13124
+  },
+  {
+   "time": "2026-10-01T14:11:10.0664506-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 816,
+   "bytes_down": 12590
+  }
+ ]
+}

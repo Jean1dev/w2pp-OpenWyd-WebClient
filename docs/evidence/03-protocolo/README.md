@@ -12,7 +12,7 @@ Revisões: servidor `98286fdf01202f503523e89d3e50b2183f00c36c`; OpenWyd `beb9f69
 | CNFAccountLogin `010A` (2008 bytes) → seleção de personagem | **confirmado em execução** com o servidor real; conta sem personagens | 2008 bytes recebidos e traduzidos, estado 5 (Select Character), sem fixture |
 | Conteúdo de SELCHAR e banco (4 slots, 128 itens, Exp > 32 bits) | **confirmado em execução** com fluxo roteirizado; **confirmado em teste unitário** | nomes lidos do runtime; 276 verificações campo a campo |
 | CNFNew, CNFCharacterLogin, CreateMob, AccountSecure (PIN), CharacterLogin | **confirmado em teste unitário** e em execução nas etapas 4–5 | fixtures conferidas byte a byte contra os encoders Go |
-| DeleteCharacter `0211` → CNFDeleteCharacter `0112`; recusa `011A` | **confirmado em execução** no Railway (30/09) | [exclusão ponta a ponta](#exclusão-de-personagem-ponta-a-ponta-30092026) |
+| DeleteCharacter `0211` → CNFDeleteCharacter `0112`; recusa `011B` (servidor `2e532afa`) | **confirmado em execução** no Railway (30/09 e 01/10) | [exclusão ponta a ponta](#exclusão-de-personagem-ponta-a-ponta-30092026), [recusa `0x011B`](#recusa-de-exclusão-com-0x011b-01102026) |
 | Criação/entrada de personagem, Field com servidor, duas sessões, relogin | **pendente (etapa 4)** | exige clique no modelo 3D e teclado de PIN; não executado |
 | Pacotes de gameplay (`UpdateScore`, `UpdateEtc`, `SendItem`, chat…) | **não mapeados**: descartados e contados | lista de opcodes descartados no probe |
 
@@ -106,3 +106,28 @@ Limites:
 - Nenhuma captura do texto exibido. O painel tem 2 s de vida e a leitura foi feita depois de 3 s; o texto vem do fonte.
 - A automação abre a caixa e o painel pelos controles da cena, não por clique no botão desenhado.
 - Só Chromium headless.
+
+## Recusa de exclusão com `0x011B` (01/10/2026)
+
+O [PR #359](https://github.com/Jean1dev/w2pp-OpenWYD/pull/359) foi integrado (`2e532afa`, 01/10 11:35 UTC). O deploy `5b9c73de` do `tm-server`, com esse commit, está ativo e com estado `SUCCESS`, conforme `railway deployment list` em 01/10. Os campos `revisions` do JSON mostram o checkout local `external/server` (`98286fdf`), não o servidor implantado.
+
+Harness: `checkDelete` agora exige `0x011B` e o texto da recusa (`tools/trade_checks.mjs`). Como o runtime mostra a mensagem por só 2000 ms (`TMSelectCharScene.cpp`, `SetMessage(g_pMessageStringTable[20], 2000)`), a leitura passou a ser feita assim que a resposta chega, antes da espera de 3 s. Isso encerra o limite "nenhuma captura do texto exibido" de 30/09.
+
+```
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases delete
+python tools/capture_world_logs.py --since 2026-10-01T16:29:40Z --until 2026-10-01T16:32:10Z --out docs/evidence/03-protocolo/2026-10-01-delete-011b-server.txt
+```
+
+Para o JSON e o log do servidor, ver [2026-10-01-delete-011b.json](2026-10-01-delete-011b.json) e [2026-10-01-delete-011b-server.txt](2026-10-01-delete-011b-server.txt).
+
+**Execução 16:26 UTC (aprovada pela regra antiga):** recusa `0x11b` e lista intacta; exclusão `0x112`; relogin igual. O `panelText` veio vazio, porque a leitura acontecia depois de o painel sumir. Esta execução levou à correção do harness.
+
+**Execução 16:29 UTC (aprovada, regra nova):**
+1. Personagem descartável criado no slot 1 e presente após o relogin.
+2. Senha errada: `0x0211` enviado (corpo de 32 bytes no log do servidor). Resposta `0x011B`, painel "Falha ao apagar o personagem." (mensagem 20) e lista intacta.
+3. Senha certa: novo `0x0211`, resposta `0x0112`, só o slot 1 esvaziado.
+4. Relogin com a mesma lista e o mesmo nível no slot 0. Saúde de protocolo limpa nas três sessões.
+
+O servidor não registra os pacotes que envia; o `0x011B` foi observado no cliente (`socket.lastRecvOpcode`), junto com a mensagem correspondente da tabela de strings.
+
+Limites: só Chromium headless; a caixa e o painel são acionados pelos controles da cena (exports de automação), não por clique no botão desenhado.

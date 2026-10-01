@@ -1151,9 +1151,11 @@ async function main() {
           const p = window.clientProbe(), o = p.socket.lastRecvOpcode;
           return p.dialect.inboundFrames > f0 && (o === 0x112 || o === 0x11a || o === 0x11b) ? o : 0;
         }, 30000, frames0);
+        // The runtime shows the refusal message for 2000 ms only (SetMessage(..., 2000)).
+        const panel = await s.until('delete reply message', () => Module._wyd_scene_message_visible() === 1 ?
+          Module.UTF8ToString(Module._wyd_scene_message_text()) : '', 1500).catch(() => '');
+        if (panel) await s.shot('delete-reply');
         await sleep(3000);
-        const panel = await s.eval(() => Module._wyd_scene_message_visible() === 1 ?
-          Module.UTF8ToString(Module._wyd_scene_message_text()) : '');
         return { lastRecvOpcode: op, panelText: panel };
       };
       let s = await select('B-delete');
@@ -2453,7 +2455,10 @@ async function main() {
       const closed = s => s.until('trade window closed', () => Module._wyd_field_trade_value(0) === 0, 30000);
       const open = async (from, to) => {
         await from.requestTrade(to);
-        await to.page.locator('#canvas').press('Enter'); await to.frames(2);
+        // The original swallows Enter on box 601 (TMFieldScene::OnCharEvent), so a
+        // player accepts with a click on OK; the automation export does what that click does.
+        assert.equal(await to.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'trade box OK refused');
+        await to.frames(2);
         await from.until('trade window', id => Module._wyd_field_trade_value(0) === 1 && Module._wyd_field_trade_value(1) === id, 30000, to.id);
         await to.until('trade window', id => Module._wyd_field_trade_value(0) === 1 && Module._wyd_field_trade_value(1) === id, 30000, from.id);
       };

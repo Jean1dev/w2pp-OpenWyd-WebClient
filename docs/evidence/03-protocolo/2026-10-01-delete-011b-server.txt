@@ -1,0 +1,30 @@
+# Railway read-only; 2026-10-01T16:29:40Z .. 2026-10-01T16:32:10Z; sanitized identities.
+time=2026-10-01T16:30:04.990Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-10-01T16:30:04.990Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-10-01T16:30:04.990Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-10-01T16:30:04.991Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<redacted>
+time=2026-10-01T16:30:05.114Z level=INFO msg="account login: OK" conn=1 account=<redacted> id=168 role=player chars=1
+time=2026-10-01T16:30:11.193Z level=INFO msg="recv packet" conn=1 type=0x0fde len=20 routed=true
+time=2026-10-01T16:30:17.802Z level=INFO msg="recv packet" conn=1 type=0x020f len=24 routed=true
+time=2026-10-01T16:30:17.803Z level=INFO msg="create char" conn=1 slot=1 class=0 name=<redacted> mode=11 want_mode=11
+time=2026-10-01T16:30:17.910Z level=INFO msg="create char: OK" conn=1 name=<redacted> slot=1 total=2
+time=2026-10-01T16:30:23.394Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-10-01T16:30:23.394Z level=INFO msg="connection closed" conn=1
+time=2026-10-01T16:30:44.837Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-10-01T16:30:44.837Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-10-01T16:30:44.837Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-10-01T16:30:44.837Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<redacted>
+time=2026-10-01T16:30:44.975Z level=INFO msg="account login: OK" conn=1 account=<redacted> id=168 role=player chars=2
+time=2026-10-01T16:30:50.276Z level=INFO msg="recv packet" conn=1 type=0x0fde len=20 routed=true
+time=2026-10-01T16:31:00.816Z level=INFO msg="recv packet" conn=1 type=0x0211 len=32 routed=true
+time=2026-10-01T16:31:25.325Z level=INFO msg="recv packet" conn=1 type=0x0211 len=32 routed=true
+time=2026-10-01T16:31:36.953Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-10-01T16:31:36.953Z level=INFO msg="connection closed" conn=1
+time=2026-10-01T16:31:51.215Z level=INFO msg="cpsock connection" ip=<redacted> first4="11 f3 11 1f"
+time=2026-10-01T16:31:51.215Z level=INFO msg="connection accepted" conn=1 ip=<redacted>
+time=2026-10-01T16:31:51.215Z level=INFO msg="recv packet" conn=1 type=0x020d len=104 routed=true
+time=2026-10-01T16:31:51.215Z level=INFO msg="account login: relaying to dbServer" conn=1 account=<redacted>
+time=2026-10-01T16:31:51.335Z level=INFO msg="account login: OK" conn=1 account=<redacted> id=168 role=player chars=1
+time=2026-10-01T16:31:56.870Z level=INFO msg="recv packet" conn=1 type=0x0fde len=20 routed=true
+time=2026-10-01T16:32:05.397Z level=INFO msg="connection drop reason" conn=1 ip=<redacted> err=EOF
+time=2026-10-01T16:32:05.397Z level=INFO msg="connection closed" conn=1

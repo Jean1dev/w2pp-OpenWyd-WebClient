@@ -1,6 +1,6 @@
 # ADR 011: DeleteCharacter ponta a ponta e resposta de falha do servidor (etapa 3)
 
-Data: 30/09/2026. Estado: exclusão **confirmada em execução** no Railway. A correção da resposta de falha no servidor está **confirmada em teste**, aberta no [PR #359](https://github.com/Jean1dev/w2pp-OpenWYD/pull/359) e ainda **não publicada**.
+Data: 30/09/2026. Estado: exclusão **confirmada em execução** no Railway. A correção da resposta de falha no servidor está **confirmada em teste**, aberta no [PR #359](https://github.com/Jean1dev/w2pp-OpenWYD/pull/359) e ainda **não publicada**. **Revisão de 01/10/2026:** integrada em `2e532afa` e implantada no Railway. A recusa `0x011B` com a mensagem 20 foi **confirmada em execução** ([evidência](../evidence/03-protocolo/README.md#recusa-de-exclusão-com-0x011b-01102026)).
 
 ## Contexto
 
@@ -33,3 +33,5 @@ A etapa 3 só tinha prova unitária de `DeleteCharacter` (`0211`, 48→44) e `CN
 ## Consequências
 
 Até o PR #359 ser publicado, o cliente web mostra a falha de exclusão com o texto de falha de criação, exatamente como o cliente Windows faria contra o mesmo servidor. O cliente não compensa isso.
+
+Revisão de 01/10/2026: com o servidor `2e532afa`, a recusa chega como `0x011B`, e o runtime mostra "Falha ao apagar o personagem.". `checkDelete` passou a exigir `0x011B` e o texto. O `patches/server/0002` fica como registro histórico, porque o conteúdo agora está no upstream.

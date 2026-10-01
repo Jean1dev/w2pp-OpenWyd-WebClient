@@ -34,10 +34,12 @@ test('a change resets both checks and evidence is complete', () => {
 test('delete removes only the target slot and survives relogin', () => {
   const before = [{ name: 'Keep', level: 9 }, { name: 'Tmp', level: 0 }, { name: '', level: -1 }, { name: '', level: -1 }];
   const after = [before[0], { name: '', level: -1 }, before[2], before[3]];
-  const r = { slot: 1, before, refused: { slots: before, lastRecvOpcode: 0x11a },
+  const r = { slot: 1, before, refused: { slots: before, lastRecvOpcode: 0x11b, panelText: 'x' },
     deleted: { slots: after, lastRecvOpcode: 0x112 }, relogin: after };
   checkDelete(r);
-  for (const bad of [{ refused: { slots: after, lastRecvOpcode: 0x11a } }, { deleted: { slots: before, lastRecvOpcode: 0x112 } },
+  for (const bad of [{ refused: { slots: after, lastRecvOpcode: 0x11b } },
+    { refused: { slots: before, lastRecvOpcode: 0x11a } }, { refused: { slots: before, lastRecvOpcode: 0x112 } },
+    { refused: { slots: before, lastRecvOpcode: 0x11b, panelText: '' } }, { deleted: { slots: before, lastRecvOpcode: 0x112 } },
     { deleted: { slots: [{ name: '' }, ...after.slice(1)], lastRecvOpcode: 0x112 } }, { relogin: before },
     { relogin: [{ name: 'Keep', level: 8 }, ...after.slice(1)] }, { slot: 2 }])
     assert.throws(() => checkDelete({ ...r, ...bad }));
