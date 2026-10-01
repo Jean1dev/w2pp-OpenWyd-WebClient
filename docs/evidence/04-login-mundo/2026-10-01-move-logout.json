@@ -1,0 +1,589 @@
+{
+ "when": "2026-10-01T14:43:11.604Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "create",
+  "enter",
+  "second",
+  "move",
+  "logout"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 30888,
+   "at": "2026-10-01T14:43:47.068Z"
+  },
+  "create": {
+   "ok": true,
+   "created": true,
+   "preview": {
+    "nameMatches": true,
+    "level": 0,
+    "maxHp": 100,
+    "hp": 100,
+    "str": 12,
+    "int": 12,
+    "dex": 12,
+    "con": 12,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "human": 1
+   },
+   "ms": 19207,
+   "at": "2026-10-01T14:44:13.564Z"
+  },
+  "enter": {
+   "ok": true,
+   "me": {
+    "id": 1,
+    "name": "Web*******",
+    "x": 2089.5,
+    "y": 2094.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 35,
+    "inPass": 2,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 3,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 37,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "glErrors": 0,
+   "ms": 17750,
+   "at": "2026-10-01T14:44:36.167Z"
+  },
+  "second": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "me": {
+    "id": 2,
+    "name": "Web*******",
+    "x": 2090.5,
+    "y": 2095.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 38,
+    "inPass": 3,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 3,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 41,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "ms": 158377,
+   "at": "2026-10-01T14:47:20.111Z"
+  },
+  "move": {
+   "ok": true,
+   "aSeesB": true,
+   "bSeesA": true,
+   "aWalk": {
+    "from": [
+     2089.5,
+     2094.5
+    ],
+    "to": [
+     2090.5,
+     2089.5
+    ],
+    "actionsSent": 2,
+    "input": {
+     "before": {
+      "mouse": 0,
+      "moveTo": [
+       2089.5,
+       2094.5
+      ]
+     },
+     "after": {
+      "mouse": 6,
+      "moveTo": [
+       2090.5,
+       2089.5
+      ]
+     }
+    }
+   },
+   "bWalk": {
+    "from": [
+     2090.5,
+     2095.5
+    ],
+    "to": [
+     2098.5,
+     2091.5
+    ],
+    "actionsSent": 3,
+    "input": {
+     "before": {
+      "mouse": 0,
+      "moveTo": [
+       2090.5,
+       2095.5
+      ]
+     },
+     "after": {
+      "mouse": 9,
+      "moveTo": [
+       2098.5,
+       2091.5
+      ]
+     }
+    }
+   },
+   "bSawAFrom": [
+    2089.5,
+    2094.5
+   ],
+   "bSawATo": [
+    2090.5,
+    2089.5
+   ],
+   "aActual": [
+    2090.5,
+    2089.5
+   ],
+   "aSawBTo": [
+    2098.5,
+    2091.5
+   ],
+   "bActual": [
+    2098.5,
+    2091.5
+   ],
+   "nameAinB": true,
+   "nameBinA": true,
+   "angleAinB": -1.5707964897155762,
+   "lookAinB": [
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    863
+   ],
+   "lookAself": [
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    863
+   ],
+   "lookMatches": true,
+   "bSawAMove": true,
+   "aSawBMove": true,
+   "ms": 148149,
+   "at": "2026-10-01T14:50:03.019Z"
+  },
+  "logout": {
+   "ok": true,
+   "despawnSeenByB": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "lastPosition": [
+    2090.5,
+    2089.5
+   ],
+   "reloginPosition": [
+    2090.5,
+    2101.5
+   ],
+   "respawnSeenByB": true,
+   "newId": 1,
+   "persistedPreview": true,
+   "persistedLook": true,
+   "citySpawn": true,
+   "ms": 146779,
+   "at": "2026-10-01T14:52:41.220Z"
+  }
+ },
+ "ok": true,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "c96a437bdfe7e53ddc2d10eedad01be48dacce04",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-10-01T14:43:47.470Z",
+   "freeMiB": 1249,
+   "totalMiB": 8014,
+   "browserMiB": 1055,
+   "pages": {
+    "A": {
+     "wasmMiB": 150,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end create",
+   "at": "2026-10-01T14:44:13.969Z",
+   "freeMiB": 1235,
+   "totalMiB": 8014,
+   "browserMiB": 1061,
+   "pages": {
+    "A": {
+     "wasmMiB": 150,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end enter",
+   "at": "2026-10-01T14:44:36.802Z",
+   "freeMiB": 1168,
+   "totalMiB": 8014,
+   "browserMiB": 1179,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end second",
+   "at": "2026-10-01T14:47:21.512Z",
+   "freeMiB": 679,
+   "totalMiB": 8014,
+   "browserMiB": 2144,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 497
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  },
+  {
+   "point": "end move",
+   "at": "2026-10-01T14:50:04.237Z",
+   "freeMiB": 710,
+   "totalMiB": 8014,
+   "browserMiB": 2139,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 497
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  },
+  {
+   "point": "end logout",
+   "at": "2026-10-01T14:52:42.490Z",
+   "freeMiB": 682,
+   "totalMiB": 8014,
+   "browserMiB": 2161,
+   "pages": {
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    },
+    "A2": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "selchar",
+   "file": ".cache/world/2026-10-01T14-43-11-581Z/A-selchar.png",
+   "sha256": "88a67b5cf5772cc8f4013a1d97968cd0c0ef3fa1c5bcc549645372468ab4fad8"
+  },
+  {
+   "name": "field",
+   "file": ".cache/world/2026-10-01T14-43-11-581Z/A-field.png",
+   "sha256": "f40bd74087ac8989f72513a66a6c6f37504393887432deb830faf15847239ecb"
+  },
+  {
+   "name": "after-move",
+   "file": ".cache/world/2026-10-01T14-43-11-581Z/A-after-move.png",
+   "sha256": "2ca0e0a1baa1f85e4a6f14dbb8d006648f3afa0bf4073774d32881cc69ee810a"
+  },
+  {
+   "name": "field",
+   "file": ".cache/world/2026-10-01T14-43-11-581Z/B-field.png",
+   "sha256": "3f45926487d70f2ad243f0c28733029757b80a2e6ec878f7ffb91cab08d3b29f"
+  },
+  {
+   "name": "after-move",
+   "file": ".cache/world/2026-10-01T14-43-11-581Z/B-after-move.png",
+   "sha256": "7398bc3de9e6cac97dbe34d91a39a01f07a769c9e1cb017112f86a8ca88567db"
+  },
+  {
+   "name": "relogin",
+   "file": ".cache/world/2026-10-01T14-43-11-581Z/A2-relogin.png",
+   "sha256": "b17a663cfa0ad37e152e8800e0d2bd28f0eeca8098dbd3780d44903e6c6d080f"
+  }
+ ],
+ "final_B": {
+  "inTranslated": 39,
+  "inPass": 9,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 6,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 48,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "final_A2": {
+  "inTranslated": 37,
+  "inPass": 3,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 2,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 40,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "B": [],
+  "A2": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-10-01T11:43:15.6363927-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-10-01T11:43:39.0362631-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-01T11:46:05.5496457-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-01T11:50:15.9131255-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 340,
+   "bytes_down": 13052
+  },
+  {
+   "time": "2026-10-01T11:51:43.0737603-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-01T11:52:53.8721699-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 356,
+   "bytes_down": 13320
+  },
+  {
+   "time": "2026-10-01T11:52:53.9099947-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 200,
+   "bytes_down": 11924
+  }
+ ]
+}

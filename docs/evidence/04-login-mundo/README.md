@@ -18,10 +18,10 @@
 | Duas contas, spawn mútuo, nomes e equipamento | **confirmado em execução** | A vê B e B vê A; nomes iguais aos criados; `look` de A visto por B igual ao de A |
 | Movimento bidirecional | **confirmado em execução** | clique real no canvas; o servidor registra `0x036C` e `0x0366` de cada sessão e os repassa; a posição final vista pelo outro coincide com a do dono (2090,5/2101,5 e 2091,5/2104,5); direção vista por B: −π/2 |
 | Quem confirma a posição | **confirmado em fonte e em log** | o servidor aceita o destino e repassa o frame à área de visão (`movement.go`); a outra sessão só move a entidade ao receber o frame do servidor |
-| Relogin e persistência | **parcial** | a cada login o servidor gerou spawn próprio perto da cidade (2097/2100, 2093/2093, 2090/2106, 2091/2105), coerente com a regra "cidade, não coordenada exata" (`world.go`, `character.go:228-235`). A fase automatizada de logout/relogin com a segunda sessão **não rodou** (ver Limites) |
-| Despawn ao desconectar | **confirmado em log, não no cliente** | ao fechar B, o servidor enviou `0x0165` para A (22:31:36Z). A verificação do lado do cliente não rodou |
-| Troca de mapa | **preparado, não executado** | `ReqTeleport` `0x290` e `ChangeCity` `0x291` passam pelo dialeto. `0x291` já chega ao servidor (`routed=true`). A fase `mapchange` (portal Armia → Armia Field) não rodou |
-| Login concorrente | **confirmado em fonte, não executado** | o servidor não bloqueia sessões duplicadas; o cargo é sobrescrito (`world.go:442`). A fase `concurrent` não rodou |
+| Relogin e persistência | **confirmado em execução** ([01/10](2026-10-01-two-sessions.md)) | logout/relogin automatizado com B observando: despawn, mesmo PIN, respawn no spawn da cidade (2090,5/2101,5), prévia e `look` persistidos. Histórico: a cada login o servidor gerou spawn próprio perto da cidade (2097/2100, 2093/2093, 2090/2106, 2091/2105), coerente com a regra "cidade, não coordenada exata" (`world.go`, `character.go:228-235`). A fase automatizada de logout/relogin com a segunda sessão **não rodou** (ver Limites) |
+| Despawn ao desconectar | **confirmado em execução** ([01/10](2026-10-01-two-sessions.md)) | B perde A no cliente ao A sair. Histórico: ao fechar B, o servidor enviou `0x0165` para A (22:31:36Z). A verificação do lado do cliente não rodou |
+| Troca de mapa | **confirmado em execução** ([01/10](2026-10-01-two-sessions.md)) | portal Armia → Armia Field: A chega em 2588,5/2098,5 e B o perde. Histórico: `ReqTeleport` `0x290` e `ChangeCity` `0x291` passam pelo dialeto. `0x291` já chega ao servidor (`routed=true`). A fase `mapchange` (portal Armia → Armia Field) não rodou |
+| Login concorrente | **confirmado em execução** ([01/10](2026-10-01-two-sessions.md)) | o backend aceita a duplicata; a sessão original segue no Field e recebe entidades novas. Histórico: o servidor não bloqueia sessões duplicadas; o cargo é sobrescrito (`world.go:442`). A fase `concurrent` não rodou |
 | Erro de protocolo diagnosticável | **confirmado em execução** | avisos do servidor aparecem no painel; opcodes descartados ficam listados no probe e contados. Fora da tradução, o único opcode de saída descartado ao entrar era `0x0291`, que agora passa |
 | Cliente Windows 7662 | **pendente** | não há ambiente Windows com o cliente; ver o roteiro manual abaixo |
 
@@ -71,6 +71,10 @@ Comando: `npm run world -- --target reseau.proxy.rlwy.net:56950 --env-file .env`
   Não rodaram: `second,move,logout`, `mapchange` (o trajeto novo segue sem prova completa) e `concurrent`.
 
 Evidências sanitizadas: `2026-10-01-suite-0.json` (badpass/badpin), `-1..4.json` (classes 0–3), `-5.json` (cenário interrompido), e o log do servidor [`2026-10-01-suite-server.txt`](2026-10-01-suite-server.txt), com três `create char: OK`.
+
+### Cenários de duas sessões de 01/10/2026
+
+`login,create,enter,second,move,logout`, `login,enter,second,mapchange` e `login,enter,concurrent`, cada um em processo próprio, com contas novas: todos aprovados. Detalhes em [2026-10-01-two-sessions.md](2026-10-01-two-sessions.md).
 
 ## 3. Roteiro manual para o cliente Windows 7662 (pendente)
 
