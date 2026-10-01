@@ -1,0 +1,29 @@
+{
+  "directory": ".cache/asset-cache/run-jPPbcT",
+  "files": [
+    {
+      "path": "chromium-real-cold.png",
+      "sha256": "b09896931ace0c4094b780b24975f3b1301b7f5784002bc124c9add1fb6ebb19"
+    },
+    {
+      "path": "chromium-real-restart.png",
+      "sha256": "582e25b917074b89b00e8523829b73617eae0ed3d815ea2ed4ab336f90731e09"
+    },
+    {
+      "path": "chromium-real-warm.png",
+      "sha256": "2397148f6590729d040ce4001d5a778cb33223f16d25cadc784d9edef47143ba"
+    },
+    {
+      "path": "firefox-real-cold.png",
+      "sha256": "92f17a6da9bee37d2e5f176898afbc59911886999e7635c8097061fc30d9a885"
+    },
+    {
+      "path": "firefox-real-restart.png",
+      "sha256": "753749b1d3ca3227c0b7adbcaba59777be2b2b2d120b33e16f928e860055e45b"
+    },
+    {
+      "path": "firefox-real-warm.png",
+      "sha256": "d418671d126862bd1984dea24378fc07a6a7877e810df2ca209f7adc46edc448"
+    }
+  ]
+}

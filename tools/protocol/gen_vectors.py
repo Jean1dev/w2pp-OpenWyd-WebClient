@@ -19,6 +19,7 @@ import struct
 from pathlib import Path
 
 from cpsock_ref import CPSock, HEADER_SIZE, INIT_CODE, StreamError, cpp_table, split_frames
+from gen_fixtures import header, party_frame, trade_frame
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = ROOT / "docs/evidence/03-protocolo/vectors"
@@ -151,6 +152,16 @@ def build_streams(rng: random.Random, ref: CPSock) -> list[dict]:
             **expect,
         })
 
+    party = [ref.encode(party_frame(k), 3) for k in ("invite", "leader", "member", "remove")]
+    joined = b"".join(party)
+    add("s2c party byte by byte", "s2c", joined, one_by_one(len(joined)), frames=party)
+    add("s2c party coalesced", "s2c", joined, [len(joined)], frames=party)
+    add("s2c party truncated", "s2c", joined[:-1], [len(joined) - 1], error="unexpected_eof")
+    trade = [ref.encode(f, 3) for f in (trade_frame(8, 7), header(12, 0x386, 7), header(12, 0x384, 7))]
+    joined = b"".join(trade)
+    add("s2c trade byte by byte", "s2c", joined, one_by_one(len(joined)), frames=trade)
+    add("s2c trade split mid-offer", "s2c", joined, [100, len(joined) - 100], frames=trade)
+    add("s2c trade truncated", "s2c", joined[:-1], [len(joined) - 1], error="unexpected_eof")
     s = init + a + b + c
     add("c2s handshake split 1+3", "c2s", s, [1, 3, len(s) - 4], frames=[a, b, c])
     add("c2s byte by byte", "c2s", s, one_by_one(len(s)), frames=[a, b, c])

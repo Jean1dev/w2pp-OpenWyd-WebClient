@@ -1,0 +1,86 @@
+Party presentation and read-only probes. Acceptance flags are set only by
+the server confirmation. No probe sends packets or changes game state.
+
+diff --git a/Projects/TMProject/TMFieldScene.cpp b/Projects/TMProject/TMFieldScene.cpp
+--- a/Projects/TMProject/TMFieldScene.cpp
++++ b/Projects/TMProject/TMFieldScene.cpp
+@@ -5494,9 +5494,7 @@
+ 			sprintf(stCNFParty2.LeaderName, pPartyItem->GetText());
+ 
+ 			auto pHuman = (TMHuman*)g_pObjectManager->GetHumanByID(pPartyItem->m_dwCharID);
+-			if (pHuman)
+-				pHuman->m_bParty = 1;
+-
++			// The server confirmation sets membership.
+ 			SendOneMessage((char*)&stCNFParty2, sizeof(stCNFParty2));
+ 		}
+ 		else if (pPartyItem	&& g_pEventTranslator->m_bCtrl == 1	&& pPartyItem->m_bSelectEnable == 1	&& !pPartyList->m_bRButton)
+@@ -19906,9 +19904,7 @@
+ 		stCnfParty.LeaderID = pStd->Leader.ID;
+ 		sprintf(stCnfParty.LeaderName, pStd->Leader.Name);
+ 		
+-		if (pNode)
+-			pNode->m_bParty = 1;
+-
++		// The server confirmation sets membership.
+ 		SendOneMessage((char*)&stCnfParty, sizeof(stCnfParty));
+ 	}
+ 
+@@ -19921,6 +19917,12 @@
+ 
+ int TMFieldScene::OnPacketAddParty(MSG_AddParty* pStd)
+ {
++	// 0x037D carries no class in the Go dialect. Resolve presentation only.
++	if (pStd->Party.Class == -1)
++	{
++		auto* member = (TMHuman*)g_pObjectManager->GetHumanByID(pStd->Party.ID);
++		if (member) pStd->Party.Class = member->m_nSkinMeshType - 1;
++	}
+ 	auto pPartyList = m_pPartyList;
+ 	pStd->Party.Name[15] = 0;
+ 	for (int i = 0; i < pPartyList->m_nNumItem; ++i)
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -1091,7 +1091,7 @@
+ // (B_MONEY 65563, B_CARGO_MONEY 65688, B_IG_OK 65886): center as drawn, or -1.
+ extern "C" WYD_EXPORT int wyd_field_button_screen(unsigned int id, int which) {
+   TMFieldScene* f = WydField();
+-  if (!f || (id != 65563u && id != 65688u && id != 65886u)) return -1;
++  if (!f || (id != 65563u && id != 65688u && id != 65886u && id != 641u && id != 475139u)) return -1;
+   auto* b = static_cast<SPanel*>(f->m_pControlContainer->FindControl(id));
+   if (!b || !b->IsVisible() || b->m_GCPanel.nWidth <= 0 || b->m_GCPanel.nHeight <= 0) return -1;
+   return static_cast<int>(which == 0 ? b->m_GCPanel.nPosX + b->m_GCPanel.nWidth / 2
+@@ -1118,3 +1118,32 @@
+   wchar_t empty_cmdline[] = L"";
+   return wWinMain(reinterpret_cast<HINSTANCE>(1), nullptr, empty_cmdline, 1);
+ }
++
++// Party probes: snapshots and the rendered row center, never input shortcuts.
++extern "C" WYD_EXPORT int wyd_field_party_count() {
++  auto* f = WydField();
++  return f && f->m_pPartyList ? f->m_pPartyList->m_nNumItem : 0;
++}
++extern "C" WYD_EXPORT int wyd_field_party_value(int row, int field) {
++  auto* f = WydField();
++  if (!f || !f->m_pPartyList || row < 0 || row >= f->m_pPartyList->m_nNumItem) return -1;
++  auto* p = static_cast<SListBoxPartyItem*>(f->m_pPartyList->m_pItemList[row]);
++  if (!p) return -1;
++  switch (field) {
++    case 0: return p->m_dwCharID;
++    case 1: return p->m_nState; // 1 invite, 2 leader, 0 member
++    case 2: return p->m_nLevel;
++    case 3: return p->m_nClass;
++    case 4: return static_cast<int>(p->m_GCText.nPosX + 25);
++    case 5: return static_cast<int>(p->m_GCText.nPosY + 7);
++  }
++  return -1;
++}
++extern "C" WYD_EXPORT int wyd_field_party_member(unsigned int id) {
++  auto* p = g_pObjectManager ? static_cast<TMHuman*>(g_pObjectManager->GetHumanByID(id)) : nullptr;
++  return p ? p->m_bParty : -1;
++}
++extern "C" WYD_EXPORT int wyd_field_party_menu_target() {
++  auto* f = WydField();
++  return f && f->m_pPGTPanel && f->m_pPGTPanel->IsVisible() ? f->m_dwOpID : 0;
++}

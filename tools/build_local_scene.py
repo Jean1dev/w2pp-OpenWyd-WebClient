@@ -27,6 +27,7 @@ def main():
     packager = ROOT / ".cache/toolchains/emsdk/upstream/emscripten/tools/file_packager.py"
     subprocess.run([sys.executable, str(packager), "openwyd_assets.data", "--preload",
                     f"{ROOT / 'assets-local/runtime'}@/", "--js-output=openwyd_assets.js",
+                    "--use-preload-cache", "--indexedDB-name=WYD_PRELOAD_CACHE",
                     "--no-node", "--quiet"], cwd=site, check=True)
     print(json.dumps({"site": ".cache/local-scene", "wasm": wasm.name}))
 

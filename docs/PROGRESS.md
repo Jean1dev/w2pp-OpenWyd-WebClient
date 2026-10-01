@@ -1,36 +1,37 @@
 # Progresso
 
-Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. A morte para os Trolls e a volta à cidade (caixa 11, `0x03AE`/`0x0289`, HP 2 no spawn) também foram aprovadas ([morte e respawn](evidence/05-gameplay/2026-09-29-death-respawn.md)). O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. Cliente Windows e o restante do gameplay ainda não foram provados.
+Atualização: 30/09/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. A morte para os Trolls e a volta à cidade (caixa 11, `0x03AE`/`0x0289`, HP 2 no spawn) também foram aprovadas ([morte e respawn](evidence/05-gameplay/2026-09-29-death-respawn.md)). Também foram aprovados no Railway a poção (fatia 2) e a fatia 3: loja NPC (venda, compra, recusa, clique repetido), banco (item e ouro nos dois sentidos, recusas), chat (fala, sussurro, aviso de offline) e teleporte por comando `/cidade` ([fatia 3](evidence/05-gameplay/2026-09-30-shop-bank-chat.md)). O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. O grupo foi aprovado no Railway (recusa, aceite, saída, expulsão, desconexão e relogin; [fatia 4](evidence/05-gameplay/2026-09-30-party.md)). Em 30/09, a exclusão de personagem foi aprovada ponta a ponta no Railway ([etapa 3](evidence/03-protocolo/README.md#exclusão-de-personagem-ponta-a-ponta-30092026)). As correções de troca e de recusa de exclusão estão em PRs no servidor ([#358](https://github.com/Jean1dev/w2pp-OpenWYD/pull/358), [#359](https://github.com/Jean1dev/w2pp-OpenWYD/pull/359)), sem merge. Cliente Windows, troca online e reinício do servidor ainda não foram provados.
 
 | Etapa | Estado | Evidência |
 |---|---|---|
 | 1 Auditoria | Em andamento | [Fontes, layouts, build e assets](evidence/01-auditoria/README.md) |
 | 2 Build e cena | Em andamento | [Cena real no navegador](evidence/02-build/README.md) |
-| 3 Protocolo | Em andamento | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
+| 3 Protocolo | Em andamento (DeleteCharacter aprovado ponta a ponta em 30/09; recusa chega como `011A`, correção no PR #359) | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (combate básico, morte/respawn, uma skill de cada uma das quatro classes, Giro da Fúria em dois alvos e equipar/desequipar com observador aprovados; poção e loot implementados, sem execução online; drop no chão bloqueado pelo servidor) | [Combate: dialeto e cenário](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo aprovado; troca no PR #358 do servidor, com fase `trade` preparada e não executada; faltam buff/cura e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
-| 7 Experiência web | Pendente | — |
+| 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
 
 ## Próxima ação
 
 1. Etapa 5:
-   - fatia 2: rodar `login,enter,second,death,potion` (duas páginas; precisa de mais memória livre que a disponível nesta sessão, issue #6);
-   - buff e cura exigem nível 11+ ou 16–20;
-   - depois loja, banco, teleporte, chat `0333/0334`, grupo, troca e persistência após reinício.
+   - fatia 4, troca: o operador revisa, faz merge e publica o [PR #358](https://github.com/Jean1dev/w2pp-OpenWYD/pull/358) no `tm-server` ([ADR 010](decisions/010-server-trade-forwarding.md)). Depois, rodar `--phases login,enter,second,trade` (fase e probes já prontos, patch 0020) com ≥ 2 GB livres;
+   - fatia 5: persistência após reinício controlado do servidor (exige combinar com o operador);
+   - buff e cura (nível 11+ ou 16–20), teleporte pago por NPC e ouro guardado no banco entre sessões.
 
-   Rodar os cenários online em processos separados, por causa da memória ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
+   Rodar os cenários online em processos separados. Antes de abrir A e B, confirmar ≥ 2 GB livres: órfãos `tail`/`grep`, Docker e Chrome em segundo plano custaram ~1,3 GB nesta sessão ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar:
-   - repetir `npm run world` completo com o trajeto novo até o portal (a execução de 29/09 falhou só na caminhada da `mapchange`);
+   - rodar os cenários restantes da suíte em processos separados: `login,enter,second,move,logout`, `login,enter,second,mapchange` e `login,enter,concurrent`. Em 01/10, `badpass,badpin` e `classes` 0–3 passaram, e a execução foi interrompida por memória ao abrir B;
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
    - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
 3. Etapa 8 — confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
-4. Fechar a etapa 3 (falta DeleteCharacter ponta a ponta) e a etapa 1 (consumidores ainda assinalados na [matriz](compatibility.md)).
+4. Etapa 3: depois do merge e deploy do PR #359, repetir `--phases delete` e conferir `0x011B` na recusa. Etapa 1: consumidores ainda assinalados na [matriz](compatibility.md).
 5. Servidor, entregas separadas (não feitas):
    - itens no chão: `0x026E`, CNF de 28 bytes, decay e dono ([ADR 007](decisions/007-inventory-dialect.md));
    - enviar `0x0336` depois do login, porque o CurrentScore do snapshot é o template da classe;
-   - copiar o `Coin` do template para o mob em `SpawnMobAt`, porque hoje nenhum mob dá ouro.
+   - copiar o `Coin` do template para o mob em `SpawnMobAt`, porque hoje nenhum mob dá ouro;
+   - sussurro: gravar o nome de quem envia e reproduzir a reescrita legada; enviar aviso nas recusas de compra, venda, banco e teleporte; confirmar o layout de 57 bytes do `0x0339` ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
 6. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
@@ -394,5 +395,105 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
   - comparação com o cliente Windows.
 - **Limitações:** drop no chão bloqueado pelo servidor; cargo, split e delete fora desta fatia; a recusa por requisito no servidor (`NoticeReqNotMet`) não foi alcançada, porque o runtime bloqueia antes.
 - **Próximo passo:** rodar `potion` e `loot` com memória livre; depois buff/cura ou a fatia 3.
+
+### 30/09/2026 — etapa 5: poção (fatia 2) e fatia 3 (loja, banco, teleporte, chat)
+
+- **Pedido do usuário:** executar o orquestrador. No plano aprovado: poção primeiro, depois a fatia 3.
+- **Memória:** o usuário autorizou encerrar 61 processos `tail`/`grep` órfãos de monitores antigos e o Docker Desktop, fechou o Chrome (o processo em segundo plano foi encerrado) e fechou as outras sessões do Claude Code. O Node passou a ver 2,3–3,5 GB livres; nenhuma execução foi interrompida por memória.
+- **Arquivos:**
+  - alterados: `client/dialect/WydDialect.cpp`, `tools/protocol/{gen_fixtures.py,dialect_test.cpp,overlay/zz_ext_dialect_test.go,gen_client_stream.py}`, `tools/verify_world.mjs` (portal com nova tentativa, poção dentro da `death`, fases `shop`/`bank`/`chat` e auxiliares de sessão), `tools/world_checks{,.test}.mjs`, `tools/capture_world_logs.py`, `docs/compatibility.md`, checklist e inventário da etapa 5;
+  - novos: `patches/openwyd/0018-shop-cargo-chat-probes.patch`, [ADR 008](decisions/008-shop-cargo-chat-dialect.md), [evidências da fatia 3](evidence/05-gameplay/2026-09-30-shop-bank-chat.md), JSONs e logs do servidor sanitizados.
+- **Confirmado em teste:**
+  - `protocol:dialect` 545/0;
+  - `protocol:vectors` com 97 vetores e 28 fluxos, e overlay com os encoders reais;
+  - `world:checks` 25/0;
+  - `scene` e `client:stream` verdes;
+  - WASM `tmproject_startup.1790788748589055200` (SHA-256 `1433ef27…`), 115 objetos certificados, 0 indefinidos.
+- **Confirmado em execução (Railway):**
+  - poção aprovada na execução 8: uso com HP 80 → 130, uma unidade consumida pelo servidor, B vê a cura, clique duplo consome 2, relogin idêntico;
+  - loja, banco, chat e teleporte por `/azran`/`/armia` aprovados, com os valores do cliente iguais aos do log do servidor.
+- **Falhas registradas e corrigidas (harness):**
+  - regeneração enchendo o HP antes da poção (respawn de 1–50%, não HP 2);
+  - A passando do tile do portal;
+  - página 0 da bolsa cheia;
+  - clique segurado comprando duas vezes (comportamento original: 513 por nível + trava de 500 ms);
+  - nome "Guarda Carga";
+  - caixa de valor modal depois da recusa;
+  - corte do primeiro caractere no memo de sussurro.
+
+  O dialeto também teve de descartar o padding de `MSG_Sell` (20→18) e de `MSG_MessageWhisper` (160→158), detectado pelos `static_assert`.
+- **Limites:**
+  - só Chromium headless, sem cliente Windows;
+  - o nome do remetente do sussurro não foi observado (lacuna confirmada só em fonte);
+  - o `0x0339` @12 continua hipótese para ouro guardado entre sessões;
+  - teleporte pago, chat de grupo/guilda e interrupção no meio de uma transação não foram exercitados;
+  - sem commit nem deploy nesta sessão.
+- **Próximo passo:** fatia 4 (grupo e troca).
+
+### 30/09/2026 — etapa 7: cache local do pacote principal
+
+- **Pedido do usuário:** implementar cache automático do pacote principal (~320 MB), com atualização por conteúdo.
+- **Arquivos:** `tools/build_local_scene.py`, `web/client.js`, gateway `static.go`, `deploy_test.go` e `s3_test.go`, `tools/verify_asset_cache.mjs`, `package.json`, `docs/deploy.md` e [evidências](evidence/07-web/2026-09-30-asset-cache.md).
+- **Decisão:** cache nativo do Emscripten 6.0.0 em `WYD_PRELOAD_CACHE` (IndexedDB); hash do conteúdo invalida o pacote; loader `.js` revalidado também no diretório local. WASM e músicas fora deste cache.
+- **Confirmado em execução:** gateway vet/test verde; 24 cenários aprovados no harness Chromium/Firefox, incluindo atualização, falhas de armazenamento, cena real de `client.html` e reinício do navegador. Reaberturas reais: zero requisições e zero bytes do `.data`; primeiro acesso: 319.802.941 bytes.
+- **Preparação:** restaurados 7.093 arquivos da cópia local existente, todos conferidos com o manifesto; pacote regenerado sem alterar hash do `.data`; novo manifesto local `a457267b6cd82874` em `.cache/deploy-assets`.
+- **Limites:** medições locais não provam ganho de tempo em produção; Chromium warm foi mais lento que cold. Sem Safari, login, multiplayer ou deploy nesta fatia. Assets continuam ignorados pelo Git.
+- **Entrega solicitada:** commit e push do código e das evidências na branch `Jean1dev/shop-bank-chat`; pacote de assets e perfis de navegador permanecem locais.
+- **Próximo passo:** publicar loader/dados/manifesto juntos num prefixo novo, aplicar gateway atualizado e medir no domínio público. Instruções em `docs/deploy.md`; demais pendências de gameplay preservadas.
+
+### 30/09/2026 — etapa 5, fatia 4: grupo no Railway e troca no servidor
+
+- **Pedido do usuário:** executar o orquestrador. No plano aprovado: aprovar o grupo no Railway e fazer a troca como entrega separada no servidor. O usuário autorizou encerrar o Chrome para liberar memória.
+- **Arquivos:**
+  - servidor, no checkout `external/server` (branch local `webclient/trade-forwarding`, base `98286fdf`, sem commit porque o índice referencia um blob ausente): `handler/trade.go`, `trade_test.go`, `view_test.go`, `party.go`, `protocol/types.go`, `types_test.go` e `world/session.go`. Entrega em `patches/server/0001-trade-forwarding.patch` (SHA-256 `6a8f8c1d…`);
+  - cliente: `client/dialect/WydDialect.cpp` (`0383` 154↔156, `0384`/`0386`), `tools/protocol/{gen_fixtures.py,gen_vectors.py,gen_client_stream.py,dialect_test.cpp,overlay/zz_ext_dialect_test.go}`, `tools/verify_world.mjs` (pick do alvo do grupo), [ADR 010](decisions/010-server-trade-forwarding.md), ADR 009, `docs/compatibility.md`, [evidência](evidence/05-gameplay/2026-09-30-party.md) e checklist da etapa 5.
+- **Confirmado em fonte:** fluxo legado de `_MSG_Trade.cpp` (`w2pp-OpenWYD` `8f65f35a`): encaminhamento, `CNFCheck`, `SendCarry`, `SaveUser` e `RemoveTrade`. O runtime já consome `0383/0384/0386/0185`. Divergência registrada: o `MSG_Trade` legado tem alinhamento natural (156), mas o servidor Go usa 154 empacotados. O layout do servidor foi mantido e o dialeto traduz.
+- **Confirmado em teste:**
+  - servidor: testes de troca 19/0 (8 novos ou reescritos), `go vet` limpo. No `go test ./...` completo, só falham 13 testes que dependem de `Release/` ausente no checkout;
+  - cliente: `protocol:dialect` 800/0; `protocol:vectors` com 97 vetores e 34 fluxos, e o overlay com o encoder real do servidor alterado; `world:checks` 27/0; `scene` e `client:stream` verdes;
+  - WASM `tmproject_startup.1790802394708885000` (115 objetos certificados, 0 indefinidos).
+- **Online (Railway):**
+  - execução 4 do grupo reprovou no harness: o hover pegou um NPC que cobria B. A correção foi feita, mas não foi validada online;
+  - execução 5 foi interrompida pelo Claude Code por falta de memória e não foi reiniciada;
+  - nenhuma troca online.
+- **Bloqueios:**
+  - publicar o patch do servidor (operador);
+  - memória do host para duas sessões (issue #6);
+  - não há stack local com persistência (Docker indisponível).
+- **Execução 6 (pedida pelo usuário, 21:49–22:11 UTC):** fase `party` **aprovada** no Railway, validando online a correção do pick. Recusa, aceite, clique repetido, saída, expulsão, desconexão de membro e de líder, e relogin com inventário preservado. Zero descartes do dialeto, zero erros de página e nenhum `crack`. Log do servidor: 6 `0x037F`, 5 `0x03AB` e 4 `0x037E` roteados.
+- **Próximo passo:** publicação do patch de troca pelo operador; depois, fase `trade` no harness.
+
+### 30/09–01/10/2026 — PRs no servidor, exclusão de personagem e suíte da etapa 4
+
+- **Pedido do usuário:** executar o orquestrador. No plano aprovado, o usuário pediu que a alteração necessária no `tm-server` seja feita e enviada como PR ao repositório do servidor, e escolheu fechar as etapas 3 e 4.
+- **Checkouts:** `external/server-pr`, clone limpo de `Jean1dev/w2pp-OpenWYD` com `main` = `98286fdf`. O `external/server` tem o índice corrompido e o remoto apontando para `../start`, que não existe.
+- **Servidor (entregas separadas, sem merge nem deploy):**
+  - [PR #358](https://github.com/Jean1dev/w2pp-OpenWYD/pull/358), troca. Commit `cf583a37`, diff idêntico ao `patches/server/0001`. Testes de troca 19/0, `go test ./...` do tmserver verde no clone limpo, `go vet` limpo e `gofmt` sem diff.
+  - [PR #359](https://github.com/Jean1dev/w2pp-OpenWYD/pull/359), recusa de exclusão `0x011A` → `0x011B`, como no legado `ProcessDBMessage.cpp:641-649`. Teste novo `TestDeleteCharacterWrongPassword`, `go test ./...` verde. Entregue como `patches/server/0002-delete-character-fail.patch` ([ADR 011](decisions/011-delete-character-end-to-end.md)).
+- **Cliente:**
+  - patches `0020-trade-probes` e `0021-selchar-delete-probe`. O 0021 também apaga os 256 bytes do campo de senha da exclusão; o original apagava 4;
+  - `tools/verify_world.mjs`, com as fases `delete` e `trade`, `openPlayerMenu`/`uiButton`/`trade()`/`requestTrade` e o auxiliar `classChar`;
+  - `tools/trade_checks{,.test}.mjs`; `tools/world_checks.mjs` (fases e regras); `package.json`; `tools/capture_world_logs.py` (filtro);
+  - ADR 010 (revisão) e ADR 011; matriz; evidências das etapas 3, 4 e 5.
+- **Confirmado em teste:**
+  - WASM `tmproject_startup.1790812300295676400` (SHA-256 `6c441b66…`), 115 objetos certificados e 0 indefinidos;
+  - pilha de patches 0001–0021 aplicada;
+  - `protocol:dialect` 800/0, `protocol:vectors` verde, `world:checks` 31/0, `scene` e `client:stream` verdes.
+- **Confirmado em execução (Railway):**
+  - `delete` aprovado na primeira execução ([evidência](evidence/03-protocolo/README.md#exclusão-de-personagem-ponta-a-ponta-30092026)): senha errada recusada com `0x011A` e lista intacta; senha certa com `0x0112` e só o slot descartável removido; relogin igual;
+  - suíte da etapa 4: `badpass,badpin` e `classes` 0–3 aprovados. As classes 1–3 foram **criadas** nos slots 1–3 da conta A, que agora está cheia.
+- **Falhas:**
+  - a primeira suíte reprovou em `classes` 1, porque o nome derivado tinha 14 caracteres. O harness foi corrigido;
+  - a segunda foi interrompida pelo Claude Code por falta de memória ao abrir B e não foi reiniciada.
+- **Não executado:**
+  - fase `trade` online (depende do merge e deploy do PR #358);
+  - `move,logout`, `mapchange` e `concurrent` desta suíte;
+  - cliente Windows;
+  - nenhum commit no repositório do cliente.
+- **CI (pedido do usuário, 01/10):**
+  - Cliente: o job `protocol` do PR #11 falhava porque o overlay usava `MsgCNFCheck`, que só existe com o PR #358, e a CI usa o servidor fixado `98286fdf`. Localmente passava porque o `external/server` tem o patch aplicado. Corrigido no commit `2ba7d89`: valor literal no overlay e opção `--server` em `run_go_vectors.py`, verificada contra o clone limpo e contra o servidor com patch. No mesmo commit, as actions passaram para as majors em Node 24 e o job `checks` passou a rodar `tools/*.test.mjs`. Os 5 jobs ficaram verdes.
+  - Servidor: o [PR #360](https://github.com/Jean1dev/w2pp-OpenWYD/pull/360) fixa o `govulncheck` em `v1.7.0`. O `@latest` agora resolve para a v1.8.0, que exige Go 1.26, e com isso Vulnerabilities falha em qualquer execução nova. O PR também passa as actions para Node 24 e fixa o runner em `ubuntu-24.04`. Todos os jobs ficaram verdes, sem anotações. Os PRs #358 e #359 precisam do #360 (merge ou rebase) para que uma nova execução de Vulnerabilities passe.
+  - Os patches 0020/0021 foram gerados de novo sem a linha em branco extra no fim do arquivo. A pilha 0001–0021 aplica num checkout LF limpo do upstream fixado com `--whitespace=error`.
+- **Próximo passo:** merge e deploy dos PRs #358 e #359 pelo operador. Depois, rodar `trade` e `delete`, e os cenários restantes da etapa 4 com memória livre.
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.

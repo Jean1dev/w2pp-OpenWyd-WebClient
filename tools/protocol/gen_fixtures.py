@@ -354,6 +354,54 @@ def standard_parm(opcode: int, ident: int, parm: int) -> bytearray:
     return b
 
 
+# Shop, cargo gold and chat (ADR 008). IDScene = 30000 (protocol/selchar.go).
+ID_SCENE = 30000
+CARGO_COIN = {"id": 5, "coin": 1234567}
+CHAT_NOTICE = {"id": 5, "text": "Pontos Caos atual: 3 (+1)"}  # handler sendChatText
+CHAT_PLAYER = {"id": 7, "text": "ola B"}  # a 140-byte line forwarded as sent
+WHISPER = {"id": 7, "name": "Destino", "text": "oi", "color": 0}
+BUY_ECHO = {"id": ID_SCENE, "target": 12474, "npcPos": 3, "myPos": 17, "coin": 2400}
+SELL_ECHO = {"id": ID_SCENE, "target": 12474, "myType": 1, "myPos": 13}
+DEPOSIT_ECHO = {"id": ID_SCENE, "parm": 500}
+OUT_BUY = {"id": 5, "target": 12474, "npcPos": 3, "myPos": 17, "coin": 0}
+
+
+def update_cargo_coin(d: dict) -> bytearray:
+    b = header(57, 0x0339, d["id"])
+    struct.pack_into("<i", b, 12, d["coin"])
+    return b
+
+
+def chat_text(d: dict, size: int | None = None) -> bytearray:
+    raw = d["text"].encode("ascii") + b"\0"
+    b = header(size or 12 + len(raw), 0x0333, d["id"])
+    b[12 : 12 + len(raw)] = raw
+    return b
+
+
+def whisper(d: dict, size: int = 158) -> bytearray:
+    b = header(size, 0x0334, d["id"])
+    put_name(b, 12, d["name"])
+    raw = d["text"].encode("ascii")
+    b[28 : 28 + len(raw)] = raw
+    if size >= 158:
+        struct.pack_into("<h", b, 156, d["color"])
+    return b
+
+
+def buy(d: dict) -> bytearray:
+    b = header(24, 0x0379, d["id"])
+    struct.pack_into("<Hhh", b, 12, d["target"], d["npcPos"], d["myPos"])
+    struct.pack_into("<i", b, 20, d["coin"])
+    return b
+
+
+def sell(d: dict) -> bytearray:
+    b = header(18, 0x037A, d["id"])
+    struct.pack_into("<Hhh", b, 12, d["target"], d["myType"], d["myPos"])
+    return b
+
+
 # Outbound expectations: what the translator must emit for runtime structs
 # built by dialect_test.cpp with these values.
 OUT_ACCOUNT = {"pass": "segredo1", "account": "fixture01", "force": 1, "mac": [1, 2, 3, 0xDEADBEEF]}
@@ -418,6 +466,45 @@ def out_attack(d: dict) -> bytearray:
     return b
 
 
+def party_frame(kind: str) -> bytearray:
+    if kind == "accept":
+        b = header(32, 0x3AB, 8)
+        struct.pack_into("<h", b, 12, 7)
+        put_name(b, 14, "PartyA")
+    elif kind == "remove":
+        b = header(16, 0x37E, 30000)
+        struct.pack_into("<hh", b, 12, 8, 0)
+    elif kind in ("leader", "member"):
+        b = header(40, 0x37D, 30000)
+        struct.pack_into("<HHHHH", b, 12, 7 if kind == "leader" else 30000, 8, 130, 80, 7 if kind == "leader" else 8)
+        put_name(b, 22, "PartyA" if kind == "leader" else "PartyB")
+        struct.pack_into("<H", b, 38, 52428)
+    else:
+        b = header(48, 0x37F, 7 if kind == "request" else 30000)
+        struct.pack_into("<BBHHHh", b, 12, 0, 0, 8, 130, 80, 7)
+        put_name(b, 22, "PartyA")
+        if kind == "request":
+            struct.pack_into("<ih", b, 40, 8, 8)
+    return b
+
+
+def trade_frame(sender=7, opponent=8, result=False) -> bytearray:
+    """Classic packed MSG_Trade (154 bytes, the server's MsgTradeBody): one item
+    from carry slot 3, 50 gold, checked; unused entries carry InvenPos 0xFF.
+    result=True builds the pre-fix server's 1-byte-count placeholder instead."""
+    b = header(21 if result else 154, 0x383, sender)
+    if result:
+        b[12] = 1
+        put_item(b, 13, {"index": 1100})
+        return b
+    put_item(b, 12, {"index": 1100, "eff": [[43, 5]]})
+    for i in range(15):
+        b[132 + i] = 0xFF
+    b[132] = 3
+    struct.pack_into("<iBH", b, 147, 50, 1, opponent)
+    return b
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.parse_args()
@@ -460,6 +547,14 @@ def main() -> int:
         "swap_item_range": (swap_item(SWAP_RANGE), SWAP_RANGE),
         "use_item": (use_item(USE_ECHO), USE_ECHO),
         "update_carry": (update_carry(CARRY), CARRY),
+        "update_cargo_coin": (update_cargo_coin(CARGO_COIN), CARGO_COIN),
+        "chat_notice": (chat_text(CHAT_NOTICE), CHAT_NOTICE),
+        "chat_player": (chat_text(CHAT_PLAYER, 140), CHAT_PLAYER),
+        "whisper": (whisper(WHISPER), WHISPER),
+        "whisper_short": (whisper(WHISPER, 28 + len(WHISPER["text"])), WHISPER),
+        "buy_echo": (buy(BUY_ECHO), BUY_ECHO),
+        "sell_echo": (sell(SELL_ECHO), SELL_ECHO),
+        "deposit_echo": (standard_parm(0x0388, ID_SCENE, 500), DEPOSIT_ECHO),
     }
     outbound = {
         "account_login": (out_account_login(), dict(OUT_ACCOUNT, clientVersion=CLIENT_VERSION)),
@@ -470,7 +565,20 @@ def main() -> int:
         "attack_multi": (out_attack(OUT_ATTACK_MULTI), OUT_ATTACK_MULTI),
         "swap_item": (swap_item(OUT_SWAP), OUT_SWAP),
         "use_item": (use_item(OUT_USE), OUT_USE),
+        "buy": (buy(OUT_BUY), OUT_BUY),
     }
+    for kind in ("invite", "leader", "member", "remove"):
+        inbound["party_" + kind] = (party_frame(kind), {"kind": kind})
+    for kind in ("request", "accept"):
+        outbound["party_" + kind] = (party_frame(kind), {"kind": kind})
+    trade = {"item": 1100, "eff": [[43, 5]], "pos": 3, "money": 50, "check": 1}
+    outbound["trade_offer"] = (trade_frame(7, 8), dict(trade, opponent=8))
+    inbound["trade_offer"] = (trade_frame(8, 7), dict(trade, opponent=7))
+    inbound["trade_result_placeholder"] = (trade_frame(result=True), {"dropped": True})
+    inbound["trade_ack_placeholder"] = (header(13, 0x383, 7), {"dropped": True})
+    inbound["quit_trade"] = (header(12, 0x384, 7), {"signal": True})
+    inbound["cnf_check"] = (header(12, 0x386, 7), {"signal": True})
+    outbound["quit_trade"] = (header(12, 0x384, 7), {"signal": True})
     doc = {
         "generator": "tools/protocol/gen_fixtures.py",
         "note": "synthetic; no real account data. wire_hex is the full plaintext frame (header included).",

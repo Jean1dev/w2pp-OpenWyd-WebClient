@@ -107,3 +107,29 @@ func TestRemoteIPBehindProxy(t *testing.T) {
 		t.Fatalf("invalid header must fall back to the peer: %s", got)
 	}
 }
+
+func TestAssetLoaderRevalidation(t *testing.T) {
+	for _, inSite := range []bool{true, false} {
+		site, assets := t.TempDir(), t.TempDir()
+		dir := assets
+		if inSite {
+			dir = site
+		}
+		write(t, dir, "openwyd_assets.js", "loader with package hash")
+		h := newHarness(t, func(c *config.Config) { c.StaticDir = site; c.AssetDir = assets })
+		resp, _ := get(t, h.srv.URL+"/openwyd_assets.js", nil)
+		if resp.StatusCode != http.StatusOK || resp.Header.Get("Cache-Control") != "private, no-cache" {
+			t.Fatalf("inSite=%v: %d %v", inSite, resp.StatusCode, resp.Header)
+		}
+		req, _ := http.NewRequest(http.MethodGet, h.srv.URL+"/openwyd_assets.js", nil)
+		req.Header.Set("If-Modified-Since", resp.Header.Get("Last-Modified"))
+		unchanged, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		unchanged.Body.Close()
+		if unchanged.StatusCode != http.StatusNotModified || unchanged.Header.Get("Cache-Control") != "private, no-cache" {
+			t.Fatalf("revalidation inSite=%v: %d %v", inSite, unchanged.StatusCode, unchanged.Header)
+		}
+	}
+}

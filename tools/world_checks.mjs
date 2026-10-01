@@ -15,7 +15,7 @@ export function redactEvidence(value, secrets) {
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
   'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'castarea',
-  'equip', 'potion', 'loot', 'concurrent'];
+  'equip', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'trade', 'delete', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -42,6 +42,13 @@ export function validateOptions(opt) {
   if (phases.has('potion'))
     assert.deepEqual([...phases].sort(), ['death', 'enter', 'login', 'potion', 'second'],
       'potion runs only with login,enter,second,death');
+  // Slice 3: shop and bank are private to A and end with their own relogin;
+  // chat needs B as the listener and includes the /city teleport commands.
+  for (const [p, only] of [['shop', ['enter', 'login', 'shop']], ['bank', ['bank', 'enter', 'login']],
+    ['chat', ['chat', 'enter', 'login', 'second']], ['party', ['enter', 'login', 'party', 'second']],
+    ['trade', ['enter', 'login', 'second', 'trade']], ['delete', ['delete']]]) {
+    if (phases.has(p)) assert.deepEqual([...phases].sort(), only, `${p} runs only with ${only.join(',')}`);
+  }
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
     move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], loot: ['login'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
@@ -295,7 +302,7 @@ export function checkPotion(p) {
   // Natural regeneration adds Level+30 per 10 s tick; a 200 potion must
   // raise HP by more than one such tick (or fill it).
   assert(p.use.hp - p.hpBefore > 39 || p.use.hp === p.maxHp, 'HP did not rise beyond regeneration after the potion');
-  assert(p.observer.hpAfter > p.observer.hpBefore, 'B did not see the heal');
+  assert(p.observer.hpAfter > p.hpBefore, 'B did not see the heal');
   const spent = p.use.amount - p.double.amount;
   assert(spent >= 1 && spent <= 2, `double use consumed ${spent} units`);
   assert(p.double.usesSent >= 1, 'double use sent nothing');
@@ -315,4 +322,60 @@ export function checkLoot(l) {
   assert.deepEqual(l.lost, [], 'carry lost items while looting');
   assert(l.end.coin >= l.start.coin, 'coin fell while looting');
   checkInventoryRelogin(l.end, l.relogin);
+}
+
+// NPC shop (slice 3). Gold and items move only on the server's word: the
+// sale by its 0x037A echo, 0x0182 clear and 0x0337 gold; the purchase by the
+// 0x0379 echo, 0x0337 and 0x0182. A refused buy leaves both untouched.
+export function checkShop(s) {
+  assert(s.merchant > 0 && s.cells.length > 0, 'shop window did not list items');
+  assert(s.sell.sent >= 1, 'no 0x037A left the client');
+  assert.equal(s.sell.after.index, 0, 'sold slot not cleared by the server');
+  assert(s.sell.coinAfter > s.sell.coinBefore, 'sale did not raise gold');
+  assert(s.buy.sent >= 1, 'no 0x0379 left the client');
+  assert(s.buy.gained >= 1, 'bought item did not reach the carry');
+  assert(s.buy.coinAfter < s.buy.coinBefore, 'purchase did not lower gold');
+  if (s.poor) {
+    assert(s.poor.sent >= 1, 'refused buy sent nothing');
+    assert.equal(s.poor.coinAfter, s.poor.coinBefore, 'refused buy changed gold');
+    assert.equal(s.poor.gained, 0, 'refused buy added an item');
+  }
+  // Every unit gained was paid for, at one unit price, also on a repeated click.
+  const spent = s.buy.coinBefore - s.buy.coinAfter;
+  assert.equal(spent % s.buy.gained, 0, 'purchase: gold is not a whole number of units');
+  const price = spent / s.buy.gained;
+  assert.equal(s.repeat.coinBefore - s.repeat.coinAfter, s.repeat.gained * price, 'repeated buy: gold and items disagree');
+  checkInventoryRelogin(s.beforeRelogin, s.relogin);
+  assert.equal(s.relogin.coin, s.beforeRelogin.coin, 'gold differs after relogin');
+}
+
+// Account cargo (slice 3): both gold pools and the stored item change only by
+// the server's echoes; a refused withdraw changes nothing; relogin keeps both.
+export function checkBank(b) {
+  assert(b.opened, 'cargo window did not open');
+  assert.equal(b.deposit.coin, b.deposit.coinBefore - b.amount, 'deposit: carry gold');
+  assert.equal(b.deposit.cargo, b.deposit.cargoBefore + b.amount, 'deposit: cargo gold');
+  assert.equal(b.withdraw.coin, b.deposit.coin + b.amount, 'withdraw: carry gold');
+  assert.equal(b.withdraw.cargo, b.deposit.cargo - b.amount, 'withdraw: cargo gold');
+  assert.equal(b.overdraw.sent, 1, 'overdraw: one 0x0387 expected');
+  assert.equal(b.overdraw.coin, b.withdraw.coin, 'overdraw changed carry gold');
+  assert.equal(b.overdraw.cargo, b.withdraw.cargo, 'overdraw changed cargo gold');
+  assert.equal(b.overdeposit.sent, 0, 'deposit above carry gold must be refused by the client');
+  assert.equal(b.store.cargoItem, b.store.item, 'item did not reach the cargo');
+  assert.equal(b.store.carryItem, 0, 'stored item still in the carry');
+  assert.equal(b.fetch.carryItem, b.store.item, 'item did not come back');
+  assert.equal(b.relogin.cargo, b.withdraw.cargo, 'cargo gold differs after relogin');
+  assert.equal(b.relogin.coin, b.withdraw.coin, 'carry gold differs after relogin');
+}
+
+// Chat (slice 3): B shows A's line under A's name; the whisper reaches B; the
+// /city command moves A by the server (0x036C) and B loses sight of it.
+export function checkChat(c) {
+  assert(c.say.sent, 'no 0x0333 left the client');
+  assert(c.say.heard, "B did not show A's line");
+  assert(c.whisper.sent, 'no 0x0334 left the client');
+  assert(c.whisper.heard, 'B did not show the whisper');
+  assert(c.teleport.moved > 50, 'the /city command did not move A');
+  assert(c.teleport.bLost, 'B still sees A after the teleport');
+  assert(c.back.moved > 50, 'the return command did not move A');
 }

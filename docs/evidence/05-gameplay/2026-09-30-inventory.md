@@ -66,26 +66,41 @@ A [execução 1](2026-09-30-inventory-equip-score-failed.json) teve o mesmo flux
 
 A regra passou a comparar os dois recálculos do servidor, com e sem o item. É uma **divergência do servidor**, que continua exibindo um score de template até o primeiro `0x0336`. O candidato para uma entrega separada é enviar `sendScore` depois do login. Não foi corrigida no cliente.
 
-## Poção — **não provada**
+## Poção — **aprovada** (Railway, execução 8)
 
-| Execução | Resultado |
-|---|---|
-| 1 (`…,potion`, dano dos Gremlins) | **interrompida pelo Claude Code por falta de memória** durante o login de B (1.087 MiB livres depois do `enter` de A, [issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)) |
-| 2 (mesmo cenário, pedida pelo usuário; [JSON](2026-09-30-inventory-potion-gremlins-failed.json)) | **reprovada no desenho:** HP 130/130 depois de 11 lutas contra Gremlins. Nenhuma execução de grind (136 abates somados, quatro classes) ficou abaixo de 50% de HP; o dano é pequeno e a regeneração natural (nível+30 a cada 10 s) repõe tudo |
-| 3 (`…,death,potion`) | **interrompida pelo Claude Code por falta de memória** durante o login de B (1.174 MiB livres depois do `enter` de A) |
-
-Mudança depois da execução 2: a fase `potion` passou a exigir `login,enter,second,death`.
-
-- O dano vem da fase `death`, já provada: A morre para os Trolls e o servidor a revive com HP 2 no spawn de Armia, ao lado de B.
-- A regra exige que o HP suba mais do que um tick de regeneração (39) ou chegue ao máximo, para não confundir a poção com a regeneração.
-
-Em nenhuma das três execuções o cenário chegou a usar a poção. Nenhum processo ficou órfão.
-
-Comando pendente:
+Comando, cada execução num processo separado:
 
 ```
 node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,second,death,potion --class 0
 ```
+
+Antes das execuções 4–8, a memória foi liberada com autorização do usuário: 61 processos `tail`/`grep` órfãos de monitores antigos, Docker Desktop, Chrome em segundo plano e outras sessões do Claude Code. Com isso, o Node via 2,3–2,6 GB livres no início e ≥ 1.019 MiB com as duas páginas no Field. Nenhuma execução foi interrompida por memória.
+
+| Execução | Resultado |
+|---|---|
+| 1 (`…,potion`, dano dos Gremlins) | **interrompida pelo Claude Code por falta de memória** durante o login de B (1.087 MiB livres depois do `enter` de A, [issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)) |
+| 2 (mesmo cenário, pedida pelo usuário; [JSON](2026-09-30-inventory-potion-gremlins-failed.json)) | **reprovada no desenho:** HP 130/130 depois de 11 lutas contra Gremlins. O dano é pequeno, e a regeneração natural (nível+30 a cada 10 s) repõe tudo |
+| 3 (`…,death,potion`) | **interrompida pelo Claude Code por falta de memória** durante o login de B (1.174 MiB livres depois do `enter` de A) |
+| 4 ([JSON](2026-09-30-inventory-potion-regen-failed.json)) | `death` aprovada; `potion` reprovou com HP 130/130. O servidor revive com 1–50% do HP máximo (aqui 41, não 2), e entre o recall e o uso passaram mais de 30 s (amostragem de memória, screenshots, abertura do inventário): três ticks de regeneração |
+| 5 ([JSON](2026-09-30-inventory-potion-portal-failed.json)) | A caixa do portal abriu, mas A passou do tile (2141.5,2065.5). O servidor calcula o teleporte pelo tile atual e ignora o pedido em silêncio. O harness passou a voltar ao portal e repetir, com até 3 tentativas registradas em `portalAttempts` |
+| 6 ([JSON](2026-09-30-inventory-potion-regen2-failed.json)) | Mesmo motivo da 4, mesmo com a leitura do HP adiada |
+| 7 ([JSON](2026-09-30-inventory-potion-emptycell-failed.json)) | **Poção funcionou** (HP 80→130, 120→119, clique duplo 119→117 com 2 envios, B viu 130). Reprovou só na pré-condição do harness: o loot encheu a página 0 da bolsa, e não havia célula vazia para o caso negativo |
+| 8 ([JSON](2026-09-30-inventory-potion-passed.json), [log do servidor](2026-09-30-inventory-potion-passed-server.txt)) | **aprovada** |
+
+Correções do harness nesta sequência:
+- o primeiro uso acontece dentro da fase `death`, logo após o recall, com o inventário aberto pela tecla `i` enquanto A espera o recall;
+- o caso negativo usa uma célula de equipamento vazia quando a página 0 da bolsa está cheia;
+- o observador compara o HP que B vê com o HP de A antes da poção.
+
+Resultado da execução 8 (`2026-09-30T17-01-36-742Z`), confirmado em execução:
+- A morre para os Trolls, a caixa 11 envia `0x03AE`/`0x0289`, e o servidor revive A no spawn de Armia com HP 41/130. No momento do uso, depois de um tick de regeneração, o HP era 80;
+- um clique direito real na poção (slot 0) envia um `0x0373`; o servidor consome uma unidade (117→116 pelo `0x0182`), e o HP sobe para 130 pelo tick;
+- B, no spawn, vê o HP de A em 130 pelo `0x0336` do servidor;
+- dois cliques direitos no mesmo quadro enviam dois `0x0373`, e o servidor consome dois (→114); o valor local do runtime também é 114;
+- um clique direito numa célula vazia (equipamento 7) não envia nada, e bolsa e equipamento continuam iguais;
+- o relogin preserva a bolsa inteira, o ouro, o nível, a EXP e as 114 poções;
+- protocolo limpo;
+- o log do servidor registra `0x03AE` (`routed=false`), `0x0289` e três `0x0373` de 22 bytes de corpo.
 
 ## Loot — **aprovado** (Railway), sem ouro por defeito do servidor
 

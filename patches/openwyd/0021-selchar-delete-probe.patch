@@ -1,0 +1,51 @@
+Character deletion through the original SelectChar controls (4615, box
+4615, password panel, 65886) for the end-to-end test. The password lives
+only in a stack buffer and the original field, both cleared after the
+send; the original code cleared only 4 bytes of the 256-byte field.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -1179,3 +1179,30 @@
+   auto* it = g->GetItem(0, 0);
+   return it && it->m_pItem ? it->m_pItem->sIndex : 0;
+ }
++
++// Character deletion through the original controls: 4615 opens box 4615, the
++// harness confirms it with wyd_debug_scene_msgbox_ok, which opens the password
++// panel. The password is typed into the original field and cleared after 65886.
++extern "C" WYD_EXPORT int wyd_debug_selchar_open_delete(int slot) {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || slot < 0 || slot >= 4 || g_AccountLock != 1) return 0;
++  if (!scene->m_pHuman[slot] || !g_pObjectManager->m_stSelCharData.MobName[slot][0]) return 0;
++  g_pObjectManager->m_cCharacterSlot = static_cast<char>(slot);
++  scene->OnControlEvent(4615, 0);
++  return scene->m_pMessageBox && scene->m_pMessageBox->IsVisible() && scene->m_pMessageBox->m_dwMessage == 4615 ? 1 : 0;
++}
++extern "C" WYD_EXPORT int wyd_selchar_delete_panel_visible() {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  return scene && scene->m_pInputPWPanel && scene->m_pInputPWPanel->IsVisible() ? 1 : 0;
++}
++extern "C" WYD_EXPORT int wyd_debug_selchar_delete(const char* password) {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || !password || !scene->m_pPWEdit || !scene->m_pInputPWPanel || !scene->m_pInputPWPanel->IsVisible()) return 0;
++  char buf[16] = {0};
++  std::snprintf(buf, sizeof(buf), "%s", password);
++  scene->m_pPWEdit->SetText(buf);
++  std::memset(buf, 0, sizeof(buf));
++  const int r = scene->OnControlEvent(65886, 0);
++  std::memset(scene->m_pPWEdit->m_strText, 0, sizeof(scene->m_pPWEdit->m_strText));
++  return r;
++}
+diff --git a/Projects/TMProject/TMSelectCharScene.cpp b/Projects/TMProject/TMSelectCharScene.cpp
+--- a/Projects/TMProject/TMSelectCharScene.cpp
++++ b/Projects/TMProject/TMSelectCharScene.cpp
+@@ -728,7 +728,7 @@
+ 		sprintf(stDelCharacter.Password, "%s", m_pPWEdit->GetText());
+ 
+ 		g_pSocketManager->SendOneMessage((char*)&stDelCharacter, sizeof(stDelCharacter));
+-		memset(m_pPWEdit->m_strText, 0, 4);
++		memset(m_pPWEdit->m_strText, 0, sizeof(m_pPWEdit->m_strText));
+ 		m_pInputPWPanel->SetVisible(0);
+ 		m_pControlContainer->SetFocusedControl(nullptr);
+ 		return 1;

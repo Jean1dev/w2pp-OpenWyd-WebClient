@@ -1,0 +1,254 @@
+{
+ "when": "2026-09-30T23:57:40.945Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "delete"
+ ],
+ "accounts": {
+  "A": "wae*******",
+  "B": "wad*******"
+ },
+ "results": {
+  "delete": {
+   "ok": true,
+   "created": true,
+   "slot": 1,
+   "before": [
+    {
+     "filled": true,
+     "target": false,
+     "level": 0
+    },
+    {
+     "filled": true,
+     "target": true,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "target": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "target": false,
+     "level": 0
+    }
+   ],
+   "refused": {
+    "lastRecvOpcode": "0x11a",
+    "panelText": "",
+    "slots": [
+     {
+      "filled": true,
+      "target": false,
+      "level": 0
+     },
+     {
+      "filled": true,
+      "target": true,
+      "level": 0
+     },
+     {
+      "filled": false,
+      "target": false,
+      "level": 0
+     },
+     {
+      "filled": false,
+      "target": false,
+      "level": 0
+     }
+    ]
+   },
+   "deleted": {
+    "lastRecvOpcode": "0x112",
+    "slots": [
+     {
+      "filled": true,
+      "target": false,
+      "level": 0
+     },
+     {
+      "filled": false,
+      "target": false,
+      "level": 0
+     },
+     {
+      "filled": false,
+      "target": false,
+      "level": 0
+     },
+     {
+      "filled": false,
+      "target": false,
+      "level": 0
+     }
+    ]
+   },
+   "relogin": [
+    {
+     "filled": true,
+     "target": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "target": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "target": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "target": false,
+     "level": 0
+    }
+   ],
+   "ms": 150121,
+   "at": "2026-10-01T00:00:11.737Z"
+  }
+ },
+ "ok": true,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "9b73dac6b1a739844686e7e34d8128fe277ecccf",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end delete",
+   "at": "2026-10-01T00:00:11.738Z",
+   "freeMiB": 1558,
+   "totalMiB": 8014,
+   "browserMiB": 244,
+   "pages": {}
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "delete-box",
+   "file": ".cache/world/2026-09-30T23-57-40-936Z/B-delete-relogin-delete-box.png",
+   "sha256": "36f6939766269aff8957d5debdc913d68065aa808f6adcf7b1a8d184ad2e6742"
+  },
+  {
+   "name": "delete-refused",
+   "file": ".cache/world/2026-09-30T23-57-40-936Z/B-delete-relogin-delete-refused.png",
+   "sha256": "cffed3bd2338e7dec63c868518edca3cb317f0bf6dc04d4ff86d5f916c8f1960"
+  },
+  {
+   "name": "delete-box",
+   "file": ".cache/world/2026-09-30T23-57-40-936Z/B-delete-relogin-delete-box.png",
+   "sha256": "12729ade52cebf6326afa50793d3ad5d5dd8a0e8d713b1985f77ba8709709ea9"
+  },
+  {
+   "name": "delete-done",
+   "file": ".cache/world/2026-09-30T23-57-40-936Z/B-delete-relogin-delete-done.png",
+   "sha256": "abafaae9651fac4b474ba21434a3e4d2bd3204d58ff7906261e4a7f4bc228e4f"
+  },
+  {
+   "name": "delete-final",
+   "file": ".cache/world/2026-09-30T23-57-40-936Z/B-delete-final-delete-final.png",
+   "sha256": "9c80f22ea5badc3e4ff358949e6ca79d52c5d5cdcd9b5fceda3046007e3740aa"
+  }
+ ],
+ "pageErrors": {
+  "B-delete": [],
+  "B-delete-relogin": [],
+  "B-delete-final": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-09-30T20:57:41.4534483-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-09-30T20:57:58.6743728-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-30T20:58:18.1172789-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 200,
+   "bytes_down": 2876
+  },
+  {
+   "time": "2026-09-30T20:58:40.70981-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-30T20:59:32.5045573-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 252,
+   "bytes_down": 2888
+  },
+  {
+   "time": "2026-09-30T20:59:55.987212-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-09-30T21:00:11.7369827-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 164,
+   "bytes_down": 2020
+  }
+ ]
+}

@@ -1,0 +1,121 @@
+Read-only probes for stage 5 slice 3: the NPC shop panel (merchant, cell
+items and centers), the account cargo (gold, visible page, slots, cell
+centers), the chat window (line count, newest lines, edit box state), the
+gold buttons of the inventory and cargo windows, the amount box and the
+client catalog price of an item. The harness buys, sells, stores and chats
+with real mouse and keyboard input; nothing here sends a packet or changes
+state.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -1011,6 +1011,109 @@
+   return g_pCursor->m_pAttachedItem->m_pItem->sIndex;
+ }
+ 
++// NPC shop, cargo and chat (stage 5 slice 3, read-only). The harness buys,
++// sells, stores and chats with real mouse and keyboard input; these only
++// locate cells and read what the client shows. Nothing here sends a packet.
++extern "C" WYD_EXPORT int wyd_field_shop_visible() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pShopPanel && f->m_pShopPanel->IsVisible() ? 1 : 0;
++}
++
++extern "C" WYD_EXPORT unsigned int wyd_field_shop_merchant() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pGridShop ? f->m_pGridShop->m_dwMerchantID : 0;
++}
++
++// Shop cell (x 0..4, y 0..7 of the visible grid): item index and center.
++extern "C" WYD_EXPORT int wyd_field_shop_cell_item(int x, int y) {
++  TMFieldScene* f = WydField();
++  if (!f || !f->m_pGridShop) return -1;
++  SGridControlItem* it = f->m_pGridShop->GetItem(x, y);
++  return it && it->m_pItem ? it->m_pItem->sIndex : 0;
++}
++
++extern "C" WYD_EXPORT int wyd_field_shop_cell_screen(int x, int y, int which) {
++  TMFieldScene* f = WydField();
++  return f ? WydCellCenter(f->m_pGridShop, x, y, which) : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_shop_grid_size(int which) {
++  TMFieldScene* f = WydField();
++  if (!f || !f->m_pGridShop) return -1;
++  return which == 0 ? f->m_pGridShop->m_nColumnGridCount : f->m_pGridShop->m_nRowGridCount;
++}
++
++extern "C" WYD_EXPORT int wyd_field_cargo_visible() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pCargoPanel && f->m_pCargoPanel->IsVisible() ? 1 : 0;
++}
++
++// Account cargo gold as the client holds it (0x0339 and the deposit/withdraw
++// echoes), and the visible cargo page (0..2, control 67328+page) or -1.
++extern "C" WYD_EXPORT int wyd_field_cargo_coin() {
++  return g_pObjectManager ? g_pObjectManager->m_nCargoCoin : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_cargo_page() {
++  TMFieldScene* f = WydField();
++  if (!f) return -1;
++  for (int i = 0; i < 3; ++i)
++    if (f->m_pCargoGridList[i] && f->m_pCargoGridList[i]->IsVisible()) return i;
++  return -1;
++}
++
++// Cargo slot as the client holds it (0..127) and a cell center on a page.
++extern "C" WYD_EXPORT int wyd_debug_cargo_item(int slot) {
++  if (!g_pObjectManager || slot < 0 || slot >= MAX_CARGO) return -1;
++  return g_pObjectManager->m_stItemCargo[slot].sIndex;
++}
++
++extern "C" WYD_EXPORT int wyd_field_cargo_cell_screen(int page, int x, int y, int which) {
++  TMFieldScene* f = WydField();
++  if (!f || page < 0 || page >= 3) return -1;
++  return WydCellCenter(f->m_pCargoGridList[page], x, y, which);
++}
++
++// Chat window: number of lines and line k counted from the newest (0).
++extern "C" WYD_EXPORT int wyd_field_chat_count() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pChatList ? f->m_pChatList->m_nNumItem : -1;
++}
++
++extern "C" WYD_EXPORT const char* wyd_field_chat_line(int k) {
++  TMFieldScene* f = WydField();
++  if (!f || !f->m_pChatList || k < 0 || k >= f->m_pChatList->m_nNumItem) return "";
++  SListBoxItem* it = f->m_pChatList->m_pItemList[f->m_pChatList->m_nNumItem - 1 - k];
++  return it && it->GetText() ? it->GetText() : "";
++}
++
++// Gold buttons of the inventory/cargo windows and the amount box OK
++// (B_MONEY 65563, B_CARGO_MONEY 65688, B_IG_OK 65886): center as drawn, or -1.
++extern "C" WYD_EXPORT int wyd_field_button_screen(unsigned int id, int which) {
++  TMFieldScene* f = WydField();
++  if (!f || (id != 65563u && id != 65688u && id != 65886u)) return -1;
++  auto* b = static_cast<SPanel*>(f->m_pControlContainer->FindControl(id));
++  if (!b || !b->IsVisible() || b->m_GCPanel.nWidth <= 0 || b->m_GCPanel.nHeight <= 0) return -1;
++  return static_cast<int>(which == 0 ? b->m_GCPanel.nPosX + b->m_GCPanel.nWidth / 2
++                                     : b->m_GCPanel.nPosY + b->m_GCPanel.nHeight / 2);
++}
++
++extern "C" WYD_EXPORT int wyd_field_gold_input_visible() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pInputGoldPanel && f->m_pInputGoldPanel->IsVisible() ? 1 : 0;
++}
++
++// The client's catalog price of an item (ItemList nPrice). The harness uses it
++// only to choose what to try; the server charges from its own table.
++extern "C" WYD_EXPORT int wyd_item_price(int index) {
++  return index > 0 && index < MAX_ITEMLIST ? g_pItemList[index].nPrice : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_chat_editing() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pEditChatPanel && f->m_pEditChatPanel->IsVisible() ? 1 : 0;
++}
++
+ extern "C" int wyd_start_client() {
+   wchar_t empty_cmdline[] = L"";
+   return wWinMain(reinterpret_cast<HINSTANCE>(1), nullptr, empty_cmdline, 1);
