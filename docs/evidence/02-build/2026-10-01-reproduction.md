@@ -18,7 +18,7 @@ Nos itens, bytes 0–133 são preservados; a máscara u16 em 134 vira u32 em 136
 ## Mudanças e verificações
 
 - Importador valida tabelas obrigatórias e assinatura básica da fonte antes de copiar músicas/dataset; erros de ausência ou tamanho inválido têm mensagem legível. Manifesto das músicas agora também registra o hash de saída.
-- Sete testes sintéticos aprovados: offsets, sinais, máscara, primeiro/último registro, campos ausentes, tamanhos inválidos, entradas obrigatórias e ausência de cópias após erro de tabela. A CI passa a executar a suíte; não se afirma execução remota da CI nesta sessão.
+- Sete testes sintéticos aprovados: offsets, sinais, máscara, primeiro/último registro, campos ausentes, tamanhos inválidos, entradas obrigatórias e ausência de cópias após erro de tabela. A CI passa a executar a suíte; **confirmado em execução** no GitHub Actions, [execução 36866420277](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/actions/runs/36866420277), com os 7 testes aprovados.
 - **Confirmado em execução:** importação de 7.093 arquivos, 319.802.941 bytes, e 13 músicas, 26.272.662 bytes. Todos os hashes de saída conferidos com o manifesto. Vinte padrões do manifesto upstream não encontrados, preservados como lacunas explícitas.
 - Amostra convertida: item 1115 `Armadura_de_Couro(A)`, preço 2300, posição 4, grau 3. Não é validação de preço/economia do servidor.
 - **Confirmado em execução:** compilação limpa dos 115 objetos em 96.661 ms, `contract_unchanged=true`, `certified=true`. Link estrito aprovado com zero símbolos indefinidos; WASM válido, 988 exports, quatro exports obrigatórios presentes.
@@ -73,7 +73,7 @@ Durações: Chromium 2 min 20 s; Firefox na mesma ordem de grandeza (sem cronome
 ## Limites
 
 - Cena Field é a fixture offline do runtime, não mapa entregue pelo servidor; Select Server não conecta. Login e mundo online são evidência da etapa 4.
-- Safari não testado (sem ambiente macOS). CI remota não verificada nesta sessão.
+- Safari não testado (sem ambiente macOS). A CI do PR passou ([execução 36866420277](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/actions/runs/36866420277)); ela não executa a cena, que depende de assets locais.
 - Sem comparação pixel a pixel com o `WYD.exe`; paridade visual fica para a etapa 6.
 
 ## Decisão
