@@ -362,11 +362,24 @@ func TestIdleTimeoutClosesBoth(t *testing.T) {
 
 func TestShutdownClosesRelays(t *testing.T) {
 	h := newHarness(t, nil)
-	_, tcp := h.open()
+	ws, tcp := h.open()
+	// Read like a browser does: the read answers the gateway's close frame.
+	// An idle client would leave the handshake to the library's own 5 s
+	// timeout, which races waitIdle's deadline.
+	closed := make(chan error, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, _, err := ws.Read(ctx)
+		closed <- err
+	}()
 	h.cancel()
 	tcp.SetReadDeadline(time.Now().Add(5 * time.Second))
 	if _, err := tcp.Read(make([]byte, 1)); err == nil || isTimeout(err) {
 		t.Fatalf("shutdown did not close server side: %v", err)
+	}
+	if err := <-closed; websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+		t.Fatalf("browser side not closed cleanly on shutdown: %v", err)
 	}
 	h.waitIdle()
 }

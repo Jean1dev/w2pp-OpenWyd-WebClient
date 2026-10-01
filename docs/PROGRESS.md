@@ -497,3 +497,12 @@ As cores e texturas erradas eram defeito de código, não falta de asset: os cat
 - **Próximo passo:** merge e deploy dos PRs #358 e #359 pelo operador. Depois, rodar `trade` e `delete`, e os cenários restantes da etapa 4 com memória livre.
 
 Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Validada. Uma etapa parcialmente testada não é Validada.
+
+### 01/10/2026 — gateway: fechamento limpo no desligamento
+
+- **Sintoma:** `TestShutdownClosesRelays` falhou na CI do PR #12 (`relay still live: 1`) sem mudança em `gateway/`; passou ao repetir.
+- **Causa (confirmada em fonte e em execução):** o `NetConn` do par usava contexto derivado de `baseCtx`. No desligamento, `coder/websocket` v1.8.15 fecha a conexão via `context.AfterFunc` sem frame de fechamento, concorrendo com `closeBoth("shutdown", true)`. Quando a biblioteca ganhava, o navegador recebia EOF (como falha de rede); quando `closeBoth` ganhava, `Close` aguardava a resposta do cliente por até 5 s, o mesmo prazo de `waitIdle`. Localmente: 3/10 falhas no teste original; com o teste exigindo `StatusNormalClosure`, 32/50.
+- **Correção:** `gateway/internal/relay/relay.go`: contexto do par cancelado apenas por `closeBoth`; o loop observa `baseCtx` separadamente. O teste lê do WebSocket como um navegador e exige `StatusNormalClosure`.
+- **Verificação:** Go 1.25.13 local (zip oficial, SHA-256 conferido, em `.cache/toolchains`); `go vet ./...`; teste de desligamento 50/50 em < 1 s; `go test -count=10 ./...` duas vezes sem falhas. `-race` não executado localmente (sem cgo/gcc); fica para a CI.
+- **Limite:** navegador que não responde ao frame de fechamento ainda atrasa o desligamento em até 5 s por relay, dentro dos 10 s do processo.
+

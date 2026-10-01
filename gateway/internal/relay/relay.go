@@ -183,7 +183,11 @@ func (g *Gateway) handleWS(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) run(ch config.Channel, ip string, ws *websocket.Conn, tcp net.Conn) {
 	id := g.nextID.Add(1)
 	start := time.Now()
-	ctx, cancel := context.WithCancel(g.baseCtx)
+	// The pair's context is cancelled only by closeBoth. Deriving it from
+	// baseCtx would let the library hard-close the WebSocket on shutdown
+	// (NetConn closes the conn when its context ends), racing the clean
+	// close below; shutdown is observed through baseCtx in the loop instead.
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	browser := websocket.NetConn(ctx, ws, websocket.MessageBinary)
 	lim := g.cfg.Limits
@@ -240,8 +244,10 @@ loop:
 		case <-done:
 			break loop
 		case <-ctx.Done():
-			// Either a pump already closed both sides (reason is kept by
-			// once) or the gateway is shutting down.
+			// A pump already closed both sides.
+			<-done
+			break loop
+		case <-g.baseCtx.Done():
 			closeBoth("shutdown", true)
 			<-done
 			break loop
