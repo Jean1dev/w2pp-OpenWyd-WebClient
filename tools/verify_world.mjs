@@ -39,6 +39,7 @@ import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { areaPair, checkAreaAttempt } from './area_checks.mjs';
 import { checkParty, checkPartyEvidence } from './party_checks.mjs';
+import { fsTraceInit, packageIndex, openedByDir } from './fs_trace.mjs';
 import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
   checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, itemAmount } from './world_checks.mjs';
@@ -62,6 +63,9 @@ const { values: opt } = parseArgs({
     'class': { type: 'string', default: '0' },
     'grind-level': { type: 'string', default: '4' },
     headed: { type: 'boolean', default: false },
+    // Record which package files each page opens (tools/fs_trace.mjs); the
+    // list goes to .cache only, as the full asset manifest stays out of Git.
+    'trace-files': { type: 'boolean', default: false },
   },
 });
 const phases = validateOptions(opt);
@@ -137,6 +141,10 @@ async function startGateway(port, target) {
 }
 
 // One browser context = one game client.
+// Package files opened per session label (--trace-files).
+const traced = new Map();
+const traceOpens = page => page.evaluate(() => [...(window.__measure?.opens ?? [])]);
+
 class Session {
   constructor(browser, origin, label, creds) {
     this.browser = browser; this.origin = origin; this.label = label; this.creds = creds;
@@ -145,6 +153,7 @@ class Session {
 
   async open() {
     this.context = await this.browser.newContext({ viewport: { width: 1024, height: 768 } });
+    if (opt['trace-files']) await this.context.addInitScript(fsTraceInit);
     this.page = await this.context.newPage();
     this.connected = false;
     this.page.on('websocket', ws => {
@@ -157,7 +166,10 @@ class Session {
       window.Module?._wyd_get_game_state?.() === 7 && window.clientEvidence.frames > 20, 120000);
   }
 
-  async close() { await this.context?.close(); this.context = null; }
+  async close() {
+    if (opt['trace-files'] && this.context) try { traced.set(this.label, await traceOpens(this.page)); } catch {}
+    await this.context?.close(); this.context = null;
+  }
 
   // WASM linear memory (grows, never shrinks) and live JS heap of this page.
   memory() {
@@ -2855,6 +2867,18 @@ async function main() {
   } finally {
     for (const s of sessions) {
       try { if (s.context) ev[`final_${s.label}`] = dialectSummary(await s.probe()); } catch {}
+      if (opt['trace-files'] && s.context) try { traced.set(s.label, await traceOpens(s.page)); } catch {}
+    }
+    if (opt['trace-files']) {
+      const index = await packageIndex(SITE);
+      const all = new Set([...traced.values()].flat().map(([p]) => p));
+      const sum = by => Object.fromEntries(Object.entries(by).map(([k, v]) => [k, { files: v.files, MiB: +(v.bytes / 2 ** 20).toFixed(1) }]));
+      const trace = { sessions: Object.fromEntries([...traced].map(([label, opens]) =>
+        [label, { files: opens.filter(([p]) => index.has(p)).length, byDir: sum(openedByDir(opens.map(([p]) => p), index)) }])),
+        union: { files: [...all].filter(p => index.has(p)).length, byDir: sum(openedByDir([...all], index)) },
+        paths: [...traced].map(([label, opens]) => ({ label, opens })) };
+      await writeFile(join(OUT, 'opened-files.json'), JSON.stringify(trace, null, 1));
+      ev.openedFiles = { sessions: trace.sessions, union: trace.union, list: join(OUT, 'opened-files.json') };
     }
     ev.pageErrors = Object.fromEntries(sessions.map(s => [s.label, s.pageErrors]));
     ev.screenshots = sessions.flatMap(s => s.shots);

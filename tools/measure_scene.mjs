@@ -4,8 +4,7 @@
 //
 //   node tools/measure_scene.mjs [--seconds 60] [--browser chromium|firefox]
 //
-// The page is instrumented from outside: an init script wraps Module.FS.open
-// and Module._wyd_tick_client once the runtime initializes. Nothing in the
+// The page is instrumented from outside (tools/fs_trace.mjs). Nothing in the
 // runtime or the page changes.
 import { chromium, firefox } from 'playwright';
 import { createReadStream } from 'node:fs';
@@ -14,6 +13,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { extname, join, normalize, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { fsTraceInit, packageIndex } from './fs_trace.mjs';
 
 const { values: opt } = parseArgs({ options: {
   seconds: { type: 'string', default: '60' },
@@ -48,55 +48,6 @@ async function serveSite() {
   await new Promise(done => server.listen(0, '127.0.0.1', done));
   return { server, origin: `http://127.0.0.1:${server.address().port}`, served: () => bytes, reset: () => { bytes = 0; } };
 }
-
-// Package index (file_packager metadata): path -> size.
-async function packageIndex() {
-  const js = await readFile(join(SITE, 'openwyd_assets.js'), 'utf8');
-  const m = js.match(/loadPackage\((\{[\s\S]*?\})\);/);
-  if (!m) throw new Error('package metadata not found in openwyd_assets.js');
-  const files = JSON.parse(m[1]).files;
-  return new Map(files.map(f => [f.filename.toLowerCase().replace(/\/{2,}/g, '/'), f.end - f.start]));
-}
-
-const INIT = () => {
-  window.__measure = { t0: performance.now(), opens: new Map(), ticks: [], rafs: [], ready: null, firstFrame: null };
-  let mod;
-  Object.defineProperty(window, 'Module', {
-    configurable: true,
-    get() { return mod; },
-    set(value) {
-      mod = value;
-      // The runtime reassigns Module to itself; wrap the page's object once.
-      if (!value || value.__measured || typeof value.onRuntimeInitialized !== 'function') return;
-      value.__measured = true;
-      const init = value.onRuntimeInitialized;
-      value.onRuntimeInitialized = function () {
-        const m = window.__measure;
-        m.ready = performance.now() - m.t0;
-        const fs = value.FS;
-        const open = fs.open;
-        fs.open = function (path, ...rest) {
-          if (typeof path === 'string') {
-            const key = path.toLowerCase().replace(/\\/g, '/').replace(/\/{2,}/g, '/');
-            m.opens.set(key, (m.opens.get(key) ?? 0) + 1);
-          }
-          return open.call(this, path, ...rest);
-        };
-        const result = init.apply(this, arguments);
-        const tick = value._wyd_tick_client;
-        value._wyd_tick_client = function () {
-          const a = performance.now();
-          const r = tick.apply(this, arguments);
-          const b = performance.now();
-          if (m.firstFrame === null) m.firstFrame = b - m.t0;
-          if (m.ticks.length < 200000) { m.ticks.push(b - a); m.rafs.push(b); }
-          return r;
-        };
-        return result;
-      };
-    },
-  });
-};
 
 const pct = (xs, p) => {
   if (!xs.length) return null;
@@ -154,7 +105,7 @@ async function run(context, site, label, index) {
 
 await mkdir(opt.out, { recursive: true });
 const site = await serveSite();
-const index = await packageIndex();
+const index = await packageIndex(SITE);
 // Persistent profile so the second run hits the IndexedDB package cache (warm).
 const profile = await mkdtemp(join(tmpdir(), 'wyd-measure-'));
 const engine = { chromium, firefox }[opt.browser];
@@ -163,7 +114,7 @@ const report = { when: new Date().toISOString(), browser: opt.browser, viewport:
 try {
   context = await engine.launchPersistentContext(profile, { headless: true });
   report.version = context.browser()?.version() ?? null;
-  await context.addInitScript(INIT);
+  await context.addInitScript(fsTraceInit);
   for (const label of ['cold', 'warm']) {
     const r = await run(context, site, label, index);
     console.log(`${label}: ready ${r.readyMs} ms, first frame ${r.firstFrameMs} ms, served ${(r.servedBytes / 2 ** 20).toFixed(1)} MiB, ` +
