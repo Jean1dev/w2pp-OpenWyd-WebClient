@@ -148,6 +148,11 @@ func (g *Gateway) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer g.release(ip)
+	// Count the relay before the upgrade hijacks the connection: from then on
+	// http.Server.Shutdown no longer waits for this handler, so a later Add
+	// could race Wait and let shutdown return while a relay is starting.
+	g.active.Add(1)
+	defer g.active.Done()
 
 	// Dial before upgrading so an unreachable server is a plain HTTP error.
 	dctx, cancel := context.WithTimeout(r.Context(), g.cfg.Limits.DialTimeout.Std())
@@ -170,12 +175,8 @@ func (g *Gateway) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	g.active.Add(1)
 	g.live.Add(1)
-	defer func() {
-		g.live.Add(-1)
-		g.active.Done()
-	}()
+	defer g.live.Add(-1)
 	g.run(ch, ip, ws, tcp)
 }
 
@@ -183,7 +184,11 @@ func (g *Gateway) handleWS(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) run(ch config.Channel, ip string, ws *websocket.Conn, tcp net.Conn) {
 	id := g.nextID.Add(1)
 	start := time.Now()
-	ctx, cancel := context.WithCancel(g.baseCtx)
+	// The pair's context is cancelled only by closeBoth. Deriving it from
+	// baseCtx would let the library hard-close the WebSocket on shutdown
+	// (NetConn closes the conn when its context ends), racing the clean
+	// close below; shutdown is observed through baseCtx in the loop instead.
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	browser := websocket.NetConn(ctx, ws, websocket.MessageBinary)
 	lim := g.cfg.Limits
@@ -240,8 +245,10 @@ loop:
 		case <-done:
 			break loop
 		case <-ctx.Done():
-			// Either a pump already closed both sides (reason is kept by
-			// once) or the gateway is shutting down.
+			// A pump already closed both sides.
+			<-done
+			break loop
+		case <-g.baseCtx.Done():
 			closeBoth("shutdown", true)
 			<-done
 			break loop
