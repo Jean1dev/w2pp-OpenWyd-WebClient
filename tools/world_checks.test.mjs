@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkBank, checkChat } from './world_checks.mjs';
+  itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkBank, checkPaidTeleport, checkChat } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
   const value = { error: 'fixture-secret', nested: ['prefix fixture-secret suffix'], x: 123456 };
@@ -311,16 +311,35 @@ test('bank moves gold both ways by the amount, refuses overdraws and keeps both 
     withdraw: { coin: 50, cargo: 0 },
     overdraw: { sent: 1, coin: 50, cargo: 0 }, overdeposit: { sent: 0, coin: 50, cargo: 0 },
     store: { item: 400, cargoItem: 400, carryItem: 0 }, fetch: { carryItem: 400 },
-    relogin: { coin: 50, cargo: 0 } };
+    keep: { amount: 37, sent: 1, coin: 13, cargo: 37 },
+    relogin: { coin: 13, cargo: 37 }, restore: { coin: 50, cargo: 0 } };
   checkBank(b);
   const bad = [
     { opened: false }, { deposit: { ...b.deposit, cargo: 0 } }, { deposit: { ...b.deposit, coin: 50 } },
     { withdraw: { coin: 25, cargo: 25 } }, { overdraw: { sent: 0, coin: 50, cargo: 0 } },
     { overdraw: { sent: 1, coin: 1050, cargo: -1000 } }, { overdeposit: { sent: 1, coin: 50, cargo: 0 } },
     { store: { item: 400, cargoItem: 0, carryItem: 400 } }, { fetch: { carryItem: 0 } },
-    { relogin: { coin: 50, cargo: 25 } },
+    { relogin: { coin: 50, cargo: 25 } }, { relogin: { coin: 13, cargo: 0 } }, { relogin: { coin: 50, cargo: 0 } },
+    { keep: { amount: 37, sent: 0, coin: 13, cargo: 37 } }, { keep: { amount: 37, sent: 1, coin: 50, cargo: 37 } },
+    { restore: { coin: 13, cargo: 37 } },
   ];
   for (const x of bad) assert.throws(() => checkBank({ ...b, ...x }), JSON.stringify(Object.keys(x)));
+});
+
+test('paid portal charges the price once, refuses without it and keeps the charge after relogin', () => {
+  const t = { paid: { lastSent: 0x290, moved: 900, nearNoatum: true, coinBefore: 1000, coinAfter: 300 },
+    back: { sent: true }, parked: { sent: 1, amount: 800 },
+    refused: { lastSent: 0x290, moved: 0, coinBefore: 500, coinAfter: 500 },
+    restore: { sent: 1, coin: 300 }, relogin: { coin: 300 } };
+  checkPaidTeleport(t, 700);
+  const bad = [
+    { paid: { ...t.paid, coinAfter: 1000 } }, { paid: { ...t.paid, nearNoatum: false } }, { paid: { ...t.paid, lastSent: 0x36c } },
+    { refused: { ...t.refused, moved: 900 } }, { refused: { ...t.refused, coinAfter: 0 } }, { refused: { ...t.refused, coinBefore: 800 } },
+    { restore: { sent: 1, coin: 1000 } }, { relogin: { coin: 1000 } }, { back: { sent: false } },
+  ];
+  for (const x of bad) assert.throws(() => checkPaidTeleport({ ...t, ...x }, 700), JSON.stringify(Object.keys(x)));
+  validateOptions(options('login,enter,paidteleport'));
+  assert.throws(() => validateOptions(options('login,enter,second,paidteleport')));
 });
 
 test('chat needs B to show the line and the whisper, and the /city commands to move A by the server', () => {

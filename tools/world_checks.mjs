@@ -15,7 +15,7 @@ export function redactEvidence(value, secrets) {
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
   'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'castarea',
-  'equip', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'trade', 'delete', 'concurrent'];
+  'equip', 'potion', 'loot', 'shop', 'bank', 'paidteleport', 'chat', 'party', 'trade', 'tradeedge', 'delete', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -45,8 +45,10 @@ export function validateOptions(opt) {
   // Slice 3: shop and bank are private to A and end with their own relogin;
   // chat needs B as the listener and includes the /city teleport commands.
   for (const [p, only] of [['shop', ['enter', 'login', 'shop']], ['bank', ['bank', 'enter', 'login']],
+    ['paidteleport', ['enter', 'login', 'paidteleport']],
     ['chat', ['chat', 'enter', 'login', 'second']], ['party', ['enter', 'login', 'party', 'second']],
-    ['trade', ['enter', 'login', 'second', 'trade']], ['delete', ['delete']]]) {
+    ['trade', ['enter', 'login', 'second', 'trade']], ['tradeedge', ['enter', 'login', 'second', 'tradeedge']],
+    ['delete', ['delete']]]) {
     if (phases.has(p)) assert.deepEqual([...phases].sort(), only, `${p} runs only with ${only.join(',')}`);
   }
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
@@ -364,8 +366,30 @@ export function checkBank(b) {
   assert.equal(b.store.cargoItem, b.store.item, 'item did not reach the cargo');
   assert.equal(b.store.carryItem, 0, 'stored item still in the carry');
   assert.equal(b.fetch.carryItem, b.store.item, 'item did not come back');
-  assert.equal(b.relogin.cargo, b.withdraw.cargo, 'cargo gold differs after relogin');
-  assert.equal(b.relogin.coin, b.withdraw.coin, 'carry gold differs after relogin');
+  assert(b.keep.amount > 0 && b.keep.sent === 1, 'kept deposit: one 0x0387 expected');
+  assert.equal(b.keep.coin, b.overdeposit.coin - b.keep.amount, 'kept deposit: carry gold');
+  assert.equal(b.keep.cargo, b.overdeposit.cargo + b.keep.amount, 'kept deposit: cargo gold');
+  assert.equal(b.relogin.cargo, b.keep.cargo, 'cargo gold differs after relogin');
+  assert.equal(b.relogin.coin, b.keep.coin, 'carry gold differs after relogin');
+  assert.equal(b.restore.coin, b.relogin.coin + b.keep.amount, 'restore: carry gold');
+  assert.equal(b.restore.cargo, b.relogin.cargo - b.keep.amount, 'restore: cargo gold');
+}
+
+// Paid city portal (Armia -> Noatum): with the price on A the server charges it
+// once and moves A; with less, 0x0290 still leaves the client and nothing
+// changes. The parked gold comes back and the relogin keeps only the charge.
+export function checkPaidTeleport(t, price) {
+  assert.equal(t.paid.lastSent, 0x290, 'paid: no 0x0290 after OK');
+  assert(t.paid.moved > 50 && t.paid.nearNoatum, 'paid: A did not reach Noatum');
+  assert.equal(t.paid.coinAfter, t.paid.coinBefore - price, 'paid: charge differs from the price');
+  assert(t.back.sent, 'no /armia command left the client');
+  assert(t.parked.sent === 1 && t.refused.coinBefore < price, 'refused: A still had the price');
+  assert.equal(t.refused.lastSent, 0x290, 'refused: no 0x0290 after OK');
+  assert(t.refused.moved < 3, 'refused: A was teleported without the price');
+  assert.equal(t.refused.coinAfter, t.refused.coinBefore, 'refused: gold changed');
+  assert.equal(t.restore.sent, 1, 'restore: one 0x0387 expected');
+  assert.equal(t.restore.coin, t.paid.coinAfter, 'restore: gold differs from after the charge');
+  assert.equal(t.relogin.coin, t.paid.coinAfter, 'relogin: gold differs from after the charge');
 }
 
 // Chat (slice 3): B shows A's line under A's name; the whisper reaches B; the

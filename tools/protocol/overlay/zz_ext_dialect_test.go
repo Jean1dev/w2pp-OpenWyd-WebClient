@@ -545,6 +545,9 @@ func TestExtDialectInbound(t *testing.T) {
 	t.Run("notice_unknown", func(t *testing.T) {
 		same(t, EncodeStandardParm(999), body(t, "notice_unknown"))
 	})
+	t.Run("notice_no_empty_slot", func(t *testing.T) {
+		same(t, EncodeStandardParm(31), body(t, "notice_no_empty_slot"))
+	})
 	for _, name := range []string{"attack_echo", "attack_multi", "attack_mob", "attack_target_overflow"} {
 		t.Run(name, func(t *testing.T) {
 			var l fxAttack

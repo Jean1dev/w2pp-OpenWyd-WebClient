@@ -8,7 +8,7 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Validada (01/10: build limpo, importador com testes sintéticos e cena Field/Select Server em Chromium e Firefox; Field é fixture offline; Safari não testado) | [Cena real no navegador](evidence/02-build/README.md), [reprodução de 01/10](evidence/02-build/2026-10-01-reproduction.md) |
 | 3 Protocolo | Validada (01/10: vetores, streaming adversarial, login real e DeleteCharacter com recusa `0x011B` no Railway `2e532afa`; login real no tm-server do operador, não numa stack local) | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; faltam buff/cura e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; faltam buff/cura e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
@@ -16,20 +16,22 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
 ## Próxima ação
 
 1. Etapa 5:
-   - fatia 4, troca: aprovada em 01/10. Faltam recusa por falta de espaço e desconexão no meio da troca;
+   - fatia A (01/10): venda, ouro no banco entre sessões, teleporte pago e casos de troca confirmados. Falta uma execução completa de `tradeedge` dentro do prazo, que agora é de 60 min; ela também vende os 3 itens 1774 que sobraram em B;
+   - depois do merge e deploy dos PRs [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361) e [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362): conferir no HUD o nível e o HP reais logo após o login, e o loot com ouro dos Gremlins (`loot`);
    - fatia 5: persistência após reinício controlado do servidor (exige combinar com o operador);
-   - buff e cura (nível 11+ ou 16–20), teleporte pago por NPC e ouro guardado no banco entre sessões.
+   - buff e cura (nível 11+ ou 16–20).
 
    Rodar os cenários online em processos separados. Antes de abrir A e B, confirmar ≥ 2 GB livres: órfãos `tail`/`grep`, Docker e Chrome em segundo plano custaram ~1,3 GB nesta sessão ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar (os cenários de duas sessões passaram em 01/10, [evidência](evidence/04-login-mundo/2026-10-01-two-sessions.md)):
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
    - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
 3. Etapa 8 — confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
-4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6. Investigar por que a venda do item 4144 não rendeu ouro com A em 1.000.000 (fase `shop`, 01/10; causa não verificada).
+4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6.
 5. Servidor, entregas separadas (não feitas):
    - itens no chão: `0x026E`, CNF de 28 bytes, decay e dono ([ADR 007](decisions/007-inventory-dialect.md));
-   - enviar `0x0336` depois do login, porque o CurrentScore do snapshot é o template da classe;
-   - copiar o `Coin` do template para o mob em `SpawnMobAt`, porque hoje nenhum mob dá ouro;
+   - score do login: PR [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361), aberto. O `0x0336` já era enviado; a divergência era o snapshot `0x0114` levar o score do template, enquanto o legado manda o `MOB` depois de `GetCurrentScore`;
+   - ouro dos mobs: PR [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362), aberto. `SpawnMobAt` passa a copiar o `Coin` @28;
+   - aviso na recusa do teleporte pago (o original avisa, o Go fica em silêncio);
    - sussurro: gravar o nome de quem envia e reproduzir a reescrita legada; enviar aviso nas recusas de compra, venda, banco e teleporte; confirmar o layout de 57 bytes do `0x0339` ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
 6. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
 
@@ -568,3 +570,36 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Falhas registradas:** a troca 1 reprovou por defeito do harness (Enter na caixa 601), corrigido. `login,enter,shop` reprovou com "sale did not raise gold": A já tinha 1.000.000 de ouro (contas de 01/10), e a venda do item 4144 não rendeu ouro. Causa não verificada. Essa execução comprou dois itens 1774 para A.
 - **Limites:** o aceite da caixa 601 e o OK da exclusão usam exports de automação; só Chromium headless; nenhum cliente Windows nesta sessão; recusa por falta de espaço e desconexão no meio da troca não exercitadas; capturas com nomes ficam só no `.cache`. Sem commit, push ou deploy.
 - **Próximo passo:** relogin do cliente Windows pelo operador (fecha a etapa 4); na etapa 5, buff/cura, reinício controlado e a falha de venda com 1.000.000 de ouro.
+
+### 01/10/2026 — etapa 5, fatia A, e PRs do servidor (score do login e ouro dos mobs)
+
+- **Pedido do usuário:** fatia A (venda, teleporte pago, ouro no banco entre sessões e casos de troca) e os PRs 1 e 2 do servidor. Com autorização, foram encerrados processos que ocupavam memória: o resto do Chrome, o OneDriveSetup, `tail`/`grep` órfãos e o CapCut.
+- **Servidor (entregas separadas, sem merge nem deploy):** clone limpo `external/server-pr` em `2e532afa`.
+  - **PR [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361):** `OverlayLoginScores` grava `BaseScore` (estado persistido) e `CurrentScore` (`computeScore`) no snapshot com template, como `ProcessDBMessage.cpp:812-821`. O item registrado antes ("enviar `0x0336`") estava errado, porque `enterWorldView` já envia o `0x0336`.
+  - **PR [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362):** `ParseMobBasics` lê o `Coin` @28 (`Basedef.h:556`; o Gremlin tem 50), e `SpawnMobAt` o copia. Uma morte de mob com `Coin` passa a fazer o `rand()` de ouro, como o legado.
+  - Os testes novos dos dois PRs falham sem a correção. `go test ./tmserver/...` e `go vet` limpos localmente; sem `-race`, que roda na CI.
+- **Cliente:**
+  - `tools/verify_world.mjs`: venda só de item com preço; ouro guardado no `bank`; fases `paidteleport` e `tradeedge`; helpers de troca compartilhados; `holdCanvas`.
+  - `tools/world_checks{,.test}.mjs`: `checkBank` e `checkPaidTeleport`.
+  - `tools/trade_checks{,.test}.mjs`: `checkTradeEdge` e `sellPrice`.
+  - `patches/openwyd/0022-inventory-page-buttons.patch`.
+  - `client/dialect/WydDialect.cpp`: avisos 16–33.
+  - Fixture `notice_no_empty_slot` em `gen_fixtures.py`, `dialect_test.cpp` e no overlay Go.
+  - ADRs 008 e 010 (revisões), checklist e [evidência da fatia A](evidence/05-gameplay/2026-10-01-slice-a.md).
+- **Confirmado em teste:**
+  - `world:checks` 33/0, `protocol:dialect` 803/0, `protocol:vectors` verde;
+  - `client:stream` e `scene` verdes;
+  - WASM `tmproject_startup.1790883428920400700` (SHA-256 `8c562869…`), 115 objetos certificados, 0 indefinidos.
+- **Confirmado em execução (Railway `2e532afa`):**
+  - `shop`: a venda do 1774 rende 75;
+  - `bank`: 74 de ouro no banco sobrevivem ao relogin;
+  - `paidteleport`: cobra exatamente 700 e leva a Noatum; com 500 de ouro, recusa sem cobrar; o relogin mantém só a cobrança;
+  - `tradeedge`, execução 2: a bolsa cheia desfaz a troca (aviso 31) e a desconexão no meio da troca fecha a janela de B, as duas sem mudar nada.
+- **Falhas e limites:**
+  - **`bank`:** a primeira execução foi interrompida pelo Claude Code por falta de memória e deixou 37 de ouro no banco de A.
+  - **`tradeedge`:**
+    - execução 1: defeitos do harness (destino da compra na página visível; A fora da visão de B); deixou 4 itens 1774 em B;
+    - execução 2: estourou o prazo de 40 min na limpeza (~46 s por venda); ficaram 3 itens 1774 em B (slots 27–29).
+  - **Online:** as execuções usaram o WASM `…1790876556349708400`, que ainda não tinha a tabela de avisos estendida.
+  - Sem commit nem push nesta sessão.
+- **Próximo passo:** merge e deploy dos PRs #361/#362 pelo operador, e então conferir o score do login e o `loot` com ouro. Uma `tradeedge` completa (60 min). Relogin do cliente Windows (etapa 4).

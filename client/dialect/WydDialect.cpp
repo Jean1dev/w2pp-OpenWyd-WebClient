@@ -715,6 +715,24 @@ const char* NoticeText(std::uint32_t code)
 		"Entrada negada pelo servidor.",                    // BillingDenied
 		"Limite do banco atingido.",                        // CargoFull
 		"Requisitos do item nao atendidos.",                // ReqNotMet
+		"Ja existe um efeito desse tipo ativo.",            // CantEatMore
+		"Skill de outra classe.",                           // OtherClassSkill
+		"Pontos de skill insuficientes.",                   // NotEnoughSkillPoint
+		"Apenas uma skill desse grupo pode ser aprendida.", // OnlyOneEighthSkill
+		"Aprenda as skills anteriores primeiro.",           // LearnPrereq
+		"Skill ja aprendida.",                              // AlreadyLearned
+		"Ouro insuficiente.",                               // NotEnoughCoin
+		"Limite de pontos atingido.",                       // MaxPoint
+		"Apenas em equipamentos.",                          // OnlyToEquips
+		"Nao e possivel refinar mais.",                     // CantRefineMore
+		"O refinamento falhou.",                            // FailToRefine
+		"Refinamento bem-sucedido.",                        // RefineSuccess
+		"O ovo chocou.",                                    // Incubated
+		"Aguarde a incubacao.",                             // IncuWaitMore
+		"A montaria subiu de nivel.",                       // MountLevel
+		"Nao ha espaco no inventario.",                     // NoEmptySlot
+		"As duas bolsas ja estao ativas.",                  // MaxBag
+		"E preciso ter a chave.",                           // NoKey
 	};
 	return code < sizeof(kTexts) / sizeof(kTexts[0]) ? kTexts[code] : nullptr;
 }

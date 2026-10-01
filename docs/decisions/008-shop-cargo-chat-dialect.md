@@ -66,3 +66,9 @@ Na revisão anterior, o dialeto descartava como desconhecidos, nos dois sentidos
 
 - Fala, sussurro, compra, venda e banco deixam de reprovar a saúde de protocolo.
 - Não há regra nova no cliente: sucesso e recusa vêm do servidor. O que o runtime mostra por conta própria (a linha da própria fala, o delta do eco de depósito) é corrigido pelos pacotes seguintes do servidor.
+
+## Revisão de 01/10/2026
+
+- `0x0339` @12: **confirmado em execução** com saldo diferente de zero entre sessões. 74 de ouro no banco antes e depois do relogin, iguais ao log `cargo deposit coin=37 cargo=74` ([fatia A](../evidence/05-gameplay/2026-10-01-slice-a.md)).
+- Teleporte pago: o OK da caixa 16 envia `0x0290` sem conferir o ouro, e o servidor recusa em silêncio quando falta ouro. Confirmado em execução; a falta do aviso continua como lacuna do servidor.
+- Avisos do servidor: o dialeto traduz os códigos 0–33 de `handler/notice.go` em texto próprio (antes eram 0–15).

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkDelete } from './trade_checks.mjs';
+import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions } from './world_checks.mjs';
 
 const ef = [[0, 0], [0, 0], [0, 0]];
@@ -31,6 +31,31 @@ test('a change resets both checks and evidence is complete', () => {
     assert.throws(() => checkTradeEvidence({ ...r, ...bad }));
 });
 
+test('trade edge: no room rolls back, a disconnect cancels, the filler is sold back', () => {
+  const a0 = bag({ 13: 412 }, 100), b0 = bag({ 0: 400 }, 1000);
+  const fullCarry = {}; for (let k = 0; k < 30; k++) fullCarry[k] = k === 0 ? 400 : 1774;
+  const bFull = bag(fullCarry, 1000 - 29 * 300);
+  const r = { a0, b0, bFull, sellPrice: 75,
+    fill: { item: 1774, price: 300, freeBefore: 29, freeAfter: 0, bought: Array.from({ length: 29 }, (_, k) => k + 1) },
+    full: { offer: { item: 412, takerSees: 412 }, a: a0, b: bFull },
+    drop: { offer: { item: 412, takerSees: 412 }, aSawCheck: true, bClosed: true, a: a0, b: bFull },
+    cleanup: { sold: 29, b: bag({ 0: 400 }, 1000 - 29 * 225) } };
+  checkTradeEdge(r);
+  // Filler left by an interrupted run (slot 1 before the fill) is sold back too.
+  const pre = { ...r, b0: bag({ 0: 400, 1: 1774 }, 1000), fill: { ...r.fill, freeBefore: 28, preexisting: [1],
+    bought: Array.from({ length: 28 }, (_, k) => k + 2) }, cleanup: { sold: 29, b: bag({ 0: 400 }, 1000 - 28 * 300 + 29 * 75) } };
+  checkTradeEdge(pre);
+  assert.throws(() => checkTradeEdge({ ...pre, cleanup: { sold: 28, b: bag({ 0: 400, 1: 1774 }, 1000 - 28 * 225) } }));
+  for (const bad of [{ fill: { ...r.fill, freeAfter: 1 } }, { full: { ...r.full, b: b0 } }, { full: { ...r.full, a: bag({}, 100) } },
+    { drop: { ...r.drop, bClosed: false } }, { drop: { ...r.drop, a: bag({}, 100) } }, { drop: { ...r.drop, b: bag({ 0: 400, 1: 412 }, 0) } },
+    { cleanup: { sold: 28, b: r.cleanup.b } }, { cleanup: { sold: 29, b: bag({ 0: 400, 5: 1774 }, 1000 - 29 * 225) } },
+    { cleanup: { sold: 29, b: bag({ 0: 400 }, 1000) } }])
+    assert.throws(() => checkTradeEdge({ ...r, ...bad }), JSON.stringify(Object.keys(bad)));
+  assert.equal(sellPrice(300), 75);
+  assert.equal(sellPrice(30000), 5000);
+  assert.equal(sellPrice(50000), 6250);
+});
+
 test('delete removes only the target slot and survives relogin', () => {
   const before = [{ name: 'Keep', level: 9 }, { name: 'Tmp', level: 0 }, { name: '', level: -1 }, { name: '', level: -1 }];
   const after = [before[0], { name: '', level: -1 }, before[2], before[3]];
@@ -49,6 +74,7 @@ test('trade and delete run as isolated scenarios', () => {
   const opt = { target: 'localhost:8281', 'client-version': '12000', class: '0' };
   validateOptions({ ...opt, phases: 'login,enter,second,trade' });
   validateOptions({ ...opt, phases: 'delete' });
+  validateOptions({ ...opt, phases: 'login,enter,second,tradeedge' });
   for (const phases of ['login,enter,trade', 'login,enter,second,trade,party', 'login,delete', 'badpass,delete'])
     assert.throws(() => validateOptions({ ...opt, phases }));
 });

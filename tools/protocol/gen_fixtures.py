@@ -537,6 +537,8 @@ def main() -> int:
         # handler/notice.go: MsgMessageBoxOk with the local notice code, ID = conn.
         "notice_bad_pass": (standard_parm(0x0102, 7, 3), {"id": 7, "parm": 3}),
         "notice_unknown": (standard_parm(0x0102, 7, 999), {"id": 7, "parm": 999}),
+        # NoticeNoEmptySlot (31), e.g. a trade rolled back for lack of room.
+        "notice_no_empty_slot": (standard_parm(0x0102, 7, 31), {"id": 7, "parm": 31}),
         # handler/combat.go echo of a one-target request, mobai.go mob strike.
         "attack_echo": (attack(ATTACK_ECHO), ATTACK_ECHO),
         "attack_multi": (attack(ATTACK_MULTI), ATTACK_MULTI),

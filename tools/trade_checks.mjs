@@ -45,6 +45,36 @@ export function checkTradeEvidence(r) {
   assert(r.back?.takerSlot >= 0, 'missing return trade');
 }
 
+// Server sell price (shop.go sell): Price/4, halved above 10000, 2/3 above 5000.
+export function sellPrice(price) {
+  let sp = Math.floor(price / 4);
+  if (sp > 10000) sp = Math.floor(sp / 2);
+  else if (sp > 5000) sp = Math.floor(2 * sp / 3);
+  return sp;
+}
+
+// Trade edge cases: no room on the taker rolls the swap back with nothing
+// moved; a disconnect mid-trade closes the partner's window with nothing moved;
+// the filler bought to fill B is sold back.
+export function checkTradeEdge(r) {
+  const n = r.fill.bought.length, pre = r.fill.preexisting ?? [];
+  assert(n > 0 && n === r.fill.freeBefore, `bought ${n} of ${r.fill.freeBefore} free slots`);
+  assert(r.fill.bought.every(x => x >= 0 && x < 30), 'filler outside the 30 base slots');
+  assert.equal(r.fill.freeAfter, 0, 'B still has room');
+  assert.equal(r.full.offer.takerSees, r.full.offer.item, 'full: offer not forwarded');
+  assert.deepEqual(r.full.a, r.a0, 'full: A changed');
+  assert.deepEqual(r.full.b, r.bFull, 'full: B changed');
+  assert.equal(r.drop.offer.takerSees, r.drop.offer.item, 'drop: offer not forwarded');
+  assert(r.drop.aSawCheck, "drop: A did not see B's check");
+  assert(r.drop.bClosed, "drop: B's window stayed open after A left");
+  assert.deepEqual(r.drop.a, r.a0, 'drop: A changed');
+  assert.deepEqual(r.drop.b, r.bFull, 'drop: B changed');
+  assert.equal(r.cleanup.sold, n + pre.length, 'cleanup: not all filler sold');
+  const start = r.b0.carry.map((it, x) => pre.includes(x) ? { ...it, index: 0, ef: [[0, 0], [0, 0], [0, 0]] } : it);
+  assert.deepEqual(r.cleanup.b.carry, start, 'cleanup: B carry differs from the start');
+  assert.equal(r.cleanup.b.coin, r.b0.coin - n * r.fill.price + (n + pre.length) * r.sellPrice, 'cleanup: B gold');
+}
+
 // Character deletion (stage 3): wrong password refused, right one removes only
 // the target slot; a relogin shows the same list.
 export function checkDelete(r) {
