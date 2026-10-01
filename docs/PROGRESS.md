@@ -17,7 +17,7 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
 
 1. Etapa 5:
    - fatia A (01/10): venda, ouro no banco entre sessões, teleporte pago e casos de troca confirmados. Falta uma execução completa de `tradeedge` dentro do prazo, que agora é de 60 min; ela também vende os 3 itens 1774 que sobraram em B;
-   - depois do merge e deploy dos PRs [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361) e [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362): conferir no HUD o nível e o HP reais logo após o login, e o loot com ouro dos Gremlins (`loot`);
+   - PRs [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361) e [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362) implantados (`200f4824`). O ouro dos mobs foi confirmado em execução. Ficam em aberto: o HUD com dano 21 logo após o login e 23 ao reequipar a mesma arma (causa não determinada), e a diferença de nível entre a seleção e o mundo (`selCharWireLevel`, decisão do servidor);
    - fatia 5: persistência após reinício controlado do servidor (exige combinar com o operador);
    - buff e cura (nível 11+ ou 16–20).
 
@@ -603,3 +603,17 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - **Online:** as execuções usaram o WASM `…1790876556349708400`, que ainda não tinha a tabela de avisos estendida.
   - Sem commit nem push nesta sessão.
 - **Próximo passo:** merge e deploy dos PRs #361/#362 pelo operador, e então conferir o score do login e o `loot` com ouro. Uma `tradeedge` completa (60 min). Relogin do cliente Windows (etapa 4).
+
+### 01/10/2026 — conferência dos PRs #361 e #362 no Railway
+
+- **Deploy:** `tm-server` com o commit `200f4824`, `SUCCESS` às 19:53 UTC; inclui o #361 (`307ac2ab`).
+- **Harness:** a fase `enter` registra o score do HUD e a prévia da seleção (`tools/verify_world.mjs`).
+- **Confirmado em execução:**
+  - `loot`: 7 de 23 Gremlins deram ouro, de 256 a 292, na faixa do legado;
+  - `equip`: aprovada de novo;
+  - `login,enter`: o HUD mostra nível 1, HP 105/105, dano 21.
+- **Achados:**
+  - **Nível (confirmado em fonte):** o "Nv 2" do HUD vem do nível interno em base 1 do servidor. A seleção envia `level − 1` (commit `2a2c4a4`), o mundo envia o valor sem ajuste. A hipótese anterior, de que vinha do template, estava errada.
+  - **Dano após o login:** 21, que vira 23 ao reequipar a mesma arma, igual ao padrão de 30/09. Pela fonte, a fórmula do servidor é a mesma nas duas rotas. Causa não determinada, em aberto.
+  - **HP/MP/atributos do #361:** a execução não distingue o efeito, porque template e valor calculado coincidem neste personagem; o efeito está confirmado em teste no PR.
+- **Evidência:** [fatia A](evidence/05-gameplay/2026-10-01-slice-a.md#depois-do-merge-e-deploy-dos-prs-361-e-362-0110-1954-2020-utc). Sem commit.

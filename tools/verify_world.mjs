@@ -1243,7 +1243,14 @@ async function main() {
       const p = await a.probe();
       if (p.field.fixture !== 0) throw new Error('offline fixture used');
       if (me.name !== A.char) throw new Error('own name differs from the created character');
-      return { me: { ...me, name: mask(me.name) }, dialect: dialectSummary(p), glErrors: p.glErrorTotal };
+      // The HUD score right after entry (login snapshot 0x0114, then 0x0336)
+      // next to the selection preview of the same character. The Go server
+      // sends the preview level one lower (login.go selCharWireLevel).
+      const v = await a.bag();
+      const score = { level: v.level, hp: v.hp, maxHp: v.maxHp, mp: v.mp, maxMp: v.maxMp, damage: v.damage, ac: v.ac };
+      const pv = a.preview ?? {};
+      const preview = { level: pv.level, hp: pv.hp, maxHp: pv.maxHp, mp: pv.mp, maxMp: pv.maxMp };
+      return { me: { ...me, name: mask(me.name) }, score, preview, dialect: dialectSummary(p), glErrors: p.glErrorTotal };
     });
 
     // Visual check of item data: the inventory icons come from ItemList/itemicon
