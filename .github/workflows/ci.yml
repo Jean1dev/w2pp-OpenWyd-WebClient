@@ -62,6 +62,8 @@ jobs:
           python tools/fetch_pinned.py upstream
       - name: Harness rule unit tests
         run: node --test 'tools/*.test.mjs'
+      - name: Synthetic asset conversion tests
+        run: python -m unittest discover -s tools -p test_asset_conversion.py -v
       - name: Harness scripts parse
         run: node --check tools/verify_world.mjs && node --check tools/verify_world_suite.mjs
       - name: Vectors and dialect fixtures are reproducible

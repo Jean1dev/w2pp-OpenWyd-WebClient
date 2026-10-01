@@ -20,8 +20,9 @@ SPARSE = {
     "server": ("external/server", ["tmserver", "internal", "api", "dbserver", "binserver", "webserver",
                                    "scripts", "docs/migration", "development-guidelines"]),
     "upstream": ("external/OpenWyd", ["Projects/TMProject", "Dependencies/Directx/Include",
-                                      "webclient/client-wasm/compat", "webclient/client-wasm/config",
-                                      "webclient/client-wasm/tools", "webclient/client-wasm/build/link"]),
+                                      "webclient/app", "webclient/server", "webclient/client-wasm/compat",
+                                      "webclient/client-wasm/config", "webclient/client-wasm/tools",
+                                      "webclient/client-wasm/build/link"]),
 }
 
 

@@ -1,11 +1,13 @@
 // Smoke test da cena local: detecta falha de runtime, asset ausente, erro WebGL
 // e cena não identificada. Nunca fornece credenciais nem permite rede externa.
-import { chromium } from 'playwright';
+import { chromium, firefox } from 'playwright';
 import { createReadStream } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
 
+const browserName = process.env.SCENE_BROWSER ?? 'chromium';
+if (!['chromium', 'firefox'].includes(browserName)) throw new Error('SCENE_BROWSER must be chromium or firefox');
 const SITE = resolve('.cache/local-scene');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript',
   '.css': 'text/css', '.wasm': 'application/wasm', '.data': 'application/octet-stream',
@@ -38,7 +40,7 @@ const hosted = process.env.SCENE_ORIGIN ? null : await serveSite();
 const ORIGIN = process.env.SCENE_ORIGIN ?? hosted.origin;
 const FRAME_TARGET = Number(process.env.SCENE_FRAMES ?? 120);
 const DEADLINE_MS = Number(process.env.SCENE_DEADLINE_MS ?? 180000);
-const OUT = '.cache';
+const OUT = `.cache/scene-${browserName}`;
 const MANIFEST = 'assets-local/manifest.json';
 
 // O cliente 7662 do operador não fornece tudo que o runtime 769 abre, e a lista
@@ -99,6 +101,9 @@ async function runScene(browser, { name, state, requireField }) {
   if (broken.length) fail(name, `assets presentes no dataset falharam ao abrir: ${broken.join(', ')}`);
   if (probe.assetOpenFailures > 0 && misses.length === 0) fail(name, 'falhas de abertura sem amostra de caminho');
   if (requireField) {
+    if (probe.fieldFixture !== 1 || probe.mapX !== 16 || probe.mapY !== 16 || probe.humanName !== 'OpenWYD') {
+      fail(name, 'identidade da fixture offline inesperada');
+    }
     if (probe.fieldInitialized !== 1) fail(name, 'cena Field não inicializou');
     if (probe.fieldCriticalError) fail(name, `erro crítico de Field: ${probe.fieldCriticalError}`);
     if (probe.hasGround !== 1) fail(name, 'terreno ausente');
@@ -146,16 +151,17 @@ async function exerciseInput(page) {
   };
 }
 
-const browser = await chromium.launch({ headless: true });
+let browser;
 let report;
 try {
   await mkdir(OUT, { recursive: true });
+  browser = await ({ chromium, firefox }[browserName]).launch({ headless: true });
   const scenes = [];
   scenes.push(await runScene(browser, { name: 'field', state: 0, requireField: true }));
   scenes.push(await runScene(browser, { name: 'selectserver', state: 7, requireField: false }));
-  report = { browser: browser.version(), origin: ORIGIN, frameTarget: FRAME_TARGET, scenes, failures };
+  report = { browserName, browser: browser.version(), origin: ORIGIN, frameTarget: FRAME_TARGET, scenes, failures };
 } finally {
-  await browser.close();
+  await browser?.close();
   if (hosted) await new Promise(done => hosted.server.close(done));
 }
 
