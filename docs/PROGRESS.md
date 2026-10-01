@@ -7,7 +7,7 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 1 Auditoria | Validada (consumidores dos fluxos do primeiro marco revisados em fonte; loaders 7662 e paridade Windows continuam para etapa 2/6) | [Fontes, layouts, build, assets e revisão dos consumidores](evidence/01-auditoria/README.md) |
 | 2 Build e cena | Validada (01/10: build limpo, importador com testes sintéticos e cena Field/Select Server em Chromium e Firefox; Field é fixture offline; Safari não testado) | [Cena real no navegador](evidence/02-build/README.md), [reprodução de 01/10](evidence/02-build/2026-10-01-reproduction.md) |
 | 3 Protocolo | Em andamento (DeleteCharacter aprovado ponta a ponta em 30/09; recusa chega como `011A`, correção no PR #359) | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
-| 4 Login e mundo | Em andamento (01/10: duas sessões aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; falta o cliente Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
+| 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
 | 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo aprovado; troca no PR #358 do servidor, com fase `trade` preparada e não executada; faltam buff/cura e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Pendente | — |
 | 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
@@ -544,4 +544,11 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Contorno aplicado:** `Config[3]` (música) do `Config.bin` do operador de 20 para 0, com backup `Config.bin.bak-2026-10-01`. [Evidência](evidence/04-login-mundo/2026-10-01-windows-crash.md).
 - **Confirmado em execução:** com o contorno, o operador entrou no jogo (13:10, −03:00); sem nova falha no Windows e entrada completa no log do tm-server.
 - **Próximo passo:** seguir o roteiro Windows × web com a música desligada. Correção definitiva no cliente Windows é entrega separada.
+
+### 01/10/2026 — Windows × web
+
+- **Execução manual do operador:** cliente Windows 7662 pelo launcher (música desligada) e cliente web por `npm run dev`, no tm-server Railway `2e532af`.
+- **Confirmado em execução (log do tm-server) e pelo operador:** sessões identificadas pelo horário do `WYD.log` e pela sondagem do launcher; ambos no mundo de 16:14:53 a 16:15:19 UTC; movimento repassado e visto nos dois sentidos; chat Windows → web; despawn do web entregue ao Windows (`0x0165`); sem erro nem `version mismatch`. [Evidência](evidence/04-login-mundo/2026-10-01-windows-web.md).
+- **Não coberto:** relogin do Windows com o web observando; capturas da comparação visual.
+- **Próximo passo:** repetir com os dois no mundo, fechar e reabrir o Windows; com isso a etapa 4 pode ser validada.
 

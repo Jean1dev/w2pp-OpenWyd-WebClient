@@ -23,7 +23,7 @@
 | Troca de mapa | **confirmado em execução** ([01/10](2026-10-01-two-sessions.md)) | portal Armia → Armia Field: A chega em 2588,5/2098,5 e B o perde. Histórico: `ReqTeleport` `0x290` e `ChangeCity` `0x291` passam pelo dialeto. `0x291` já chega ao servidor (`routed=true`). A fase `mapchange` (portal Armia → Armia Field) não rodou |
 | Login concorrente | **confirmado em execução** ([01/10](2026-10-01-two-sessions.md)) | o backend aceita a duplicata; a sessão original segue no Field e recebe entidades novas. Histórico: o servidor não bloqueia sessões duplicadas; o cargo é sobrescrito (`world.go:442`). A fase `concurrent` não rodou |
 | Erro de protocolo diagnosticável | **confirmado em execução** | avisos do servidor aparecem no painel; opcodes descartados ficam listados no probe e contados. Fora da tradução, o único opcode de saída descartado ao entrar era `0x0291`, que agora passa |
-| Cliente Windows 7662 | **pendente** | não há ambiente Windows com o cliente; ver o roteiro manual abaixo |
+| Cliente Windows 7662 | **parcial** ([01/10](2026-10-01-windows-web.md)) | Windows × web: login, criação, entrada, movimento visto nos dois sentidos, chat e despawn do web no Windows; falta o relogin do Windows. Ver também o [fechamento por áudio](2026-10-01-windows-crash.md) |
 
 ## 1. Pacotes divergentes corrigidos (teste unitário)
 
