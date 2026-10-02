@@ -1,0 +1,263 @@
+{
+ "when": "2026-10-02T01:33:45.562Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "learn"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 5
+    },
+    {
+     "filled": true,
+     "level": 10
+    },
+    {
+     "filled": true,
+     "level": 15
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 27246,
+   "at": "2026-10-02T01:34:13.426Z"
+  },
+  "learn": {
+   "ok": true,
+   "skill": 5064,
+   "name": "Lobisomem",
+   "cost": 33,
+   "npc": 12500,
+   "npcAt": [
+    2077.5,
+    2123.5
+   ],
+   "walkClicks": 13,
+   "merchant": 12500,
+   "offered": [
+    5048,
+    5049,
+    5050,
+    5051,
+    5052,
+    5053,
+    5054,
+    5055,
+    5056,
+    5057,
+    5058,
+    5059,
+    5060,
+    5061,
+    5062,
+    5063,
+    5064,
+    5065,
+    5066,
+    5067,
+    5068,
+    5069,
+    5070,
+    5071
+   ],
+   "box": 4,
+   "before": {
+    "learned": 0,
+    "bonus": 33,
+    "level": 11
+   },
+   "after": {
+    "learned": 65536,
+    "bonus": 0,
+    "level": 11
+   },
+   "relogin": {
+    "learned": 65536,
+    "bonus": 0,
+    "level": 11
+   },
+   "discovery": [
+    {
+     "master": "archi",
+     "npc": 12500,
+     "npcAt": [
+      2077.5,
+      2123.5
+     ],
+     "offered": [
+      5048,
+      5071
+     ]
+    }
+   ],
+   "portalBoxes": [],
+   "ms": 299602,
+   "at": "2026-10-02T01:39:19.586Z"
+  }
+ },
+ "ok": true,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "df0f8263c350c12df32ce55c902dd6cbcd7f088c",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-10-02T01:34:13.754Z",
+   "freeMiB": 1640,
+   "totalMiB": 8014,
+   "browserMiB": 1054,
+   "pages": {
+    "A": {
+     "wasmMiB": 150,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end learn",
+   "at": "2026-10-02T01:39:20.274Z",
+   "freeMiB": 1595,
+   "totalMiB": 8014,
+   "browserMiB": 1197,
+   "pages": {
+    "A-learn-relogin": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "master-click-archi",
+   "file": ".cache/world/2026-10-02T01-33-45-553Z/A-master-click-archi.png",
+   "sha256": "c5192833c31f4aea40478829b52f54e2dda45cc2f2f607836aa74b0c8eef6e52"
+  },
+  {
+   "name": "skill-master",
+   "file": ".cache/world/2026-10-02T01-33-45-553Z/A-skill-master.png",
+   "sha256": "6a893d636e9699b68af2c644d0090d600ff517727fb7252de5878e7aff104393"
+  },
+  {
+   "name": "learn-box",
+   "file": ".cache/world/2026-10-02T01-33-45-553Z/A-learn-box.png",
+   "sha256": "e536afc20b1489e9d1448d422836e9488e73ee6e2fafe543e9cd12b75139cef7"
+  }
+ ],
+ "final_A-learn-relogin": {
+  "inTranslated": 32,
+  "inPass": 2,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 2,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 34,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "A-learn-relogin": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-10-01T22:33:46.0412145-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-10-01T22:34:06.2969366-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-01T22:38:49.393843-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 860,
+   "bytes_down": 13936
+  },
+  {
+   "time": "2026-10-01T22:39:03.1744834-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-01T22:39:27.2618099-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 200,
+   "bytes_down": 10748
+  }
+ ]
+}

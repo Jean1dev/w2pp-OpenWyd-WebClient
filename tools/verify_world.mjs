@@ -31,17 +31,18 @@
 import { chromium } from 'playwright';
 import { spawn, execFile, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { resolve, join } from 'node:path';
 import { freemem, totalmem } from 'node:os';
 import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { areaPair, checkAreaAttempt } from './area_checks.mjs';
-import { checkParty, checkPartyEvidence } from './party_checks.mjs';
+import { checkGuildChat, checkParty, checkPartyChat, checkPartyEvidence } from './party_checks.mjs';
+import { fsTraceInit, packageIndex, openedByDir } from './fs_trace.mjs';
 import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, itemAmount } from './world_checks.mjs';
+  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, checkBuff, checkHealOther, checkRestart, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -61,7 +62,12 @@ const { values: opt } = parseArgs({
     phases: { type: 'string', default: 'badpass,login,create,enter,second,move,logout,mapchange,concurrent' },
     'class': { type: 'string', default: '0' },
     'grind-level': { type: 'string', default: '4' },
+    // learn: a SkillData index other than the class's first plan (buff/cure).
+    skill: { type: 'string', default: '' },
     headed: { type: 'boolean', default: false },
+    // Record which package files each page opens (tools/fs_trace.mjs); the
+    // list goes to .cache only, as the full asset manifest stays out of Git.
+    'trace-files': { type: 'boolean', default: false },
   },
 });
 const phases = validateOptions(opt);
@@ -137,6 +143,10 @@ async function startGateway(port, target) {
 }
 
 // One browser context = one game client.
+// Package files opened per session label (--trace-files).
+const traced = new Map();
+const traceOpens = page => page.evaluate(() => [...(window.__measure?.opens ?? [])]);
+
 class Session {
   constructor(browser, origin, label, creds) {
     this.browser = browser; this.origin = origin; this.label = label; this.creds = creds;
@@ -145,6 +155,7 @@ class Session {
 
   async open() {
     this.context = await this.browser.newContext({ viewport: { width: 1024, height: 768 } });
+    if (opt['trace-files']) await this.context.addInitScript(fsTraceInit);
     this.page = await this.context.newPage();
     this.connected = false;
     this.page.on('websocket', ws => {
@@ -157,7 +168,10 @@ class Session {
       window.Module?._wyd_get_game_state?.() === 7 && window.clientEvidence.frames > 20, 120000);
   }
 
-  async close() { await this.context?.close(); this.context = null; }
+  async close() {
+    if (opt['trace-files'] && this.context) try { traced.set(this.label, await traceOpens(this.page)); } catch {}
+    await this.context?.close(); this.context = null;
+  }
 
   // WASM linear memory (grows, never shrinks) and live JS heap of this page.
   memory() {
@@ -916,12 +930,15 @@ class Session {
   }
 
   // The chat box as a player uses it: Enter opens it, the text is typed,
-  // Enter sends (TMFieldScene OnKeyDown / OnCharEvent).
-  async say(text) {
-    await this.closePanels();
+  // Enter sends (TMFieldScene OnKeyDown / OnCharEvent). After a "=" line the
+  // box reopens with the "=" prefix, so `clear` erases what is already there.
+  // `keepPanels` leaves windows open (the party window holds "Sair do Grupo").
+  async say(text, { clear = false, keepPanels = false } = {}) {
+    if (!keepPanels) await this.closePanels();
     await this.page.focus('#canvas');
     await this.page.keyboard.press('Enter');
     await this.until('chat box', () => Module._wyd_field_chat_editing() === 1, 10000);
+    if (clear) for (let k = 0; k < 24; k++) await this.page.keyboard.press('Backspace');
     await this.page.keyboard.type(text, { delay: 120 });
     await this.frames(2);
     const sent0 = await this.outCount();
@@ -988,7 +1005,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'trade', 'paidteleport'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') ? 60 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'partychat', 'guildchat', 'trade', 'paidteleport'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -1494,8 +1511,14 @@ async function main() {
         2: { skill: 5048, name: 'Fera_Flamejante', cost: 24, masters: ['archi'] },
         3: { skill: 5080, name: 'Golpe_Felino', cost: 18, masters: ['forelearner'] },
       };
-      const plan = PLANS[cls];
-      assert(plan, `no learn plan for class ${cls}`);
+      // Buff and cure (stage 5): BM Lobisomem (64, Type-16 transform) and
+      // Foema Cura (27, InstanceType 6 heal), SkillData.csv costs 33 and 48.
+      const EXTRA = {
+        64: { cls: 2, skill: 5064, name: 'Lobisomem', cost: 33, masters: ['archi'] },
+        27: { cls: 1, skill: 5027, name: 'Cura', cost: 48, masters: ['foema'] },
+      };
+      const plan = opt.skill ? EXTRA[opt.skill] : PLANS[cls];
+      assert(plan && (!opt.skill || plan.cls === cls), `no learn plan for class ${cls} skill ${opt.skill}`);
       const inClass = i => i >= 5000 + cls * 24 && i < 5024 + cls * 24;
       const name = classChar(cls);
       privateValues.push(name);
@@ -1809,6 +1832,178 @@ async function main() {
       await a.shot('cast');
       console.log(`    cast x${res.attempts}: MP ${res.mpTrail.join(',')} target HP ${res.hpTrail.join(',')} sent ${res.attacksSent} echoes ${res.echoes}`);
       checkCast(res);
+      return res;
+    });
+
+    // Stage 5, buff and cure. BM Lobisomem (64, TargetType 0) and Foema Cura
+    // (27, TargetType 2) are cast on oneself: the runtime sends TargetType 0
+    // without a target and turns TargetType 2 with nobody under the mouse into
+    // a self cast (TMFieldScene SkillUse). Everything after the right click is
+    // the server's: MP cost, the Type-16 affect and body mesh (transform.go),
+    // the heal (InstanceType 6). B, on the spawn, watches A.
+    await step('buff', async () => {
+      const PLANS = {
+        2: { skill: 64, pos: 16, name: 'Lobisomem', kind: 'transform' },
+        1: { skill: 27, pos: 3, name: 'Cura', kind: 'heal' },
+      };
+      const plan = PLANS[cls];
+      assert(plan, `no buff plan for class ${cls}`);
+      const name = classChar(cls);
+      privateValues.push(name);
+      const enterOwn = async s => {
+        const slot = (await s.slots()).findIndex(x => x.name === name);
+        assert(slot >= 0, `class ${cls} character missing`);
+        return s.enter(slot);
+      };
+      // B first, so A casts seconds after entering: the server regenerates
+      // Level+30 HP every 10 s (mobai.go regenPlayers) and would hide the cure.
+      b = await newSession('B-buff', B);
+      await b.loginToSelect();
+      const pin = await b.pin();
+      assert(pin.already || pin.result === 'lock1', 'B PIN rejected');
+      await b.enter(0);
+      if ((await a.eval(() => Module._wyd_get_game_state())) !== 0) await enterOwn(a);
+      const learned = await a.eval(() => Module._wyd_field_my_score(6) >>> 0);
+      assert(((learned >>> plan.pos) & 1) === 1, `skill ${plan.skill} not learned (run learn --skill first)`);
+      const watch = () => b.eval(id => Module._wyd_field_human_present(id) === 1 ? { hp: Module._wyd_field_human_hp(id),
+        maxHp: Module._wyd_field_human_max_hp(id) } : null, a.id);
+      await b.until('B sees A', id => Module._wyd_field_human_present(id) === 1, 60000, a.id);
+      const mine = () => a.eval(() => ({ hp: Module._wyd_field_my_score(0), maxHp: Module._wyd_field_my_score(1),
+        mp: Module._wyd_field_my_score(2), level: Module._wyd_field_my_score(4),
+        model: Module._wyd_field_myhuman_class_id() }));
+      const res = { cls, skill: plan.skill, name: plan.name, kind: plan.kind, attempts: 0 };
+      r.buff = res;
+      // The belt is saved by the server (0x0378): when the skill is already on
+      // slot 0, select it with the real "1" key and cast right away.
+      if ((await a.eval(() => Module._wyd_field_short_skill(0))) === plan.skill) {
+        await a.page.focus('#canvas');
+        await a.page.keyboard.press('Digit1'); await a.frames(2);
+        res.belt = plan.skill; res.beltSaved = true;
+        res.selected = await a.eval(() => Module._wyd_field_selected_short_skill());
+      } else Object.assign(res, await a.assignSkill(plan));
+      // Dialect combat diagnostics (ADR 006): the skill index A sends and the
+      // server's answer (HP/MP, targets) as both pages receive it.
+      for (const s of [a, b]) await s.eval(() => Module._wyd_combat_enable(1));
+      res.before = await mine();
+      res.observedBefore = await watch();
+      console.log(`    before: ${JSON.stringify(res.before)}, B sees ${JSON.stringify(res.observedBefore)}`);
+      // Right click on free ground next to the hero: TargetType 0 needs no
+      // target and TargetType 2 with nobody under the mouse is a self cast.
+      const cast = async () => {
+        const box = await a.page.locator('#canvas').boundingBox();
+        for (const [dx, dy] of [[60, 60], [-60, 60], [60, -40], [-60, -40]]) {
+          await a.page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, { steps: 3 });
+          await a.frames(2);
+          if ((await a.eval(() => Module._wyd_field_hover_human_id())) !== 0) continue;
+          await a.page.mouse.down({ button: 'right' });
+          try { await a.frames(2); } finally { await a.page.mouse.up({ button: 'right' }); }
+          return 'ground';
+        }
+        return null;
+      };
+      const out0 = await a.eval(() => window.clientProbe().dialect.outTranslated);
+      res.trail = [];
+      for (let k = 0; k < 4; k++) {
+        res.via = await cast();
+        if (res.via) res.attempts++;
+        const ok = await a.until('server MP cost', mp => Module._wyd_field_my_score(2) < mp, 6000, res.before.mp)
+          .then(() => true, () => false);
+        res.trail.push(await mine());
+        if (ok) break;
+      }
+      res.attacksSent = (await a.eval(() => window.clientProbe().dialect.outTranslated)) - out0;
+      res.logsA = await a.combatLog(); res.logsB = await b.combatLog();
+      await sleep(3000);
+      res.after = await mine();
+      // B sees A's score from the server's multicast: the cure raises HP, the
+      // wolf rescales MaxHP (transBonus minHP..maxHP).
+      res.observedAfter = await b.until('B sees the change on A', ([id, hp, maxHp]) => {
+        if (Module._wyd_field_human_present(id) !== 1) return false;
+        const v = { hp: Module._wyd_field_human_hp(id), maxHp: Module._wyd_field_human_max_hp(id) };
+        return (v.hp > hp || v.maxHp !== maxHp) && v;
+      }, 20000, [a.id, res.observedBefore?.hp ?? 0, res.observedBefore?.maxHp ?? 0]).catch(() => watch());
+      await a.shot('buff-cast'); await b.shot('buff-observed');
+      console.log(`    cast x${res.attempts} via ${res.via}: after ${JSON.stringify(res.after)}, B sees ${JSON.stringify(res.observedAfter)}`);
+      await a.healthy(); await b.healthy();
+      // Relogin: the skill stays learned; a live affect is saved with the character.
+      await a.close();
+      a = await newSession(`A-${plan.kind}-relogin`, A);
+      await a.loginToSelect();
+      const pin2 = await a.pin();
+      assert(pin2.already || pin2.result === 'lock1', 'A PIN rejected after the cast');
+      await enterOwn(a);
+      res.relogin = { ...(await mine()), learned: await a.eval(() => Module._wyd_field_my_score(6) >>> 0) };
+      await a.healthy(); await b.healthy();
+      checkBuff(res, plan);
+      return res;
+    });
+
+    // Stage 5: the Foema's Cura (27) on another player. SkillData has
+    // BParty 0 and Range 6, so the server takes any player within 6 tiles
+    // (combat.go validateSkillTarget); the heal rides as a negative Dam on
+    // the target (combat.go, InstanceType 6). B is the target, outside a party.
+    await step('healother', async () => {
+      const SKILL = 27, POS = 3, RANGE = 6;
+      const name = classChar(cls);
+      privateValues.push(name);
+      b = await newSession('B-heal', B);
+      await b.loginToSelect();
+      const pin = await b.pin();
+      assert(pin.already || pin.result === 'lock1', 'B PIN rejected');
+      await b.enter(0);
+      if ((await a.eval(() => Module._wyd_get_game_state())) !== 0) {
+        const slot = (await a.slots()).findIndex(x => x.name === name);
+        assert(slot >= 0, `class ${cls} character missing`);
+        await a.enter(slot);
+      }
+      const learned = await a.eval(() => Module._wyd_field_my_score(6) >>> 0);
+      assert(((learned >>> POS) & 1) === 1, 'Cura not learned (run learn --skill 27 first)');
+      await a.until('A sees B', id => Module._wyd_field_human_present(id) === 1, 60000, b.id);
+      const res = { skill: SKILL, targetId: b.id, casterId: a.id, attempts: 0, t: {} };
+      r.healother = res;
+      const mark = k => { res.t[k] = new Date().toISOString(); };
+      mark('bothIn');
+      const seen = await a.other(b.id), me = await a.me();
+      res.distance = Math.hypot(seen.x - me.x, seen.y - me.y);
+      if (res.distance > RANGE - 2) {
+        res.approach = await a.walkTo(seen.x, seen.y, { near: 2, maxClicks: 8, stallOk: true });
+        const s2 = await a.other(b.id), m2 = await a.me();
+        res.distance = Math.hypot(s2.x - m2.x, s2.y - m2.y);
+      }
+      if ((await a.eval(() => Module._wyd_field_short_skill(0))) === SKILL) {
+        await a.page.focus('#canvas');
+        await a.page.keyboard.press('Digit1'); await a.frames(2);
+        res.beltSaved = true;
+      } else Object.assign(res, await a.assignSkill({ skill: SKILL, pos: POS }));
+      mark('skillSelected');
+      for (const s of [a, b]) await s.eval(() => Module._wyd_combat_enable(1));
+      const target = () => b.eval(() => ({ hp: Module._wyd_field_my_score(0), maxHp: Module._wyd_field_my_score(1),
+        level: Module._wyd_field_my_score(4) }));
+      res.before = { caster: { mp: await a.eval(() => Module._wyd_field_my_score(2)) }, target: await target(),
+        seenByCaster: await a.eval(id => Module._wyd_field_human_hp(id), b.id) };
+      mark('before');
+      console.log(`    distance ${res.distance.toFixed(1)}, B ${JSON.stringify(res.before.target)}, A MP ${res.before.caster.mp}`);
+      const healed = () => a.eval(([sk, id]) => {
+        for (let i = 0; i < Module._wyd_combat_count(0); i++) {
+          if (Module._wyd_combat_value(0, i, 2) !== sk) continue;
+          for (let j = 0; j < Module._wyd_combat_value(0, i, 10); j++)
+            if (Module._wyd_combat_value(0, i, 11 + 2 * j) === id && Module._wyd_combat_value(0, i, 12 + 2 * j) < 0) return true;
+        }
+        return false;
+      }, [SKILL, b.id]);
+      for (let k = 0; k < 4 && !(await healed()); k++) {
+        if (await a.clickHuman(b.id, 'right')) res.attempts++;
+        for (let t = 0; t < 12 && !(await healed()); t++) await sleep(500);
+      }
+      mark('cast');
+      await sleep(1500);
+      res.logsA = await a.combatLog(); res.logsB = await b.combatLog();
+      res.after = { caster: { mp: await a.eval(() => Module._wyd_field_my_score(2)) }, target: await target(),
+        seenByCaster: await a.eval(id => Module._wyd_field_human_hp(id), b.id) };
+      await a.shot('heal-other'); await b.shot('healed');
+      console.log(`    cast x${res.attempts}: B ${res.before.target.hp} -> ${res.after.target.hp}, A sees ${res.before.seenByCaster} -> ${res.after.seenByCaster}`);
+      await a.healthy(); await b.healthy();
+      checkHealOther(res);
       return res;
     });
 
@@ -2425,6 +2620,111 @@ async function main() {
       return res;
     });
 
+    // Stage 5, slice 5: persistence across a controlled server restart with
+    // both players online. The tm-server saves only on logout/disconnect and on
+    // its shutdown drain (world.go shutdown: every in-play character, then each
+    // loaded cargo), so A changes gold, carry and cargo right before the restart:
+    // those changes exist only in the server's memory when it stops. The
+    // operator side restarts the service once .cache/restart-ready.json appears.
+    await step('restart', async () => {
+      const res = {}; r.restart = res;
+      const FLAG = resolve(ROOT, '.cache', 'restart-ready.json');
+      await rm(FLAG, { force: true });
+      await rm(resolve(ROOT, '.cache', 'restart-done.json'), { force: true });
+      // 1. Buy the cheapest item at Aki (carry + gold).
+      await a.openNpc(/^aki$/i, ARMIA_EAST, 'shop window', () => Module._wyd_field_shop_visible() === 1);
+      await a.ensureInventory(); await a.frames(3);
+      const cells = await a.shopCells();
+      const bag0 = await a.bag();
+      const cheap = cells.filter(c => c.price > 0 && c.price <= bag0.coin).sort((p, q) => p.price - q.price)[0];
+      assert(cheap, 'no affordable shop item');
+      await a.tapCanvas(cheap.sx, cheap.sy);
+      await a.until('bought item', ([i, n]) => {
+        let c = 0; for (let s = 0; s < 64; s++) if (Module._wyd_debug_my_item(1, s) === i) c++;
+        return c > n;
+      }, 15000, [cheap.item, a.countItem(bag0, cheap.item)]);
+      await sleep(2000);
+      const bag1 = await a.bag();
+      res.buy = { item: cheap.item, price: cheap.price, coinBefore: bag0.coin, coinAfter: bag1.coin,
+        gained: a.countItem(bag1, cheap.item) - a.countItem(bag0, cheap.item) };
+      await a.page.locator('#canvas').press('Escape'); await a.frames(2);
+      // 2. Deposit gold at the cargo guard (account warehouse).
+      await a.openNpc(/^guarda[ _]carga$/i, ARMIA_EAST, 'cargo window', () => Module._wyd_field_cargo_visible() === 1);
+      await sleep(2000);
+      await a.ensureInventory();
+      const c0 = await a.cargo();
+      res.deposit = { amount: Math.max(1, Math.min(53, c0.coin)), coinBefore: c0.coin, cargoBefore: c0.cargo };
+      res.deposit.sent = await a.goldBox(65563, res.deposit.amount);
+      await a.until('deposit applied', c => Module._wyd_field_my_score(5) !== c, 10000, c0.coin);
+      await sleep(1500);
+      await a.page.locator('#canvas').press('Escape'); await a.frames(2);
+      // 3. What the server holds in memory, as the clients see it.
+      const state = async s => {
+        const v = await s.bag();
+        return { coin: v.coin, level: v.level, exp: v.exp, equip: v.equip, carry: v.carry,
+          learned: await s.eval(() => Module._wyd_field_my_score(6) >>> 0) };
+      };
+      res.before = { a: await state(a), b: await state(b), cargo: await a.cargo().then(c => ({ coin: c.cargo, items: c.items })) };
+      await a.healthy(); await b.healthy();
+      // 4. Signal the operator side and wait for both sockets to drop.
+      const err0 = await a.eval(() => window.clientProbe().socket.lastError);
+      res.readyAt = new Date().toISOString();
+      await writeFile(FLAG, JSON.stringify({ readyAt: res.readyAt }));
+      console.log(`    ready for the restart (${FLAG}); waiting for the server to drop the sessions`);
+      // The operator side writes DONE once the restart has run. The runtime gets
+      // an FD_CLOSE (CPSock WydWasmNotifyClose) that may carry error 0 and keep
+      // the Field state, so what each client noticed is recorded, not required.
+      const DONE = resolve(ROOT, '.cache', 'restart-done.json');
+      const end = Date.now() + 20 * 60000;
+      const seen = s => s.eval(e => { const p = window.clientProbe();
+        return { state: p.state, lastError: p.socket.lastError, changed: p.state !== 0 || p.socket.lastError !== e,
+          bytesReceived: p.socket.bytesReceived, msgbox: Module._wyd_scene_msgbox_message?.() ?? null }; }, err0);
+      for (;;) {
+        const done = await readFile(DONE, 'utf8').then(JSON.parse, () => null);
+        if (done) { res.operator = done; break; }
+        assert(Date.now() < end, 'the restart was not signalled within 20 minutes');
+        await sleep(5000);
+      }
+      await sleep(15000);
+      res.droppedAt = { a: new Date().toISOString(), b: new Date().toISOString() };
+      res.clientSaw = { a: await seen(a), b: await seen(b) };
+      await rm(FLAG, { force: true }); await rm(DONE, { force: true });
+      await a.close(); await b.close();
+      // 5. The server comes back: retry the login until it answers.
+      const reenter = async (label, creds, slot) => {
+        const end = Date.now() + 10 * 60000;
+        for (let k = 1; ; k++) {
+          const s = await newSession(`${label}-${k}`, creds);
+          try {
+            await s.loginToSelect();
+            const pin = await s.pin();
+            assert(pin.already || pin.result === 'lock1', `${label}: PIN rejected`);
+            await s.enter(slot);
+            return { s, attempts: k };
+          } catch (e) {
+            await s.close();
+            if (Date.now() > end) throw e;
+            await sleep(20000);
+          }
+        }
+      };
+      const ra = await reenter('A-after-restart', A, 0); a = ra.s;
+      const rb = await reenter('B-after-restart', B, 0); b = rb.s;
+      res.backAt = new Date().toISOString();
+      res.loginAttempts = { a: ra.attempts, b: rb.attempts };
+      await a.openNpc(/^guarda[ _]carga$/i, ARMIA_EAST, 'cargo window', () => Module._wyd_field_cargo_visible() === 1);
+      await sleep(2000);
+      res.after = { a: await state(a), b: await state(b), cargo: await a.cargo().then(c => ({ coin: c.cargo, items: c.items })) };
+      await a.shot('after-restart'); await b.shot('after-restart');
+      console.log(`    before: A ${res.before.a.coin}/${res.before.cargo.coin}, after: A ${res.after.a.coin}/${res.after.cargo.coin}`);
+      // 6. Give the deposit back so the account ends with the gold in hand.
+      res.restore = { sent: await a.goldBox(65688, res.deposit.amount) };
+      await a.until('deposit withdrawn', c => Module._wyd_field_my_score(5) !== c, 10000, res.after.a.coin).catch(() => false);
+      await a.healthy(); await b.healthy();
+      checkRestart(res);
+      return res;
+    });
+
     // Stage 5, slice A: the paid city portal (teleport.go, Armia -> Noatum for
     // 700). The client shows box 16 with the price and sends 0x0290 on OK
     // without checking gold; the server charges or refuses in silence.
@@ -2754,6 +3054,127 @@ async function main() {
           dropA: JSON.stringify(res.drop.a) === JSON.stringify(a0), dropB: JSON.stringify(res.drop.b) === JSON.stringify(res.bFull) } };
     });
 
+    // Party chat (stage 5): "=text" goes out as 0x0334 with an empty MobName
+    // (TMFieldScene InsertInChatList); the server routes it to the party
+    // (_MSG_MessageWhisper.cpp "Chat Party"). "partychat" typed as speech is
+    // the legacy toggle (_MSG_MessageChat.cpp:117).
+    await step('partychat', async () => {
+      const res = {}; r.partychat = res;
+      const tag = `pc${Date.now() % 100000}`;
+      // A notice (0x0102) right after the line means the server took it as a
+      // whisper to an empty name.
+      const notice = s => s.until('notice', () => window.clientProbe().socket.lastRecvOpcode === 0x102, 4000)
+        .then(() => true, () => false);
+      // Which name the listener shows on the new lines (names stay out of the evidence).
+      const shown = (s, self, other, n0) => s.eval(([self, other, n0]) => {
+        const lines = [];
+        for (let k = 0; k < Module._wyd_field_chat_count() - n0; k++) lines.push(Module.UTF8ToString(Module._wyd_field_chat_line(k)));
+        return lines.some(l => l.includes(other)) ? 'sender' : lines.some(l => l.includes(self)) ? 'receiver' : 'none';
+      }, [self, other, n0]);
+      const line = async (from, to, fromName, toName, text) => {
+        const n0 = await to.eval(() => Module._wyd_field_chat_count());
+        const sent = await from.say(text, { clear: true, keepPanels: true });
+        const [heard, gotNotice] = await Promise.all([inChat(to, text.slice(1)), notice(from)]);
+        return { ...sent, heard, notice: gotNotice, senderShown: await shown(to, toName, fromName, n0) };
+      };
+      await a.waitParty([], 0); await b.waitParty([], 0);
+      await a.inviteParty(b); await b.partyRow(a.id);
+      res.party = { aId: a.id, bId: b.id, a: await a.waitParty([a.id, b.id], a.id), b: await b.waitParty([a.id, b.id], a.id) };
+      res.leaderSays = await line(a, b, A.char, B.char, `=${tag} lider`);
+      await b.shot('partychat-heard');
+      res.memberSays = await line(b, a, B.char, A.char, `=${tag} membro`);
+      // The original toggle is the B_CHAT_PARTY button (65678, TMFieldScene
+      // OnControlEvent sends "partychat"); typing the word is the fallback.
+      const toggle = async state => {
+        const out0 = await b.outCount();
+        let via = 'button';
+        try { await b.uiButton(65678); await b.frames(3); } catch { via = 'typed'; }
+        const res = via === 'button' ? { sent: (await b.outCount()) > out0, lastSent: '0x' + (await b.lastSent()).toString(16) }
+          : await b.say('partychat', { clear: true, keepPanels: true });
+        return { ...res, via, confirmed: await inChat(b, `Party Chatting : ${state}`) };
+      };
+      res.toggleOff = await toggle('Off');
+      res.silenced = await line(a, b, A.char, B.char, `=${tag} silencio`);
+      res.toggleOn = await toggle('On');
+      res.restored = await line(a, b, A.char, B.char, `=${tag} de volta`);
+      // Leave by the party window's "Sair do Grupo" (475139), with the chat box closed.
+      for (const s of [a, b]) if (await s.eval(() => Module._wyd_field_chat_editing()) === 1) {
+        await s.page.locator('#canvas').press('Escape'); await s.frames(2);
+      }
+      await b.shot('partychat-before-leave');
+      await b.uiButton(475139);
+      res.left = await b.waitParty([], 0).then(rows => ({ b: rows }), async () => {
+        await b.shot('partychat-leave-retry'); await b.uiButton(475139); return { retried: true, b: await b.waitParty([], 0) };
+      });
+      res.left.a = await a.waitParty([], 0);
+      res.afterLeave = await line(a, b, A.char, B.char, `=${tag} sem grupo`);
+      console.log(`    leader->B ${res.leaderSays.heard}, member->A ${res.memberSays.heard}, ` +
+        `off ${res.toggleOff.confirmed}/${res.silenced.heard}, on ${res.toggleOn.confirmed}/${res.restored.heard}, ` +
+        `after leave sent ${res.afterLeave.sent}`);
+      await a.healthy();
+      await b.healthy();
+      checkPartyChat(res);
+      return res;
+    });
+
+    // Guild chat (stage 5): "-text" goes out as 0x0334 with an empty MobName and
+    // Color 3 (TMFieldScene InsertInChatList); the server routes it to the guild
+    // and stamps Color 3 (_MSG_MessageWhisper.cpp "Chat Guild"). Without Color 3
+    // the runtime files a "-" line in the whisper memo, not in the chat list, so
+    // a chat line without the prefix proves the guild path. "--text" also goes
+    // to the allied guild. A and B must already share a guild (set up outside).
+    await step('guildchat', async () => {
+      const res = {}; r.guildchat = res;
+      const tag = `gc${Date.now() % 100000}`;
+      // 0x0101 is the "not in a guild" panel; 0x0102 a line taken as a whisper.
+      const notice = s => s.until('notice', () => [0x101, 0x102].includes(window.clientProbe().socket.lastRecvOpcode), 4000)
+        .then(() => true, () => false);
+      const newLines = (s, n0) => s.eval(n0 => {
+        const lines = [];
+        for (let k = 0; k < Module._wyd_field_chat_count() - n0; k++) lines.push(Module.UTF8ToString(Module._wyd_field_chat_line(k)));
+        return lines;
+      }, n0);
+      // Names and lines stay out of the evidence; only what was shown is kept.
+      const line = async (from, to, fromName, toName, text) => {
+        const body = text.replace(/^-+/, '');
+        const n0 = await to.eval(() => Module._wyd_field_chat_count());
+        const sent = await from.say(text, { clear: true, keepPanels: true });
+        const [heard, gotNotice] = await Promise.all([inChat(to, body), notice(from)]);
+        const lines = (await newLines(to, n0)).filter(l => l.includes(body));
+        return { ...sent, heard, notice: gotNotice,
+          senderShown: lines.some(l => l.includes(fromName)) ? 'sender' : lines.some(l => l.includes(toName)) ? 'receiver' : 'none',
+          prefixShown: lines.some(l => l.includes(`> -${body}`) || l.includes(`> --${body}`)) };
+      };
+      res.memberSays = await line(a, b, A.char, B.char, `-${tag} guilda`);
+      await b.shot('guildchat-heard');
+      res.otherSays = await line(b, a, B.char, A.char, `-${tag} resposta`);
+      res.allySays = await line(a, b, A.char, B.char, `--${tag} alianca`);
+      // The original toggle is B_CHAT_GUILD (65680, OnControlEvent sends
+      // "guildchat"). The server answers with a message panel whose exact text
+      // the runtime matches to flip the guild button (TMScene.cpp:1660-1669).
+      const toggle = async state => {
+        const out0 = await b.outCount();
+        let via = 'button';
+        try { await b.uiButton(65680); await b.frames(3); } catch { via = 'typed'; }
+        const res = via === 'button' ? { sent: (await b.outCount()) > out0, lastSent: '0x' + (await b.lastSent()).toString(16) }
+          : await b.say('guildchat', { clear: true, keepPanels: true });
+        const want = `Guild Chatting : ${state}`;
+        const confirmed = await b.until(`panel "${want}"`, w => Module._wyd_scene_message_visible() === 1 &&
+          Module.UTF8ToString(Module._wyd_scene_message_text()) === w, 10000, want).then(() => true, () => false);
+        return { ...res, via, confirmed };
+      };
+      res.toggleOff = await toggle('Off');
+      res.silenced = await line(a, b, A.char, B.char, `-${tag} silencio`);
+      res.toggleOn = await toggle('On');
+      res.restored = await line(a, b, A.char, B.char, `-${tag} de volta`);
+      console.log(`    A->B ${res.memberSays.heard}, B->A ${res.otherSays.heard}, -- ${res.allySays.heard}, ` +
+        `off ${res.toggleOff.confirmed}/${res.silenced.heard}, on ${res.toggleOn.confirmed}/${res.restored.heard}`);
+      await a.healthy();
+      await b.healthy();
+      checkGuildChat(res);
+      return res;
+    });
+
     await step('chat', async () => {
       const res = {};
       r.chat = res;
@@ -2855,6 +3276,18 @@ async function main() {
   } finally {
     for (const s of sessions) {
       try { if (s.context) ev[`final_${s.label}`] = dialectSummary(await s.probe()); } catch {}
+      if (opt['trace-files'] && s.context) try { traced.set(s.label, await traceOpens(s.page)); } catch {}
+    }
+    if (opt['trace-files']) {
+      const index = await packageIndex(SITE);
+      const all = new Set([...traced.values()].flat().map(([p]) => p));
+      const sum = by => Object.fromEntries(Object.entries(by).map(([k, v]) => [k, { files: v.files, MiB: +(v.bytes / 2 ** 20).toFixed(1) }]));
+      const trace = { sessions: Object.fromEntries([...traced].map(([label, opens]) =>
+        [label, { files: opens.filter(([p]) => index.has(p)).length, byDir: sum(openedByDir(opens.map(([p]) => p), index)) }])),
+        union: { files: [...all].filter(p => index.has(p)).length, byDir: sum(openedByDir([...all], index)) },
+        paths: [...traced].map(([label, opens]) => ({ label, opens })) };
+      await writeFile(join(OUT, 'opened-files.json'), JSON.stringify(trace, null, 1));
+      ev.openedFiles = { sessions: trace.sessions, union: trace.union, list: join(OUT, 'opened-files.json') };
     }
     ev.pageErrors = Object.fromEntries(sessions.map(s => [s.label, s.pageErrors]));
     ev.screenshots = sessions.flatMap(s => s.shots);

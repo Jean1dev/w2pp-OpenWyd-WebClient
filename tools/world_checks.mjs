@@ -14,8 +14,8 @@ export function redactEvidence(value, secrets) {
 }
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
-  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'castarea',
-  'equip', 'potion', 'loot', 'shop', 'bank', 'paidteleport', 'chat', 'party', 'trade', 'tradeedge', 'delete', 'concurrent'];
+  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea',
+  'equip', 'potion', 'loot', 'shop', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -47,12 +47,15 @@ export function validateOptions(opt) {
   for (const [p, only] of [['shop', ['enter', 'login', 'shop']], ['bank', ['bank', 'enter', 'login']],
     ['paidteleport', ['enter', 'login', 'paidteleport']],
     ['chat', ['chat', 'enter', 'login', 'second']], ['party', ['enter', 'login', 'party', 'second']],
+    ['partychat', ['enter', 'login', 'partychat', 'second']],
+    ['guildchat', ['enter', 'guildchat', 'login', 'second']],
+    ['restart', ['enter', 'login', 'restart', 'second']],
     ['trade', ['enter', 'login', 'second', 'trade']], ['tradeedge', ['enter', 'login', 'second', 'tradeedge']],
     ['delete', ['delete']]]) {
     if (phases.has(p)) assert.deepEqual([...phases].sort(), only, `${p} runs only with ${only.join(',')}`);
   }
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
-    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], loot: ['login'], concurrent: ['enter'] };
+    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], buff: ['login'], healother: ['login'], loot: ['login'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
     assert(phases.has(dep), `${name} requires ${dep}`);
   // death takes A through the portal and needs B waiting at the Armia spawn;
@@ -60,12 +63,15 @@ export function validateOptions(opt) {
   for (const other of ['mapchange', 'attack'])
     assert(!(phases.has('death') && phases.has(other)), `death cannot run with ${other}`);
   // grind enters the --class character itself, alone (one game page).
-  const own = ['login', 'grind', 'learn', 'cast', 'loot'];
+  const own = ['login', 'grind', 'learn', 'cast', 'buff', 'healother', 'loot'];
   for (const p of own.slice(1)) {
     if (!phases.has(p)) continue;
     for (const other of phases)
       assert(own.includes(other), `${p} runs only with ${own.join('/')} (got ${other})`);
   }
+  if (phases.has('healother')) assert.equal(opt.class, '1', 'healother needs --class 1 (Foema)');
+  if (phases.has('buff')) assert(['1', '2'].includes(opt.class), 'buff needs --class 1 (Cura) or 2 (Lobisomem)');
+  if (opt.skill) assert(['27', '64'].includes(opt.skill), '--skill must be 27 (Cura) or 64 (Lobisomem)');
   if (phases.has('grind')) {
     assert(/^\d+$/.test(opt['grind-level'] ?? '') && Number(opt['grind-level']) >= 2 &&
       Number(opt['grind-level']) <= 20, '--grind-level must be 2..20');
@@ -402,4 +408,75 @@ export function checkChat(c) {
   assert(c.teleport.moved > 50, 'the /city command did not move A');
   assert(c.teleport.bLost, 'B still sees A after the teleport');
   assert(c.back.moved > 50, 'the return command did not move A');
+}
+
+// Buff and cure (stage 5). The MP cost comes from the server; so does the
+// effect: the BM transform turns A into the wolf model (the runtime switches
+// TMHuman::m_nClass on the body item 22 the server sends, transform.go
+// transMesh) and rescales MaxHp, which B sees; the Foema heal raises HP, seen
+// by B.
+// The skill stays learned after the relogin.
+export function checkBuff(r, plan) {
+  assert(r.attempts > 0 && r.attacksSent > 0, 'no cast sent');
+  // Lowest MP seen after the cast: regeneration refills it within seconds.
+  const mp = Math.min(r.after.mp, ...(r.trail ?? []).map(t => t.mp));
+  assert(mp < r.before.mp, `server took no MP (${r.before.mp} -> ${mp})`);
+  assert(((r.relogin.learned >>> plan.pos) & 1) === 1, 'skill lost after relogin');
+  if (plan.kind === 'transform') {
+    assert.notEqual(r.after.model, r.before.model, `A kept model ${r.before.model}`);
+    assert.notEqual(r.after.maxHp, r.before.maxHp, 'MaxHp not rescaled by the transform');
+    assert.equal(r.observedAfter?.maxHp, r.after.maxHp, 'B does not see the transformed MaxHp on A');
+    // The affect is saved: after the relogin A is still the beast, on its own
+    // screen too (the runtime takes its model from the login snapshot).
+    if (r.relogin.maxHp === r.after.maxHp)
+      assert.equal(r.relogin.model, r.after.model, `relogin model ${r.relogin.model}, transform still active`);
+  } else {
+    assert(r.before.hp < r.before.maxHp, 'no HP missing before the cure');
+    // More than one natural regeneration step (Level+30 every 10 s).
+    const hp = Math.max(r.after.hp, ...(r.trail ?? []).map(t => t.hp));
+    assert(hp - r.before.hp > r.before.level + 30,
+      `HP rose ${hp - r.before.hp}, no more than one regeneration step (${r.before.level + 30})`);
+    assert(r.observedAfter?.hp > (r.observedBefore?.hp ?? Infinity), 'B did not see A healed');
+    // The server's answer (combat diagnostics, ADR 006): the heal rides as a
+    // negative Dam on A itself, and B receives the same packet.
+    const self = l => (l?.in ?? []).find(e => e.skill === plan.skill && e.targets.some(t => t.id === e.attacker && t.damage < 0));
+    const echoA = self(r.logsA), echoB = self(r.logsB);
+    assert(echoA, 'no server heal answer on A');
+    assert(echoB && echoB.targets[0].damage === echoA.targets[0].damage && echoB.hp === echoA.hp,
+      'B did not receive the same heal answer');
+  }
+}
+
+// Slice 5, controlled restart: what both clients held right before the
+// server stopped (A's purchase and cargo deposit lived only in its memory)
+// comes back unchanged after the restart, through a fresh login.
+export function checkRestart(r) {
+  assert(r.buy?.gained === 1 && r.buy.coinAfter === r.buy.coinBefore - r.buy.price, 'purchase before the restart not applied');
+  assert(r.droppedAt?.a && r.droppedAt?.b, 'the restart did not drop both sessions');
+  for (const who of ['a', 'b']) {
+    const [x, y] = [r.before[who], r.after[who]];
+    for (const k of ['coin', 'level', 'exp', 'learned'])
+      assert.deepEqual(y[k], x[k], `${who}.${k} changed across the restart`);
+    assert.deepEqual(y.equip, x.equip, `${who}.equip changed across the restart`);
+    assert.deepEqual(y.carry, x.carry, `${who}.carry changed across the restart`);
+  }
+  assert.equal(r.after.cargo.coin, r.before.cargo.coin, 'cargo gold changed across the restart');
+  assert.deepEqual(r.after.cargo.items, r.before.cargo.items, 'cargo items changed across the restart');
+  assert(r.before.cargo.coin >= r.deposit.cargoBefore + r.deposit.amount, 'deposit not in the cargo before the restart');
+}
+
+// Cura on another player: the server answers with a negative Dam on B (the
+// heal), A pays the MP, and B sees its own HP rise by more than one natural
+// regeneration step (Level+30); both pages receive the same answer.
+export function checkHealOther(r) {
+  const echo = l => (l?.in ?? []).find(e => e.skill === r.skill && e.attacker === r.casterId &&
+    e.targets.some(t => t.id === r.targetId && t.damage < 0));
+  const ea = echo(r.logsA), eb = echo(r.logsB);
+  assert(ea, 'no server heal answer on B in A');
+  assert(eb && eb.targets[0].damage === ea.targets[0].damage, 'B did not receive the same heal answer');
+  assert(ea.mp < r.before.caster.mp, `server took no MP from A (${r.before.caster.mp} -> ${ea.mp})`);
+  assert(r.before.target.hp < r.before.target.maxHp, 'B had no HP missing');
+  assert(r.after.target.hp - r.before.target.hp > r.before.target.level + 30,
+    `B's HP rose ${r.after.target.hp - r.before.target.hp}, no more than one regeneration step`);
+  assert(r.after.seenByCaster > r.before.seenByCaster, 'A did not see B healed');
 }

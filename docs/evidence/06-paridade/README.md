@@ -55,7 +55,7 @@ A lista de caminhos não é versionada, porque o manifesto completo de assets fi
 - Modelos e animações de mobs e NPCs são abertos quando a entidade aparece (`CreateMob`), a qualquer momento da sessão.
 - Uma busca pela rede no momento do `fopen` exige Asyncify, ou o laço principal num Worker (leitura síncrona, `OffscreenCanvas`), ou um sistema de arquivos com acesso síncrono (WASMFS com OPFS, também só em Worker).
 
-Opções, a decidir em ADR antes de implementar:
+Opções avaliadas na [ADR 012](../../decisions/012-on-demand-asset-loading.md). Decisão de 01/10: **o preload integral continua**, porque leitura pela rede durante o jogo trava o quadro; ver a revisão da ADR.
 1. **Pacotes por região, com pré-busca nas transições conhecidas** (login no Field, `0x0290`, teleporte por comando), mantendo `Mesh` comum preloaded. Reduz `UI`/`Env`/`Sound`, mas não resolve `Mesh`, que vem de entidades dinâmicas.
 2. **Asyncify só nos caminhos de leitura de asset.** Busca sob demanda com cache em IndexedDB. Custa tamanho e desempenho do WASM, e mexe no build.
 3. **Laço do jogo num Worker**, com arquivos sob demanda (síncronos no Worker) e WebGL por `OffscreenCanvas`. É a mudança estrutural maior; resolve memória e travamentos de carga.
@@ -83,9 +83,42 @@ Memória dos processos do Chromium com uma página do jogo aberta (working set, 
 
 **Conclusão:** o pacote é quase metade do renderer, e a cena usa ~50 MiB dele. Carregar sob demanda economiza até ~255 MiB por página, ~25% do total e ~0,5 GB nas execuções com duas contas (issue #6). As opções 1–3 acima continuam valendo e precisam de uma ADR. O próximo dado necessário é o conjunto de arquivos abertos numa sessão online (Field com mobs, troca de mapa, combate), para dimensionar pacotes por região.
 
+## Arquivos abertos numa sessão online (01/10/2026, confirmado em execução)
+
+Duas sessões de uma conta no `tm-server` do Railway (`200f4824`), com `node tools/verify_world.mjs … --trace-files`. A opção nova instrumenta a página do cliente com o mesmo `tools/fs_trace.mjs` da medição offline. A lista de caminhos fica só em `.cache/world/<execução>/opened-files.json`; os JSONs versionados trazem o resumo por diretório.
+
+| Sessão | Percurso | Arquivos do pacote | MiB |
+|---|---|---|---|
+| [`login,loot`](2026-10-01-online-files-loot.json) | seleção de servidor e de personagem, Armia, caminhada até o campo dos Gremlins, 4 mortes, relogin | 1.870 | 73,7 |
+| [`login,enter,paidteleport`](2026-10-01-online-files-paidteleport.json) | Armia, Guarda Carga, portal pago até Noatum, `/armia`, relogin | 1.794 | 70,7 |
+| **União** | | **1.968** | **76,5 de 305** |
+
+Por diretório, na união:
+
+| Diretório | Arquivos | MiB abertos / total |
+|---|---|---|
+| `Mesh` | 1.662 | 49,0 / 174,5 |
+| `UI` | 57 | 9,7 / 70,9 |
+| `Sound` | 27 | 8,9 / 36,3 |
+| raiz | 17 | 3,1 / 3,1 |
+| `Env` | 118 | 2,7 / 13,2 |
+| `NUI` | 4 | 2,4 / 3,2 |
+| `Effect` | 71 | 0,8 / 3,8 |
+
+- O conjunto de trabalho cresce devagar: Noatum acrescentou 98 arquivos (2,8 MiB) ao de Armia e do campo. Duas sessões típicas usam juntas 25% do pacote.
+- Outros mapas, classes e equipamentos vão aumentar esse número; falta medir uma sessão longa com várias regiões.
+
+**Opção 5, nova:** pré-carregar só o conjunto quente (~80–100 MiB) e ler os demais arquivos sob demanda com XHR síncrono por faixa de bytes do `.data`. É o que o `FS.createLazyFile` do Emscripten faz.
+- **Vantagens:** não exige Asyncify nem Worker, e o `fopen` síncrono continua funcionando. Os bytes lidos podem vir do cache HTTP ou de um Service Worker com Cache Storage.
+- **Custos:**
+  - XHR síncrono na thread principal é obsoleto, embora ainda suportado; bloqueia o quadro durante a leitura de um arquivo frio;
+  - a resposta binária exige `overrideMimeType` com `x-user-defined`;
+  - o servidor de assets precisa aceitar `Range` (o gateway já responde 206, conforme a etapa 8).
+- **Economia esperada:** até ~225 MiB por página (305 → ~80).
+
 ## Limites desta medição
 
 - Só Chromium headless com renderização por software; sem GPU, sem Firefox e sem Safari.
-- Cena offline: sem mobs do servidor, sem troca de mapa e sem ensaio longo. O conjunto de trabalho de uma sessão real será maior que 50,5 MiB e precisa ser medido online (Field com mobs, troca de mapa, combate).
+- Cena offline: sem mobs do servidor, sem troca de mapa e sem ensaio longo. As sessões online acima cobrem Armia, o campo dos Gremlins e Noatum, sem ensaio longo.
 - Sem comparação visual com o cliente Windows (depende das capturas do operador).
 - Uma única execução de cada caso.

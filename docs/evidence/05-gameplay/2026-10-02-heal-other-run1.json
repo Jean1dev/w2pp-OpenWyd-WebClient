@@ -1,0 +1,330 @@
+{
+ "when": "2026-10-02T15:36:58.987Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "healother"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 6
+    },
+    {
+     "filled": true,
+     "level": 11
+    },
+    {
+     "filled": true,
+     "level": 16
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 23602,
+   "at": "2026-10-02T15:37:36.972Z"
+  },
+  "healother": {
+   "skill": 27,
+   "targetId": 2,
+   "casterId": 1,
+   "attempts": 1,
+   "distance": 2.23606797749979,
+   "approach": [
+    [
+     2087.5,
+     2105.5
+    ],
+    [
+     2089.5,
+     2096.5
+    ],
+    [
+     2085.5,
+     2093.5
+    ],
+    [
+     2085.5,
+     2093.5
+    ],
+    [
+     2088.5,
+     2095.5
+    ],
+    [
+     2085.5,
+     2093.5
+    ]
+   ],
+   "beltSaved": true,
+   "before": {
+    "caster": {
+     "mp": 146
+    },
+    "target": {
+     "hp": 1050,
+     "maxHp": 1050,
+     "level": 0
+    },
+    "seenByCaster": 1050
+   },
+   "logsA": {
+    "in": [
+     {
+      "sequence": 1,
+      "attacker": 1,
+      "skill": 27,
+      "progress": 0,
+      "hp": 120,
+      "mp": 131,
+      "exp": "23783",
+      "x": 2085,
+      "y": 2093,
+      "targets": [
+       {
+        "id": 2,
+        "damage": -100
+       }
+      ]
+     }
+    ],
+    "out": [
+     {
+      "sequence": 1,
+      "attacker": 1,
+      "skill": 27,
+      "progress": 0,
+      "hp": 0,
+      "mp": -1,
+      "exp": "0",
+      "x": 2085,
+      "y": 2093,
+      "targets": [
+       {
+        "id": 2,
+        "damage": -1
+       }
+      ]
+     }
+    ],
+    "lost": 0
+   },
+   "logsB": {
+    "in": [
+     {
+      "sequence": 1,
+      "attacker": 1,
+      "skill": 27,
+      "progress": 0,
+      "hp": 120,
+      "mp": 131,
+      "exp": "23783",
+      "x": 2085,
+      "y": 2093,
+      "targets": [
+       {
+        "id": 2,
+        "damage": -100
+       }
+      ]
+     }
+    ],
+    "out": [],
+    "lost": 0
+   },
+   "after": {
+    "caster": {
+     "mp": 146
+    },
+    "target": {
+     "hp": 1050,
+     "maxHp": 1050,
+     "level": 0
+    },
+    "seenByCaster": 1050
+   },
+   "ok": false,
+   "error": "B had no HP missing",
+   "ms": 540590,
+   "at": "2026-10-02T15:46:45.784Z"
+  }
+ },
+ "ok": false,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "4eda06fd14232af913e71c056a5155c5033b72e5",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-10-02T15:37:37.399Z",
+   "freeMiB": 1785,
+   "totalMiB": 8014,
+   "browserMiB": 1041,
+   "pages": {
+    "A": {
+     "wasmMiB": 125,
+     "jsMiB": 441
+    }
+   }
+  },
+  {
+   "point": "end healother",
+   "at": "2026-10-02T15:46:46.910Z",
+   "freeMiB": 957,
+   "totalMiB": 8014,
+   "browserMiB": 2117,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 441
+    },
+    "B-heal": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "heal-other",
+   "file": ".cache/world/2026-10-02T15-36-58-973Z/A-heal-other.png",
+   "sha256": "54d02cd2fe1581a22c174e94908832b0d00434eee05ecf459a0fb6e41ce7cb82"
+  },
+  {
+   "name": "healed",
+   "file": ".cache/world/2026-10-02T15-36-58-973Z/B-heal-healed.png",
+   "sha256": "cb285ae0baab4554083627562fd00ebc71f14d84701e29ad46aa0161f3d1851e"
+  }
+ ],
+ "error": "B had no HP missing",
+ "final_A": {
+  "inTranslated": 71,
+  "inPass": 13,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 4,
+  "outPass": 12,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 84,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "final_B-heal": {
+  "inTranslated": 65,
+  "inPass": 12,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 3,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 77,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "B-heal": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-10-02T12:37:13.2016868-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-10-02T12:37:27.5306784-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-02T12:38:56.5580695-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-02T12:47:01.7469887-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 752,
+   "bytes_down": 17560
+  },
+  {
+   "time": "2026-10-02T12:47:02.0381902-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 212,
+   "bytes_down": 16100
+  }
+ ]
+}

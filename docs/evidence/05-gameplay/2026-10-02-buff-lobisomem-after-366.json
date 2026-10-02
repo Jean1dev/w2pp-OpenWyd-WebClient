@@ -1,0 +1,335 @@
+{
+ "when": "2026-10-02T12:06:27.862Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "buff"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 6
+    },
+    {
+     "filled": true,
+     "level": 11
+    },
+    {
+     "filled": true,
+     "level": 16
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 27076,
+   "at": "2026-10-02T12:06:55.596Z"
+  },
+  "buff": {
+   "ok": true,
+   "cls": 2,
+   "skill": 64,
+   "name": "Lobisomem",
+   "kind": "transform",
+   "attempts": 1,
+   "belt": 64,
+   "beltSaved": true,
+   "selected": 0,
+   "before": {
+    "hp": 115,
+    "maxHp": 115,
+    "mp": 126,
+    "level": 11,
+    "model": 4
+   },
+   "observedBefore": {
+    "hp": 115,
+    "maxHp": 115
+   },
+   "trail": [
+    {
+     "hp": 110,
+     "maxHp": 110,
+     "mp": 54,
+     "level": 11,
+     "model": 26
+    }
+   ],
+   "via": "ground",
+   "attacksSent": 2,
+   "logsA": {
+    "in": [
+     {
+      "sequence": 1,
+      "attacker": 1,
+      "skill": 64,
+      "progress": 0,
+      "hp": 110,
+      "mp": 54,
+      "exp": "10893",
+      "x": 2094,
+      "y": 2103,
+      "targets": [
+       {
+        "id": 1,
+        "damage": 0
+       }
+      ]
+     }
+    ],
+    "out": [
+     {
+      "sequence": 1,
+      "attacker": 1,
+      "skill": 64,
+      "progress": 0,
+      "hp": 0,
+      "mp": -1,
+      "exp": "0",
+      "x": 2094,
+      "y": 2103,
+      "targets": [
+       {
+        "id": 1,
+        "damage": -1
+       }
+      ]
+     }
+    ],
+    "lost": 0
+   },
+   "logsB": {
+    "in": [
+     {
+      "sequence": 1,
+      "attacker": 1,
+      "skill": 64,
+      "progress": 0,
+      "hp": 110,
+      "mp": 54,
+      "exp": "10893",
+      "x": 2094,
+      "y": 2103,
+      "targets": [
+       {
+        "id": 1,
+        "damage": 0
+       }
+      ]
+     }
+    ],
+    "out": [],
+    "lost": 0
+   },
+   "after": {
+    "hp": 110,
+    "maxHp": 110,
+    "mp": 54,
+    "level": 11,
+    "model": 26
+   },
+   "observedAfter": {
+    "hp": 110,
+    "maxHp": 110
+   },
+   "relogin": {
+    "hp": 110,
+    "maxHp": 110,
+    "mp": 126,
+    "level": 11,
+    "model": 26,
+    "learned": 65536
+   },
+   "ms": 296586,
+   "at": "2026-10-02T12:11:59.818Z"
+  }
+ },
+ "ok": true,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "4bc615fb2cfbcfd6703ba9be4e6044c424293dcc",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-10-02T12:06:55.869Z",
+   "freeMiB": 1505,
+   "totalMiB": 8014,
+   "browserMiB": 1050,
+   "pages": {
+    "A": {
+     "wasmMiB": 150,
+     "jsMiB": 497
+    }
+   }
+  },
+  {
+   "point": "end buff",
+   "at": "2026-10-02T12:12:00.695Z",
+   "freeMiB": 720,
+   "totalMiB": 8014,
+   "browserMiB": 2107,
+   "pages": {
+    "B-buff": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    },
+    "A-transform-relogin": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "buff-cast",
+   "file": ".cache/world/2026-10-02T12-06-27-852Z/A-buff-cast.png",
+   "sha256": "569c7cc755dcebaa09a1d4ed134e38caab9e889ada1d91e0e869d0da1b1f2ce9"
+  },
+  {
+   "name": "buff-observed",
+   "file": ".cache/world/2026-10-02T12-06-27-852Z/B-buff-buff-observed.png",
+   "sha256": "151ccae9c2999de7af29a6757e3ec01d0c2f1b3309e9d5ada160fc8961b8f001"
+  }
+ ],
+ "final_B-buff": {
+  "inTranslated": 35,
+  "inPass": 5,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 3,
+  "outPass": 2,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 40,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "final_A-transform-relogin": {
+  "inTranslated": 36,
+  "inPass": 3,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 5,
+  "outPass": 2,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 39,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "B-buff": [],
+  "A-transform-relogin": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-10-02T09:06:28.3628604-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-10-02T09:06:48.7074712-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-02T09:08:22.922582-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-02T09:10:19.9211238-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 426,
+   "bytes_down": 12696
+  },
+  {
+   "time": "2026-10-02T09:11:20.2876851-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-02T09:12:11.3916938-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 200,
+   "bytes_down": 10996
+  },
+  {
+   "time": "2026-10-02T09:12:11.5505524-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 516,
+   "bytes_down": 11348
+  }
+ ]
+}

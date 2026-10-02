@@ -1,0 +1,97 @@
+From 2c7c25377fbcb270d6e7e69d46234af80587dc18 Mon Sep 17 00:00:00 2001
+From: Jeanluca <jeanlucafp@gmail.com>
+Date: Fri, 2 Oct 2026 08:58:09 -0300
+Subject: [PATCH] fix(tmserver): show a persisted BM transform in the own login
+ snapshot
+
+A BM that logged in with a live transform (affect 16) was drawn as a human
+on its own screen while everyone else saw the beast. The 7662 client builds
+its hero from MSG_CNFCharacterLogin and, once the hero exists, ignores the
+equipment of its own CreateMob (TMFieldScene::OnPacketCreateMob, live-node
+branch). The snapshot carried the saved body item, so the beast mesh that
+equipVisual puts on the CreateMob never reached the own model.
+
+The legacy sends MOB after GetCurrentScore, which writes the beast mesh into
+Equip[0].sIndex (Basedef.cpp:4106, ProcessDBMessage.cpp). Do the same on the
+wire copy only: the saved body item is not touched.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ tmserver/internal/handler/character.go      | 11 ++++++
+ tmserver/internal/handler/transform_test.go | 41 +++++++++++++++++++++
+ 2 files changed, 52 insertions(+)
+
+diff --git a/tmserver/internal/handler/character.go b/tmserver/internal/handler/character.go
+index 4aab37b7..0eddcefd 100644
+--- a/tmserver/internal/handler/character.go
++++ b/tmserver/internal/handler/character.go
+@@ -359,6 +359,17 @@ func (d *Dispatcher) completeCharacterLogin(w *world.World, s *world.Session, st
+ 		for i := range st.Equip {
+ 			equip[i] = itemToSel(st.Equip[i])
+ 		}
++		// A persisted BM transform shows on the own model: the runtime builds its
++		// hero from this snapshot and ignores the own CreateMob once it exists
++		// (TMFieldScene::OnPacketCreateMob, live-node branch). The legacy gets the
++		// same by sending MOB after GetCurrentScore, which wrote the beast mesh
++		// into Equip[0].sIndex (Basedef.cpp:4106, ProcessDBMessage.cpp). Only the
++		// wire copy changes; the saved body item does not.
++		if e := w.Entity(s.Conn); e != nil {
++			if value, _, ok := activeTransform(e); ok {
++				equip[0].Index = transMesh(value)
++			}
++		}
+ 		var carry [64]protocol.SelItem
+ 		for i := range st.Carry {
+ 			if i >= 64 {
+diff --git a/tmserver/internal/handler/transform_test.go b/tmserver/internal/handler/transform_test.go
+index a8bc598b..cd5f1e2a 100644
+--- a/tmserver/internal/handler/transform_test.go
++++ b/tmserver/internal/handler/transform_test.go
+@@ -412,3 +412,44 @@ func TestTransformCostumePersistedLoginAndNewObserver(t *testing.T) {
+ 	defer observer.Close()
+ 	assertCreate(observer)
+ }
++
++// TestTransformPersistedLoginSnapshotMesh: a BM that logs in with a live
++// transform gets the beast mesh in its own login snapshot (Equip[0].sIndex at
++// MOB@140), since the runtime builds its hero from it; a BM without the affect
++// keeps its face. The saved body item is never rewritten.
++func TestTransformPersistedLoginSnapshotMesh(t *testing.T) {
++	for _, tt := range []struct {
++		name    string
++		affects []world.Affect
++		want    uint16
++	}{
++		{"wolf", []world.Affect{{Type: 16, Value: 1, Level: 100, Time: 100}}, 22},
++		{"eden", []world.Affect{{Type: 16, Value: 5, Level: 100, Time: 100}}, 32},
++		{"no transform", nil, 21},
++	} {
++		t.Run(tt.name, func(t *testing.T) {
++			db := newDB()
++			st := world.CharacterState{Slot: 0, Name: "Beast", Class: 2, X: 2100, Y: 2100,
++				HP: 500, MaxHP: 500, Level: 50, Affects: tt.affects}
++			st.Equip[0] = world.Item{Index: 21}
++			db.loadResult = st
++			tmpl := make([]byte, content.BaseMobSize)
++			addr, stop := startServerBaseMobs(t, db, map[int][]byte{2: tmpl})
++			defer stop()
++			c := loginAndSelect(t, addr)
++			defer c.Close()
++			body := protocol.MsgCharacterLoginBody{Slot: 0}
++			send(t, c, protocol.MsgCharacterLogin, body.Encode())
++			ty, payload := read(t, c)
++			if ty != protocol.MsgCNFCharacterLogin {
++				t.Fatalf("got %#x, want CNFCharacterLogin", ty)
++			}
++			if got := binary.LittleEndian.Uint16(payload[4+140:]); got != tt.want {
++				t.Fatalf("snapshot Equip[0] = %d, want %d", got, tt.want)
++			}
++			if db.loadResult.Equip[0].Index != 21 {
++				t.Fatalf("saved body item rewritten to %d", db.loadResult.Equip[0].Index)
++			}
++		})
++	}
++}
+-- 
+2.54.0.windows.1
+
