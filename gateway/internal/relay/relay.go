@@ -70,8 +70,11 @@ func New(baseCtx context.Context, cfg *config.Config, log *slog.Logger) *Gateway
 		g.mux.Handle("GET /", staticHandler(cfg.StaticDir, assets))
 	}
 	g.handler = g.mux
-	if cfg.BasicAuth != nil {
+	switch {
+	case cfg.BasicAuth != nil:
 		g.handler = basicAuth(*cfg.BasicAuth, g.mux)
+	case cfg.PortalAuth != nil:
+		g.handler = newPortalGate(cfg, g.mux, log)
 	}
 	return g
 }

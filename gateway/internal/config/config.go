@@ -88,17 +88,31 @@ type Config struct {
 	AssetS3 *S3Assets `json:"assetS3"`
 	// BasicAuth, when set, protects every route except /healthz. The password
 	// comes from the operator's environment, never from a committed file.
-	BasicAuth            *BasicAuth `json:"basicAuth"`
-	AssetManifestVersion string     `json:"assetManifestVersion"`
-	DefaultChannel       string     `json:"defaultChannel"`
-	Channels             []Channel  `json:"channels"`
-	Limits               Limits     `json:"limits"`
+	BasicAuth *BasicAuth `json:"basicAuth"`
+	// PortalAuth, the alternative to BasicAuth, admits whoever holds an account
+	// on the operator's portal: the portal posts a short-lived signed ticket and
+	// the gateway answers with its own session cookie.
+	PortalAuth           *PortalAuth `json:"portalAuth"`
+	AssetManifestVersion string      `json:"assetManifestVersion"`
+	DefaultChannel       string      `json:"defaultChannel"`
+	Channels             []Channel   `json:"channels"`
+	Limits               Limits      `json:"limits"`
 }
 
 // BasicAuth is a single operator-issued credential for a private deployment.
 type BasicAuth struct {
 	User     string `json:"user"`
 	Password string `json:"password"`
+}
+
+// PortalAuth trusts tickets signed by the portal with a shared secret. The
+// secret comes from the operator's environment, never from a committed file.
+type PortalAuth struct {
+	// URL is the portal origin; visitors without a session go to URL + "/jogar".
+	URL          string `json:"url"`
+	TicketSecret string `json:"ticketSecret"`
+	// SessionTTL is the lifetime of the gateway's own session cookie.
+	SessionTTL Duration `json:"sessionTtl"`
 }
 
 // S3Assets locates the game data in a private bucket. Keys are
@@ -117,6 +131,9 @@ var bucketName = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
 
 // MinPasswordLen rejects trivially guessable deployment passwords.
 const MinPasswordLen = 12
+
+// MinTicketSecretLen is the HMAC-SHA256 key size shared with the portal.
+const MinTicketSecretLen = 32
 
 var channelName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
 
@@ -145,6 +162,9 @@ func (c *Config) Defaults() {
 	}
 	if l.WriteTimeout == 0 {
 		l.WriteTimeout = Duration(15 * time.Second)
+	}
+	if c.PortalAuth != nil && c.PortalAuth.SessionTTL == 0 {
+		c.PortalAuth.SessionTTL = Duration(12 * time.Hour)
 	}
 	if c.DefaultChannel == "" && len(c.Channels) == 1 {
 		c.DefaultChannel = c.Channels[0].Name
@@ -180,6 +200,24 @@ func (c *Config) Validate() error {
 		}
 		if len(a.Password) < MinPasswordLen {
 			errs = append(errs, fmt.Errorf("basicAuth.password must have at least %d characters", MinPasswordLen))
+		}
+	}
+	if a := c.PortalAuth; a != nil {
+		if c.BasicAuth != nil {
+			errs = append(errs, errors.New("basicAuth and portalAuth are exclusive"))
+		}
+		u, err := url.Parse(a.URL)
+		switch {
+		case err != nil || u.Host == "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.User != nil:
+			errs = append(errs, errors.New("portalAuth.url must be a bare scheme://host URL"))
+		case u.Scheme != "https" && !(u.Scheme == "http" && c.AllowInsecure):
+			errs = append(errs, errors.New("portalAuth.url must be https:// (http only with allowInsecure)"))
+		}
+		if len(a.TicketSecret) < MinTicketSecretLen {
+			errs = append(errs, fmt.Errorf("portalAuth.ticketSecret must have at least %d characters", MinTicketSecretLen))
+		}
+		if ttl := a.SessionTTL.Std(); ttl < time.Minute || ttl > 7*24*time.Hour {
+			errs = append(errs, errors.New("portalAuth.sessionTtl must be between 1m and 168h"))
 		}
 	}
 	if c.AssetDir != "" && c.StaticDir == "" {

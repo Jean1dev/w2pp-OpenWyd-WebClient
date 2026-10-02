@@ -57,7 +57,7 @@ func run(load func() (*config.Config, error), log *slog.Logger) error {
 	}
 	log.Info("gateway listening", "addr", cfg.Listen, "tls", cfg.TLSCert != "",
 		"tlsProxy", cfg.TLSTerminatedByProxy, "channels", channels, "static", cfg.StaticDir != "",
-		"assets", assetSource(cfg), "auth", cfg.BasicAuth != nil)
+		"assets", assetSource(cfg), "auth", authMode(cfg))
 
 	errc := make(chan error, 1)
 	go func() {
@@ -92,6 +92,16 @@ func assetSource(cfg *config.Config) string {
 		return "s3:" + cfg.AssetS3.Bucket + "/" + cfg.AssetS3.Prefix
 	case cfg.AssetDir != "":
 		return "dir:" + cfg.AssetDir
+	}
+	return "none"
+}
+
+func authMode(cfg *config.Config) string {
+	switch {
+	case cfg.BasicAuth != nil:
+		return "basic"
+	case cfg.PortalAuth != nil:
+		return "portal"
 	}
 	return "none"
 }

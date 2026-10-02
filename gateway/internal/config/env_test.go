@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func env(over map[string]string) func(string) string {
@@ -60,6 +61,47 @@ func TestFromEnvPublicNeedsExplicitOptIn(t *testing.T) {
 	c, err := FromEnv(env(map[string]string{EnvAuthUser: "", EnvAuthPassword: "", EnvAllowPublic: "true"}))
 	if err != nil || c.BasicAuth != nil {
 		t.Fatalf("explicit public deployment refused: %v", err)
+	}
+}
+
+func TestFromEnvPortalGate(t *testing.T) {
+	const secret = "0123456789abcdef0123456789abcdef"
+	portal := map[string]string{EnvAuthUser: "", EnvAuthPassword: "",
+		EnvPortalURL: "https://wyd-ten.vercel.app/", EnvPortalSecret: secret}
+	c, err := FromEnv(env(portal))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.BasicAuth != nil || c.PortalAuth == nil || c.PortalAuth.URL != "https://wyd-ten.vercel.app" ||
+		c.PortalAuth.SessionTTL.Std() != 12*time.Hour {
+		t.Fatalf("unexpected portal config %+v", c.PortalAuth)
+	}
+	bad := map[string]map[string]string{
+		"with basic":     {EnvAuthUser: "operator", EnvAuthPassword: "correct-horse-battery"},
+		"short secret":   {EnvPortalSecret: secret[:31]},
+		"no secret":      {EnvPortalSecret: ""},
+		"no url":         {EnvPortalURL: ""},
+		"http url":       {EnvPortalURL: "http://wyd-ten.vercel.app"},
+		"url with path":  {EnvPortalURL: "https://wyd-ten.vercel.app/jogar"},
+		"url with query": {EnvPortalURL: "https://wyd-ten.vercel.app?x=1"},
+	}
+	for name, over := range bad {
+		t.Run(name, func(t *testing.T) {
+			e := map[string]string{}
+			for k, v := range portal {
+				e[k] = v
+			}
+			for k, v := range over {
+				e[k] = v
+			}
+			_, err := FromEnv(env(e))
+			if err == nil {
+				t.Fatal("accepted")
+			}
+			if strings.Contains(err.Error(), secret[:16]) {
+				t.Fatal("error message leaks the secret")
+			}
+		})
 	}
 }
 

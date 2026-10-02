@@ -24,7 +24,7 @@ Um único serviço, `wydgateway -env`, na imagem do `Dockerfile` da raiz:
 | `/config.json` | canal, `wss://…/ws/<canal>`, `clientVersion` | gateway; o destino TCP não aparece |
 | `/ws/<canal>` | relé binário WebSocket ↔ TCP do tm-server | gateway; destino só por variável |
 
-Todas as rotas, exceto `/healthz`, exigem a credencial Basic, inclusive a abertura do WebSocket e os assets. Arquivos da imagem têm precedência, então o bucket não consegue sombrear `runtime.js`.
+Todas as rotas, exceto `/healthz`, exigem a credencial Basic, inclusive a abertura do WebSocket e os assets. Com o gate por conta do portal ([ADR 015](decisions/015-portal-account-gate.md)), a credencial Basic é substituída pelo cookie `wyd_play`, emitido em `POST /auth/portal`. Sem cookie, a navegação vai para `<portal>/jogar` e o resto recebe 401. Arquivos da imagem têm precedência, então o bucket não consegue sombrear `runtime.js`.
 
 ## Variáveis do serviço (definidas em 29/09)
 
@@ -42,6 +42,12 @@ Todas as rotas, exceto `/healthz`, exigem a credencial Basic, inclusive a abertu
 | `WYD_ASSET_S3_BUCKET` | nome interno do bucket | |
 | `WYD_ASSET_S3_ACCESS_KEY_ID`, `WYD_ASSET_S3_SECRET_ACCESS_KEY` | secretas | definidas por stdin a partir da CLI; se forem rotacionadas (`--reset`), redefina-as |
 | `WYD_ASSET_S3_PREFIX`, `WYD_ASSET_MANIFEST` | `assets-f4c03289374bd614`, `f4c03289374bd614` | versão ativa dos assets |
+
+Gate por conta do portal ([ADR 015](decisions/015-portal-account-gate.md)), alternativa exclusiva ao Basic. As variáveis foram **registradas** no Railway e no Vercel em 02/10, mas o gate só passa a valer com o deploy desta versão e a remoção de `WYD_BASIC_AUTH_*`:
+- `WYD_PORTAL_URL`: origem do portal, por exemplo `https://wyd-ten.vercel.app`;
+- `WYD_PORTAL_TICKET_SECRET`: ≥ 32 caracteres, o mesmo valor de `PLAY_TICKET_SECRET` no Vercel.
+
+Ao ativar o gate, remova `WYD_BASIC_AUTH_*`; com as duas credenciais o gateway recusa iniciar. No portal, defina também `WEBCLIENT_URL` com o domínio deste serviço.
 
 Opcionais: `WYD_CHANNEL`, `WYD_MAX_CONNS` e `WYD_MAX_CONNS_PER_IP`. `WYD_ALLOW_PUBLIC=true` é o único jeito de subir sem senha; não use enquanto a licença dos assets não estiver resolvida. Com dados faltando ou inválidos, o gateway recusa iniciar e lista o problema, sem nunca incluir segredos na mensagem.
 
