@@ -28,7 +28,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
    - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
 3. Etapa 8 — gate por conta do portal implantado ([ADR 015](decisions/015-portal-account-gate.md)). Falta verificar no navegador: login ou cadastro no portal → `/jogar` → jogo, duas sessões e relogin.
-   Build público sem `wyd_debug_*` e IP do cliente pela primeira entrada do `X-Forwarded-For` ([ADR 016](decisions/016-public-build-and-client-ip.md)): confirmar o build real na CI ou no Railway e, depois do deploy, o IP no log com um `X-Forwarded-For` forjado.
+   Build público sem `wyd_debug_*` e IP do cliente pela primeira entrada do `X-Forwarded-For` ([ADR 016](decisions/016-public-build-and-client-ip.md)): implantados e confirmados em produção em 02/10. Falta jogar no navegador com o build público.
    Também: confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
 4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6.
 5. Etapa 7 — painel de configurações: com o dataset, verificar no Railway música e efeitos ao vivo, mudo na troca de zona, persistência no relogin e as resoluções 1024×768/1280×1024 ([roteiro](evidence/07-web/2026-10-02-settings.md#próximo-passo)).
@@ -861,3 +861,7 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Railway:** `WYD_FORWARDED_FOR=first` e `WYD_MAX_CONNS_PER_IP=4` registradas com `--skip-deploys`.
 - **CI do PR #20:** a 1ª versão (`-sEXPORT_KEEPALIVE=0`) foi barrada pelo verificador, com 13 `wyd_debug_*` `KEEPALIVE` ainda exportadas. Corrigido no próprio código: `WYD_DEBUG_EXPORT` sem `KEEPALIVE`, exportação pelo nome e `--public` filtrando a lista.
 - **Não executado:** build real da imagem (sem Docker ou emsdk locais), que fica com a CI e o Railway.
+- **Produção (mesmo dia, a pedido do usuário):** merge do PR #20 (`384d8ef`) e deploy `de59e41b` em SUCCESS.
+  - Log com `forwardedFor="first"`. Foi registrado o IP real da máquina de teste, e um `X-Forwarded-For` forjado foi ignorado.
+  - O `.wasm` publicado tem 0 `wyd_debug_*` e todas as funções usadas pela página (946 exports).
+  - `/local-scene.html` → 404.

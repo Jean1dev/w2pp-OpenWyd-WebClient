@@ -1,8 +1,12 @@
 # ADR 016: build público sem `wyd_debug_*` e IP do cliente no Railway
 
-Data: 02/10/2026. Estado:
-- **Confirmado em teste:** verificador de exports com WASM sintético; `assemble_site --public` com link falso; patches 0001–0024 aplicados num checkout limpo; `go test`.
-- **A confirmar em execução:** build real da imagem (CI e Railway, porque não há Docker ou emsdk nesta máquina) e IP registrado depois do deploy.
+Data: 02/10/2026. Estado: **implantado e confirmado em execução** (PR [#20](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/pull/20), `384d8ef`, deploy `de59e41b`):
+- o log de início mostra `forwardedFor="first"` e `auth="portal"`;
+- requisições da máquina de teste registram o IP público real dela. Com um `X-Forwarded-For: 203.0.113.77` forjado, o log continua mostrando o IP real, ou seja, a borda do Railway descarta o valor do cliente;
+- o `.wasm` publicado (`tmproject_startup.1790967849521866044.wasm`), baixado do domínio com sessão e passado pelo `check_public_exports.py`, tem 946 exports, 0 `wyd_debug_*` e todas as funções usadas por `client.js`/`settings.js`;
+- `/local-scene.html` com sessão → 404.
+
+**Pendente:** jogar no navegador com o build público (login, seleção, Field, configurações).
 
 ## Contexto
 
