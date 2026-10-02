@@ -423,6 +423,10 @@ export function checkBuff(r, plan) {
     assert.notEqual(r.after.model, r.before.model, `A kept model ${r.before.model}`);
     assert.notEqual(r.after.maxHp, r.before.maxHp, 'MaxHp not rescaled by the transform');
     assert.equal(r.observedAfter?.maxHp, r.after.maxHp, 'B does not see the transformed MaxHp on A');
+    // The affect is saved: after the relogin A is still the beast, on its own
+    // screen too (the runtime takes its model from the login snapshot).
+    if (r.relogin.maxHp === r.after.maxHp)
+      assert.equal(r.relogin.model, r.after.model, `relogin model ${r.relogin.model}, transform still active`);
   } else {
     assert(r.before.hp < r.before.maxHp, 'no HP missing before the cure');
     // More than one natural regeneration step (Level+30 every 10 s).

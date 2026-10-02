@@ -20,7 +20,7 @@ Atualização: 01/10/2026 (noite). O cliente web, via gateway próprio, faz no t
    - PRs #361, #362 e #363 implantados (`052cd5fe`). Ouro dos mobs e dano após o login foram confirmados em execução;
    - PRs #364 e #365 implantados (`bc7b3923`); chat de grupo e nível confirmados em execução em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-partychat-level-deployed.md)). Em produção real, rodar migrações de personagem com jogadores deslogados;
    - fatia 5: persistência após reinício controlado do servidor. O usuário autorizou o reinício via Railway CLI quando a fatia entrar;
-   - buff e cura aprovados em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-buff-cure.md)). Em aberto: o modelo da BM volta ao humano no relogin com o afeto ainda ativo (hipótese: snapshot de login sem o override visual); cura em outro jogador.
+   - buff e cura aprovados em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-buff-cure.md)). O modelo da BM volta ao humano no relogin: causa confirmada em fonte, correção no PR [#366](https://github.com/Jean1dev/w2pp-OpenWYD/pull/366), sem merge. Depois do deploy, rodar `login,buff --class 2`. Em aberto: cura em outro jogador.
 
    Rodar os cenários online em processos separados. Antes de abrir A e B, confirmar ≥ 2 GB livres: órfãos `tail`/`grep`, Docker e Chrome em segundo plano custaram ~1,3 GB nesta sessão ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar (os cenários de duas sessões passaram em 01/10, [evidência](evidence/04-login-mundo/2026-10-01-two-sessions.md)):
@@ -695,3 +695,14 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Migração:** a `0025` foi aplicada, mas o TK de B, online durante o deploy, foi salvo de volta no nível 1. O mesmo `UPDATE` foi reaplicado no banco de testes (1 linha). Em produção real, migrar com os jogadores deslogados.
 - **Verificação:** `world:checks` 35/0; evidências sem valores do `.env`.
 - **Próximo passo:** modelo da BM no relogin, cura em outro jogador e fatia 5 (reinício controlado).
+
+### 02/10/2026 — BM volta a humano no relogin
+
+- **Pedido do usuário:** investigar.
+- **Causa (confirmada em fonte):**
+  - o runtime monta o próprio personagem pelo snapshot `0x0114` e, quando ele já existe, ignora o equipamento do `CreateMob` próprio (`TMFieldScene.cpp:18519-18553`);
+  - o Go envia no snapshot o item de corpo salvo, e o lobo vai só no `CreateMob` (`equipVisual`);
+  - o legado grava a malha da fera em `MOB.Equip[0].sIndex` no `GetCurrentScore`, antes de copiar o `MOB` para o snapshot (`Basedef.cpp:4106`, `ProcessDBMessage.cpp`).
+- **Servidor:** [PR #366](https://github.com/Jean1dev/w2pp-OpenWYD/pull/366) (`webclient/transform-login-snapshot`), `patches/server/0005-transform-login-snapshot.patch` (SHA-256 `2f24ca8a…`). O teste novo falha sem a correção; `go vet` limpo, `go test ./tmserver/...` verde e `gofmt` conferido. Sem merge nem deploy.
+- **Cliente:** `checkBuff` exige o mesmo modelo após o relogin enquanto a transformação durar; `world:checks` verde.
+- **Próximo passo:** merge e deploy do #366; depois, `login,buff --class 2` (a BM já tem o Lobisomem aprendido e na barra).

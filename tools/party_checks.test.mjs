@@ -47,6 +47,7 @@ test('buff and cure need a server MP cost, the visible effect and the skill afte
   checkBuff(t, wolf);
   for (const x of [{ after: { mp: 126, maxHp: 110, model: 22 } }, { after: { mp: 95, maxHp: 110, model: 3 } },
     { after: { mp: 95, maxHp: 115, model: 22 } }, { observedAfter: { maxHp: 115 } },
+    { relogin: { learned: 1 << 16, maxHp: 110, model: 3 } },
     { attacksSent: 0 }, { relogin: { learned: 0 } }])
     assert.throws(() => checkBuff({ ...t, ...x }, wolf), JSON.stringify(x));
   const h = { ...base, before: { hp: 20, maxHp: 115, mp: 145, level: 16 }, after: { hp: 115, mp: 130 },
