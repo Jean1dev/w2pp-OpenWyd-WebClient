@@ -8,7 +8,7 @@ Atualização: 01/10/2026 (noite). O cliente web, via gateway próprio, faz no t
 | 2 Build e cena | Validada (01/10: build limpo, importador com testes sintéticos e cena Field/Select Server em Chromium e Firefox; Field é fixture offline; Safari não testado) | [Cena real no navegador](evidence/02-build/README.md), [reprodução de 01/10](evidence/02-build/2026-10-01-reproduction.md) |
 | 3 Protocolo | Validada (01/10: vetores, streaming adversarial, login real e DeleteCharacter com recusa `0x011B` no Railway `2e532afa`; login real no tm-server do operador, não numa stack local) | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco, e fatia 5 (reinício controlado) aprovada; falta a cura em outro jogador) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco, fatia 5 (reinício controlado) e cura em outro jogador aprovadas; o checklist não tem mais item pendente que dependa só do cliente) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
 | 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
@@ -733,3 +733,18 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - segunda tentativa sem detectar a queda (causa não determinada; servidor reiniciado às 12:37:55) e DSN vazia na CLI;
   - a CLI de restart só sai pelo timeout.
 - **Próximo passo:** cura em outro jogador; etapa 4 (relogin do cliente Windows); etapas 6–8.
+
+### 02/10/2026 — cura em outro jogador
+
+- **Pedido do usuário:** fazer a cura em outro jogador.
+- **Confirmado em fonte:** a Cura tem `BParty = 0` e `Range = 6`; o servidor aceita qualquer jogador no alcance, sem exigir grupo.
+- **Arquivos:**
+  - `tools/verify_world.mjs`: fase `healother`, com horários por passo;
+  - `tools/world_checks.mjs`: `checkHealOther` e regras da fase;
+  - `tools/party_checks.test.mjs`;
+  - evidência e checklist.
+- **Banco de testes:** HP máximo de B em 1000 e depois em 30.000 (HP 100) durante as execuções; restaurado para 100/100.
+- **Confirmado em execução (Railway `9d9af882`):** execução 2 aprovada. O eco do servidor traz `Dam = −100` da skill 27 de A em B, igual nas duas páginas; o MP de A cai de 146 para 131; o HP de B sobe de 700 para 920 (cura e regeneração).
+- **Falha registrada:** na execução 1, a cura ocorreu no servidor, mas 6 minutos depois de A entrar, quando B já estava cheio.
+- **Verificação:** `world:checks` 37/0.
+- **Próximo passo:** etapa 4 (relogin do cliente Windows pelo operador) e etapas 6–8.

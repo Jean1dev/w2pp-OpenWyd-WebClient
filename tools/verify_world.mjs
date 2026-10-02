@@ -42,7 +42,7 @@ import { checkParty, checkPartyChat, checkPartyEvidence } from './party_checks.m
 import { fsTraceInit, packageIndex, openedByDir } from './fs_trace.mjs';
 import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, checkBuff, checkRestart, itemAmount } from './world_checks.mjs';
+  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, checkBuff, checkHealOther, checkRestart, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -1005,7 +1005,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'partychat', 'trade', 'paidteleport'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'partychat', 'trade', 'paidteleport'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -1935,6 +1935,75 @@ async function main() {
       res.relogin = { ...(await mine()), learned: await a.eval(() => Module._wyd_field_my_score(6) >>> 0) };
       await a.healthy(); await b.healthy();
       checkBuff(res, plan);
+      return res;
+    });
+
+    // Stage 5: the Foema's Cura (27) on another player. SkillData has
+    // BParty 0 and Range 6, so the server takes any player within 6 tiles
+    // (combat.go validateSkillTarget); the heal rides as a negative Dam on
+    // the target (combat.go, InstanceType 6). B is the target, outside a party.
+    await step('healother', async () => {
+      const SKILL = 27, POS = 3, RANGE = 6;
+      const name = classChar(cls);
+      privateValues.push(name);
+      b = await newSession('B-heal', B);
+      await b.loginToSelect();
+      const pin = await b.pin();
+      assert(pin.already || pin.result === 'lock1', 'B PIN rejected');
+      await b.enter(0);
+      if ((await a.eval(() => Module._wyd_get_game_state())) !== 0) {
+        const slot = (await a.slots()).findIndex(x => x.name === name);
+        assert(slot >= 0, `class ${cls} character missing`);
+        await a.enter(slot);
+      }
+      const learned = await a.eval(() => Module._wyd_field_my_score(6) >>> 0);
+      assert(((learned >>> POS) & 1) === 1, 'Cura not learned (run learn --skill 27 first)');
+      await a.until('A sees B', id => Module._wyd_field_human_present(id) === 1, 60000, b.id);
+      const res = { skill: SKILL, targetId: b.id, casterId: a.id, attempts: 0, t: {} };
+      r.healother = res;
+      const mark = k => { res.t[k] = new Date().toISOString(); };
+      mark('bothIn');
+      const seen = await a.other(b.id), me = await a.me();
+      res.distance = Math.hypot(seen.x - me.x, seen.y - me.y);
+      if (res.distance > RANGE - 2) {
+        res.approach = await a.walkTo(seen.x, seen.y, { near: 2, maxClicks: 8, stallOk: true });
+        const s2 = await a.other(b.id), m2 = await a.me();
+        res.distance = Math.hypot(s2.x - m2.x, s2.y - m2.y);
+      }
+      if ((await a.eval(() => Module._wyd_field_short_skill(0))) === SKILL) {
+        await a.page.focus('#canvas');
+        await a.page.keyboard.press('Digit1'); await a.frames(2);
+        res.beltSaved = true;
+      } else Object.assign(res, await a.assignSkill({ skill: SKILL, pos: POS }));
+      mark('skillSelected');
+      for (const s of [a, b]) await s.eval(() => Module._wyd_combat_enable(1));
+      const target = () => b.eval(() => ({ hp: Module._wyd_field_my_score(0), maxHp: Module._wyd_field_my_score(1),
+        level: Module._wyd_field_my_score(4) }));
+      res.before = { caster: { mp: await a.eval(() => Module._wyd_field_my_score(2)) }, target: await target(),
+        seenByCaster: await a.eval(id => Module._wyd_field_human_hp(id), b.id) };
+      mark('before');
+      console.log(`    distance ${res.distance.toFixed(1)}, B ${JSON.stringify(res.before.target)}, A MP ${res.before.caster.mp}`);
+      const healed = () => a.eval(([sk, id]) => {
+        for (let i = 0; i < Module._wyd_combat_count(0); i++) {
+          if (Module._wyd_combat_value(0, i, 2) !== sk) continue;
+          for (let j = 0; j < Module._wyd_combat_value(0, i, 10); j++)
+            if (Module._wyd_combat_value(0, i, 11 + 2 * j) === id && Module._wyd_combat_value(0, i, 12 + 2 * j) < 0) return true;
+        }
+        return false;
+      }, [SKILL, b.id]);
+      for (let k = 0; k < 4 && !(await healed()); k++) {
+        if (await a.clickHuman(b.id, 'right')) res.attempts++;
+        for (let t = 0; t < 12 && !(await healed()); t++) await sleep(500);
+      }
+      mark('cast');
+      await sleep(1500);
+      res.logsA = await a.combatLog(); res.logsB = await b.combatLog();
+      res.after = { caster: { mp: await a.eval(() => Module._wyd_field_my_score(2)) }, target: await target(),
+        seenByCaster: await a.eval(id => Module._wyd_field_human_hp(id), b.id) };
+      await a.shot('heal-other'); await b.shot('healed');
+      console.log(`    cast x${res.attempts}: B ${res.before.target.hp} -> ${res.after.target.hp}, A sees ${res.before.seenByCaster} -> ${res.after.seenByCaster}`);
+      await a.healthy(); await b.healthy();
+      checkHealOther(res);
       return res;
     });
 

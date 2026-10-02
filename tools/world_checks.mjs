@@ -14,7 +14,7 @@ export function redactEvidence(value, secrets) {
 }
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
-  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'buff', 'castarea',
+  'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea',
   'equip', 'potion', 'loot', 'shop', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent'];
 
 export function validateOptions(opt) {
@@ -54,7 +54,7 @@ export function validateOptions(opt) {
     if (phases.has(p)) assert.deepEqual([...phases].sort(), only, `${p} runs only with ${only.join(',')}`);
   }
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
-    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], buff: ['login'], loot: ['login'], concurrent: ['enter'] };
+    move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], buff: ['login'], healother: ['login'], loot: ['login'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
     assert(phases.has(dep), `${name} requires ${dep}`);
   // death takes A through the portal and needs B waiting at the Armia spawn;
@@ -62,12 +62,13 @@ export function validateOptions(opt) {
   for (const other of ['mapchange', 'attack'])
     assert(!(phases.has('death') && phases.has(other)), `death cannot run with ${other}`);
   // grind enters the --class character itself, alone (one game page).
-  const own = ['login', 'grind', 'learn', 'cast', 'buff', 'loot'];
+  const own = ['login', 'grind', 'learn', 'cast', 'buff', 'healother', 'loot'];
   for (const p of own.slice(1)) {
     if (!phases.has(p)) continue;
     for (const other of phases)
       assert(own.includes(other), `${p} runs only with ${own.join('/')} (got ${other})`);
   }
+  if (phases.has('healother')) assert.equal(opt.class, '1', 'healother needs --class 1 (Foema)');
   if (phases.has('buff')) assert(['1', '2'].includes(opt.class), 'buff needs --class 1 (Cura) or 2 (Lobisomem)');
   if (opt.skill) assert(['27', '64'].includes(opt.skill), '--skill must be 27 (Cura) or 64 (Lobisomem)');
   if (phases.has('grind')) {
@@ -461,4 +462,20 @@ export function checkRestart(r) {
   assert.equal(r.after.cargo.coin, r.before.cargo.coin, 'cargo gold changed across the restart');
   assert.deepEqual(r.after.cargo.items, r.before.cargo.items, 'cargo items changed across the restart');
   assert(r.before.cargo.coin >= r.deposit.cargoBefore + r.deposit.amount, 'deposit not in the cargo before the restart');
+}
+
+// Cura on another player: the server answers with a negative Dam on B (the
+// heal), A pays the MP, and B sees its own HP rise by more than one natural
+// regeneration step (Level+30); both pages receive the same answer.
+export function checkHealOther(r) {
+  const echo = l => (l?.in ?? []).find(e => e.skill === r.skill && e.attacker === r.casterId &&
+    e.targets.some(t => t.id === r.targetId && t.damage < 0));
+  const ea = echo(r.logsA), eb = echo(r.logsB);
+  assert(ea, 'no server heal answer on B in A');
+  assert(eb && eb.targets[0].damage === ea.targets[0].damage, 'B did not receive the same heal answer');
+  assert(ea.mp < r.before.caster.mp, `server took no MP from A (${r.before.caster.mp} -> ${ea.mp})`);
+  assert(r.before.target.hp < r.before.target.maxHp, 'B had no HP missing');
+  assert(r.after.target.hp - r.before.target.hp > r.before.target.level + 30,
+    `B's HP rose ${r.after.target.hp - r.before.target.hp}, no more than one regeneration step`);
+  assert(r.after.seenByCaster > r.before.seenByCaster, 'A did not see B healed');
 }

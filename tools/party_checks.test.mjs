@@ -84,3 +84,21 @@ test('restart keeps what both clients held, including unsaved gold, carry and ca
   validateOptions({ ...opt, phases: 'login,enter,second,restart' });
   assert.throws(() => validateOptions({ ...opt, phases: 'login,enter,restart' }));
 });
+
+test('cure on another player needs the server heal on B, seen by both pages', async () => {
+  const { checkHealOther } = await import('./world_checks.mjs');
+  const heal = { in: [{ skill: 27, attacker: 1, mp: 131, targets: [{ id: 2, damage: -100 }] }] };
+  const ok = { skill: 27, casterId: 1, targetId: 2, logsA: heal, logsB: heal,
+    before: { caster: { mp: 146 }, target: { hp: 100, maxHp: 1000, level: 0 }, seenByCaster: 100 },
+    after: { caster: { mp: 131 }, target: { hp: 200, maxHp: 1000, level: 0 }, seenByCaster: 200 } };
+  checkHealOther(ok);
+  const wrongTarget = { in: [{ skill: 27, attacker: 1, mp: 131, targets: [{ id: 1, damage: -100 }] }] };
+  for (const x of [{ logsA: wrongTarget }, { logsB: { in: [] } },
+    { after: { ...ok.after, target: { hp: 125, maxHp: 1000, level: 0 } } }, { after: { ...ok.after, seenByCaster: 100 } },
+    { before: { ...ok.before, target: { hp: 1000, maxHp: 1000, level: 0 } } }])
+    assert.throws(() => checkHealOther({ ...ok, ...x }), JSON.stringify(Object.keys(x)));
+  const opt = { target: 'localhost:8281', 'client-version': '12000' };
+  validateOptions({ ...opt, class: '1', phases: 'login,healother' });
+  assert.throws(() => validateOptions({ ...opt, class: '2', phases: 'login,healother' }));
+});
+
