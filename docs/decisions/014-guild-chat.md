@@ -1,6 +1,6 @@
 # ADR 014: chat de guilda no servidor (etapa 5)
 
-Data: 02/10/2026. Estado: a correção do servidor está **confirmada em teste** e foi aberta no PR [#367](https://github.com/Jean1dev/w2pp-OpenWYD/pull/367). Ainda não tem merge nem deploy. A lacuna está **confirmada em fonte** no Railway `9d9af882`. A execução online espera o deploy e a preparação da guilda no banco.
+Data: 02/10/2026. Estado: o PR [#367](https://github.com/Jean1dev/w2pp-OpenWYD/pull/367) foi integrado e implantado (`3ae11009`). O chat de guilda está **confirmado em execução** nos dois sentidos, com `--`, e com o bloqueio do toggle no servidor ([evidência](../evidence/05-gameplay/2026-10-02-guildchat.md)). O painel do toggle não aparece no cliente porque o Go envia `0x0101` com `HEADER.ID` diferente de 0. A correção, **confirmada em teste**, está no PR [#368](https://github.com/Jean1dev/w2pp-OpenWYD/pull/368), sem merge.
 
 ## Contexto
 
@@ -41,5 +41,13 @@ O chat de guilda era o único item do checklist da etapa 5 que nunca tinha sido 
 ## Consequências
 
 - Até o merge e o deploy do #367, o chat de guilda fica **bloqueado pelo servidor** no checklist.
-- Limite da prova online: com o canal desligado, o runtime também esconde as linhas de guilda, porque o painel inverte o botão. A ausência da linha em B não distingue o bloqueio do servidor do filtro local. O bloqueio no servidor fica coberto por `TestGuildChatToggle`.
+- Limite da prova online pelo cliente: com o canal desligado, o runtime também esconde as linhas de guilda, porque o painel inverte o botão. A tela de B, sozinha, não distingue o bloqueio do servidor do filtro local. Na execução 1, as estatísticas de envio do servidor fecharam esse ponto: B recebeu 3 das 4 linhas de A, e faltou a enviada com o canal desligado.
 - Sem terceira conta no ambiente de testes, a aliança (`--` para outra guilda) e a recusa sem guilda ficam só nos testes do servidor.
+
+## Revisão de 02/10/2026: painel com `HEADER.ID` 0
+
+- **Confirmado em fonte:** o 7662 só trata `MSG_MessagePanel` com `HEADER.ID == 0` (`TMScene.cpp:1371`). O legado `SendClientMessage` zera o ID (`SendFunc.cpp:27-43`). O `w.Send` do Go grava o conn da sessão.
+- **Confirmado em execução (execução 1):** o servidor enviou dois `0x0101` para B, e o painel `Guild Chatting : Off/On` não apareceu.
+- **Decisão:**
+  - PR #368 (`patches/server/0007-guild-chat-panel-id.patch`, SHA-256 `ecf8d2f8…`): `sendClientMessage` com ID 0 nos três painéis do chat de guilda;
+  - os outros envios de `MsgMessagePanel` (kefra, refino, nightmare, convite de guilda, relógio `!!`) têm o mesmo defeito e ficam para outra entrega.

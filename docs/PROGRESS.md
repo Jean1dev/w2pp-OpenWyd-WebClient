@@ -21,7 +21,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - PRs #364 e #365 implantados (`bc7b3923`); chat de grupo e nível confirmados em execução em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-partychat-level-deployed.md)). Em produção real, rodar migrações de personagem com jogadores deslogados;
    - fatia 5 aprovada em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-restart.md));
    - buff e cura aprovados em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-buff-cure.md)). O modelo da BM voltava a humano no relogin; corrigido pelo PR [#366](https://github.com/Jean1dev/w2pp-OpenWYD/pull/366) e confirmado em execução em `9d9af882`. A cura em outro jogador foi aprovada em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-buff-cure.md#cura-em-outro-jogador-loginhealother---class-1-aprovada));
-   - chat de guilda: lacuna do servidor, corrigida no PR [#367](https://github.com/Jean1dev/w2pp-OpenWYD/pull/367) (sem merge, [ADR 014](decisions/014-guild-chat.md)). Depois do merge e do deploy: criar a guilda de teste no banco com A e B e rodar `login,enter,second,guildchat`.
+   - chat de guilda confirmado em execução no `3ae11009` (PR #367; [evidência](evidence/05-gameplay/2026-10-02-guildchat.md)). Falta o painel do toggle: merge e deploy do PR [#368](https://github.com/Jean1dev/w2pp-OpenWYD/pull/368) e uma nova execução de `login,enter,second,guildchat`. A guilda de teste (id 1) continua no banco.
 
    Rodar os cenários online em processos separados. Antes de abrir A e B, confirmar ≥ 2 GB livres: órfãos `tail`/`grep`, Docker e Chrome em segundo plano custaram ~1,3 GB nesta sessão ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar (os cenários de duas sessões passaram em 01/10, [evidência](evidence/04-login-mundo/2026-10-01-two-sessions.md)):
@@ -769,3 +769,17 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Não executado:** nenhuma execução online. O servidor implantado não tem a correção, e a guilda de teste ainda não foi criada no banco.
 - **Limites:** com o canal desligado, o runtime também esconde a linha, então o bloqueio no servidor só é provado pelo teste. Aliança entre guildas e recusa sem guilda ficam só nos testes do servidor, porque não há terceira conta.
 - **Próximo passo:** merge e deploy do #367 pelo operador; criar a guilda de teste com A e B no banco; rodar `login,enter,second,guildchat`.
+
+### 02/10/2026 — chat de guilda no Railway
+
+- **Servidor:** o usuário integrou o #367 (CI verde) e autorizou a preparação no banco. Deploy `3ae11009` às 16:30 UTC.
+- **Railway CLI:** não estava instalada nesta máquina. Usado o `@railway/cli` via `npx`, com o login já existente em `~/.railway`.
+- **Banco:** guilda `WebTeste` (id 1), com o TK de A como líder e o de B como membro, criada às 16:36 por um utilitário temporário fora do Git ([preparação](evidence/05-gameplay/2026-10-02-guildchat.md#preparação-no-banco)).
+- **Confirmado em execução (execução 1):**
+  - `-` nos dois sentidos e `--`, mostrados com o nome de quem falou e sem o prefixo;
+  - com o canal de B desligado, o servidor não enviou a linha de A: 3 de 4 `0x0334` para B nas estatísticas de envio.
+- **Falha:** o painel `Guild Chatting : Off/On` não apareceu. O Go envia `0x0101` com `HEADER.ID` igual ao conn, e o 7662 só trata o painel com ID 0 (`TMScene.cpp:1371`).
+- **Correção:** [PR #368](https://github.com/Jean1dev/w2pp-OpenWYD/pull/368) (`webclient/guild-chat-panel`, `ab210eb9`), `patches/server/0007-guild-chat-panel-id.patch` (SHA-256 `ecf8d2f8…`). Os dois testes de painel falham sem a correção. `go vet` limpo e `go test ./tmserver/...` com 17 pacotes ok.
+- **Achado:** kefra, refino, nightmare, convite de guilda e o relógio `!!` usam o mesmo `w.Send` para o painel e devem estar invisíveis no 7662. Não foi verificado em execução.
+- **Arquivos:** evidência, JSON e log sanitizado da execução 1; ADR 014; checklist; patch 0007; este progresso.
+- **Próximo passo:** merge e deploy do #368; repetir `login,enter,second,guildchat`.

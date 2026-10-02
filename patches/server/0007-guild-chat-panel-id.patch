@@ -1,0 +1,96 @@
+From ab210eb9678c0a86141ba260cbbcf61561dd47b7 Mon Sep 17 00:00:00 2001
+From: Jeanluca <jeanlucafp@gmail.com>
+Date: Fri, 2 Oct 2026 13:59:20 -0300
+Subject: [PATCH] fix(tmserver): send guild chat panels with HEADER.ID 0 like
+ SendClientMessage
+
+The 7662 client only handles a MSG_MessagePanel whose HEADER.ID is 0
+(TMScene.cpp:1371); the legacy SendClientMessage zeroes it
+(SendFunc.cpp:27-43). w.Send stamps the session's own conn, so the
+client dropped the "Guild Chatting : Off/On" confirmation and the
+not-in-a-guild notice from #367. On Railway the toggle itself worked
+(the line stopped and came back) but the panel never showed.
+
+Add sendClientMessage with ID 0 and use it for the three guild chat
+panels. The other MsgMessagePanel senders (kefra, refine, nightmare,
+guild invite, the !! clock line) have the same issue and are left for a
+separate change.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ tmserver/internal/handler/chat.go            |  6 +++---
+ tmserver/internal/handler/guild_chat_test.go | 11 ++++++++---
+ tmserver/internal/handler/notice.go          |  8 ++++++++
+ 3 files changed, 19 insertions(+), 6 deletions(-)
+
+diff --git a/tmserver/internal/handler/chat.go b/tmserver/internal/handler/chat.go
+index d8e3b6d5..1afa59c7 100644
+--- a/tmserver/internal/handler/chat.go
++++ b/tmserver/internal/handler/chat.go
+@@ -40,9 +40,9 @@ func (d *Dispatcher) messageChat(w *world.World, s *world.Session, _ protocol.He
+ 		// (TMScene.cpp:1660-1669).
+ 		s.GuildChat = !s.GuildChat
+ 		if s.GuildChat {
+-			w.Send(s, protocol.MsgMessagePanel, protocol.EncodeMessagePanelBody("Guild Chatting : Off"))
++			d.sendClientMessage(w, s, "Guild Chatting : Off")
+ 		} else {
+-			w.Send(s, protocol.MsgMessagePanel, protocol.EncodeMessagePanelBody("Guild Chatting : On"))
++			d.sendClientMessage(w, s, "Guild Chatting : On")
+ 		}
+ 	case "guildon":
+ 		s.GuildDisable = false
+@@ -172,7 +172,7 @@ func (d *Dispatcher) guildChat(w *world.World, s *world.Session, body protocol.M
+ 	}
+ 	guild := e.Guild
+ 	if guild == 0 {
+-		w.Send(s, protocol.MsgMessagePanel, protocol.EncodeMessagePanelBody(onlyGuildMemberCan))
++		d.sendClientMessage(w, s, onlyGuildMemberCan)
+ 		return
+ 	}
+ 	body.MobName = [16]byte{}
+diff --git a/tmserver/internal/handler/guild_chat_test.go b/tmserver/internal/handler/guild_chat_test.go
+index 34288825..c7976587 100644
+--- a/tmserver/internal/handler/guild_chat_test.go
++++ b/tmserver/internal/handler/guild_chat_test.go
+@@ -57,11 +57,16 @@ func expectGuildLine(t *testing.T, c net.Conn, fromConn uint16, fromName, text s
+ 	}
+ }
+ 
++// expectPanel reads a SendClientMessage panel: the client drops a message
++// panel whose HEADER.ID is not 0 (TMScene.cpp:1371).
+ func expectPanel(t *testing.T, c net.Conn, text string) {
+ 	t.Helper()
+-	ty, p, ok := readMaybe(t, c)
+-	if !ok || ty != protocol.MsgMessagePanel {
+-		t.Fatalf("got %#x ok=%v, want MessagePanel %q", ty, ok, text)
++	h, p, ok := readMaybeHeader(t, c)
++	if !ok || h.Type != protocol.MsgMessagePanel {
++		t.Fatalf("got %#x ok=%v, want MessagePanel %q", h.Type, ok, text)
++	}
++	if h.ID != 0 {
++		t.Fatalf("panel HEADER.ID = %d, want 0", h.ID)
+ 	}
+ 	if got := cstr(p); got != text {
+ 		t.Fatalf("panel = %q, want %q", got, text)
+diff --git a/tmserver/internal/handler/notice.go b/tmserver/internal/handler/notice.go
+index 5f0f0a3a..77235bf5 100644
+--- a/tmserver/internal/handler/notice.go
++++ b/tmserver/internal/handler/notice.go
+@@ -108,6 +108,14 @@ func (d *Dispatcher) notify(w *world.World, s *world.Session, n Notice) {
+ 	w.Send(s, protocol.MsgMessageBoxOk, b[:])
+ }
+ 
++// sendClientMessage mirrors the legacy SendClientMessage (SendFunc.cpp:27-43): a
++// MSG_MessagePanel with HEADER.ID 0. The 7662 client only handles a message
++// panel whose ID is 0 (TMScene.cpp:1371); w.Send stamps the session's own conn,
++// which the client drops.
++func (d *Dispatcher) sendClientMessage(w *world.World, s *world.Session, text string) {
++	w.SendTo(s, protocol.Header{Type: protocol.MsgMessagePanel}, protocol.EncodeMessagePanelBody(text))
++}
++
+ // cstr trims a fixed-size NUL/space-padded C char array to a Go string.
+ func cstr(b []byte) string {
+ 	if i := indexByte(b, 0); i >= 0 {
+-- 
+2.54.0.windows.1
+
