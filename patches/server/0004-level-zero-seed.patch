@@ -1,0 +1,343 @@
+From 32e5114aba4ac6e559d9fed69dc5101ea7c89ad3 Mon Sep 17 00:00:00 2001
+From: Jeanluca <jeanlucafp@gmail.com>
+Date: Thu, 1 Oct 2026 22:15:01 -0300
+Subject: [PATCH] fix: start characters at level 0 like the legacy BaseMob
+ templates
+
+New characters were seeded at level 1, but the legacy copies g_pBaseSet,
+whose BaseScore.Level is 0 (TK/FM/BM/HT @44), and the 7662 client shows
+Level+1 on both the selection and the field. The selection preview hid the
+offset by sending level-1, so the same character read "Nv 1" on selection and
+"Nv 2" in the field.
+
+- dbserver: CreateCharacter and CreateArchCharacter seed level 0.
+- login: SELCHAR carries the stored level, the same value as the in-world
+  snapshot; selCharWireLevel is gone.
+- playerBaseAC is baseline + level, as the legacy adds +1 AC per level from the
+  level-0 baseline (Mortal 4, Celestial 230 with Level = 0). The old
+  "baseline + (level-1)" gave every character above level 0 one AC less.
+- migration 0025: characters still at level 1 with less than
+  g_pNextLevel[1] = 500 Exp go to level 0. Level and Exp share the legacy
+  curve, so characters that already leveled up are consistent and untouched.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ dbserver/internal/grpcsrv/server.go           |  7 +++--
+ dbserver/internal/grpcsrv/server_test.go      | 14 +++++++--
+ .../migrations/0025_level_zero_seed.down.sql  |  2 ++
+ .../migrations/0025_level_zero_seed.up.sql    |  7 +++++
+ .../internal/handler/arch_progression_test.go |  2 +-
+ tmserver/internal/handler/handler_test.go     | 30 ++++++++-----------
+ tmserver/internal/handler/login.go            | 16 ++++------
+ tmserver/internal/handler/score_derive.go     |  9 +++---
+ .../internal/handler/score_derive_test.go     | 22 +++++++-------
+ .../internal/handler/starter_equip_test.go    | 14 ++++-----
+ 10 files changed, 67 insertions(+), 56 deletions(-)
+ create mode 100644 internal/migrations/0025_level_zero_seed.down.sql
+ create mode 100644 internal/migrations/0025_level_zero_seed.up.sql
+
+diff --git a/dbserver/internal/grpcsrv/server.go b/dbserver/internal/grpcsrv/server.go
+index 11a1226f..e23bc93b 100644
+--- a/dbserver/internal/grpcsrv/server.go
++++ b/dbserver/internal/grpcsrv/server.go
+@@ -426,7 +426,8 @@ func (s *Server) SaveCastleQuestState(ctx context.Context, req *dbv1.SaveCastleQ
+ // CreateCharacter creates a character in a free slot. A taken slot/name (unique
+ // violation) returns ok=false, not an error.
+ func (s *Server) CreateCharacter(ctx context.Context, req *dbv1.CreateCharacterRequest) (*dbv1.CreateCharacterResponse, error) {
+-	// Initialize a playable level-1 character. The original DBSrv seeds these from
++	// Initialize a playable level-0 character ("Nv 1" on screen; the BaseMob
++	// templates carry BaseScore.Level 0 @44). The original DBSrv seeds these from
+ 	// per-class BaseMob templates (Release/DBsrv/run/BaseMob/{TK,FM,BM,HT}); until
+ 	// those are wired we set sane base stats + HP/MP and a starting position so the
+ 	// character can enter the world. (UNVERIFIED: exact per-class base attributes
+@@ -436,7 +437,7 @@ func (s *Server) CreateCharacter(ctx context.Context, req *dbv1.CreateCharacterR
+ 		Name:        req.GetName(),
+ 		Class:       uint8(req.GetClass()),
+ 		ClassMaster: classMasterMortal,
+-		Level:       1,
++		Level:       0,
+ 		Str:         12, Int: 12, Dex: 12, Con: 12,
+ 		MaxHp: 100, Hp: 100, MaxMp: 100, Mp: 100,
+ 		Coin:  1000000,           // starting gold (so the shop is usable)
+@@ -466,7 +467,7 @@ func (s *Server) CreateArchCharacter(ctx context.Context, req *dbv1.CreateArchCh
+ 		Class:       uint8(class),
+ 		ClassMaster: classMasterArch,
+ 		MortalLevel: uint16(req.GetMortalLevel()),
+-		Level:       1,
++		Level:       0, // the Arch twin also starts from g_pBaseSet (CFileDB.cpp:1448)
+ 		Str:         12, Int: 12, Dex: 12, Con: 12,
+ 		MaxHp: 100, Hp: 100, MaxMp: 100, Mp: 100,
+ 		Coin:  1000000,
+diff --git a/dbserver/internal/grpcsrv/server_test.go b/dbserver/internal/grpcsrv/server_test.go
+index 8ecdc462..fd863110 100644
+--- a/dbserver/internal/grpcsrv/server_test.go
++++ b/dbserver/internal/grpcsrv/server_test.go
+@@ -25,6 +25,7 @@ type fakeStore struct {
+ 	archErr    error
+ 	archSlot   int
+ 	archChar   domain.Character
++	created    domain.Character
+ 	saveResult error
+ 	saveErr    error
+ 	savedChar  domain.Character
+@@ -110,10 +111,11 @@ func (f *fakeStore) LoadCharacter(_ context.Context, accountID int64, slot int)
+ 	return domain.Character{}, store.ErrNotFound
+ }
+ 
+-func (f *fakeStore) CreateCharacter(_ context.Context, _ int64, _ domain.Character) (int64, error) {
++func (f *fakeStore) CreateCharacter(_ context.Context, _ int64, ch domain.Character) (int64, error) {
+ 	if f.createErr != nil {
+ 		return 0, f.createErr
+ 	}
++	f.created = ch
+ 	return 42, nil
+ }
+ 
+@@ -368,7 +370,8 @@ func TestCreateCharacterUniqueViolation(t *testing.T) {
+ }
+ 
+ func TestCreateCharacterOK(t *testing.T) {
+-	s := New(&fakeStore{})
++	fs := &fakeStore{}
++	s := New(fs)
+ 	resp, err := s.CreateCharacter(context.Background(),
+ 		&dbv1.CreateCharacterRequest{AccountId: 1, Slot: 0, Name: "hero", Class: 1})
+ 	if err != nil {
+@@ -377,6 +380,10 @@ func TestCreateCharacterOK(t *testing.T) {
+ 	if !resp.GetOk() || resp.GetCharacterId() != 42 {
+ 		t.Fatalf("got ok=%v id=%d, want ok=true id=42", resp.GetOk(), resp.GetCharacterId())
+ 	}
++	// Level 0 like the legacy BaseMob templates: the client shows Level+1.
++	if fs.created.Level != 0 {
++		t.Fatalf("new character Level = %d, want 0", fs.created.Level)
++	}
+ }
+ 
+ func TestCreateArchCharacterOK(t *testing.T) {
+@@ -398,6 +405,9 @@ func TestCreateArchCharacterOK(t *testing.T) {
+ 	if ch.MortalLevel != 399 {
+ 		t.Fatalf("MortalLevel = %d, want 399", ch.MortalLevel)
+ 	}
++	if ch.Level != 0 {
++		t.Fatalf("arch Level = %d, want 0", ch.Level)
++	}
+ 	if len(ch.Equip) != 1 || ch.Equip[0].Slot != 0 || ch.Equip[0].Index != 27 {
+ 		t.Fatalf("arch body item = %+v, want slot 0 index 27", ch.Equip)
+ 	}
+diff --git a/internal/migrations/0025_level_zero_seed.down.sql b/internal/migrations/0025_level_zero_seed.down.sql
+new file mode 100644
+index 00000000..f6b2d32b
+--- /dev/null
++++ b/internal/migrations/0025_level_zero_seed.down.sql
+@@ -0,0 +1,2 @@
++-- Restores the old level-1 seed for characters still below g_pNextLevel[1].
++UPDATE character SET level = 1 WHERE level = 0 AND exp < 500;
+diff --git a/internal/migrations/0025_level_zero_seed.up.sql b/internal/migrations/0025_level_zero_seed.up.sql
+new file mode 100644
+index 00000000..a55842fc
+--- /dev/null
++++ b/internal/migrations/0025_level_zero_seed.up.sql
+@@ -0,0 +1,7 @@
++-- New characters used to be created at level 1 while the legacy BaseMob
++-- templates start at 0. Level and Exp follow the same g_pNextLevel curve
++-- (level L needs Exp >= g_pNextLevel[L]), so every character that leveled up is
++-- already consistent; only the ones still at the seed level with less than
++-- g_pNextLevel[1] = 500 Exp are one level ahead. Arch twins were seeded the same
++-- way and ride the same curve.
++UPDATE character SET level = 0 WHERE level = 1 AND exp < 500;
+diff --git a/tmserver/internal/handler/arch_progression_test.go b/tmserver/internal/handler/arch_progression_test.go
+index 8953119a..d8626fd1 100644
+--- a/tmserver/internal/handler/arch_progression_test.go
++++ b/tmserver/internal/handler/arch_progression_test.go
+@@ -85,7 +85,7 @@ func TestArchCrystalSequenceSurvivesRelog(t *testing.T) {
+ 		wantExp := level.MaxExp - int64(i+1)*100_000_000
+ 		wantLevel := level.ForExpTier(wantExp, classMasterArch)
+ 		lost := uint32(399 - wantLevel)
+-		wantAC := uint32(628) - lost + bonus[0]
++		wantAC := uint32(629) - lost + bonus[0]
+ 		wantHP, wantMP := uint32(1000)-3*lost+bonus[1], uint32(500)-lost+bonus[2]
+ 		useArchItem(t, c, i)
+ 		slot := expect(t, c, protocol.MsgSendItem)
+diff --git a/tmserver/internal/handler/handler_test.go b/tmserver/internal/handler/handler_test.go
+index c67b6c15..ca2ebcc6 100644
+--- a/tmserver/internal/handler/handler_test.go
++++ b/tmserver/internal/handler/handler_test.go
+@@ -541,8 +541,9 @@ func TestLoginOK(t *testing.T) {
+ 	if got := cstr(payload[36:52]); got != "Hero" {
+ 		t.Errorf("slot-0 name = %q, want Hero", got)
+ 	}
+-	if lvl := binary.LittleEndian.Uint32(payload[100:104]); lvl != 49 {
+-		t.Errorf("slot-0 wire level = %d, want 49 so the client displays 50", lvl)
++	// The stored level, as in the in-world snapshot; the client shows Level+1.
++	if lvl := binary.LittleEndian.Uint32(payload[100:104]); lvl != 50 {
++		t.Errorf("slot-0 wire level = %d, want the stored 50", lvl)
+ 	}
+ 	// slot-0 gold is the real value, not a placeholder: Coin[0] at sel@20 + 792.
+ 	if coin := binary.LittleEndian.Uint32(payload[812:816]); coin != 987654 {
+@@ -623,22 +624,15 @@ func TestLoginSendsCargo(t *testing.T) {
+ 	}
+ }
+ 
+-func TestSelCharWireLevel(t *testing.T) {
+-	tests := []struct {
+-		name  string
+-		level int
+-		want  int32
+-	}{
+-		{name: "zero", level: 0, want: 0},
+-		{name: "one", level: 1, want: 0},
+-		{name: "normal", level: 50, want: 49},
+-	}
+-	for _, tt := range tests {
+-		t.Run(tt.name, func(t *testing.T) {
+-			if got := selCharWireLevel(tt.level); got != tt.want {
+-				t.Errorf("selCharWireLevel(%d) = %d, want %d", tt.level, got, tt.want)
+-			}
+-		})
++// TestSelCharLevelAsStored: the selection preview carries the stored level, the
++// same value the in-world snapshot sends; the client adds 1 on both screens.
++func TestSelCharLevelAsStored(t *testing.T) {
++	d := &Dispatcher{}
++	for _, level := range []int{0, 1, 50} {
++		rows := d.selCharsFrom([]world.CharSummary{{Slot: 0, Name: "Hero", Level: level}})
++		if got := rows[0].Level; got != int32(level) {
++			t.Errorf("SelChar.Level = %d for stored level %d, want it unchanged", got, level)
++		}
+ 	}
+ }
+ 
+diff --git a/tmserver/internal/handler/login.go b/tmserver/internal/handler/login.go
+index c53a24c8..fc86ab23 100644
+--- a/tmserver/internal/handler/login.go
++++ b/tmserver/internal/handler/login.go
+@@ -127,17 +127,17 @@ func (d *Dispatcher) cargoWire(st *world.CargoState) (int32, [128]protocol.SelIt
+ // selCharsFrom maps the dbServer character summaries to protocol.SelChar rows for
+ // the byte-exact STRUCT_SELCHAR (MSG_CNFAccountLogin / MSG_CNFNewCharacter). The
+ // summary carries the real score (gold, HP/MP, attributes) so the selection
+-// screen previews each slot's actual character, not placeholders. Level is the
+-// one exception: this client renders SelChar.Score.Level as one-based, so the
+-// wire preview stores level-1 while the in-world CharacterLogin snapshot keeps
+-// the authoritative level unchanged.
++// screen previews each slot's actual character, not placeholders. Level goes as
++// stored, like the in-world snapshot: both screens show Level+1
++// (TMSelectCharScene.cpp:1018, TMFieldScene.cpp:4230), so a new character —
++// level 0, as the legacy BaseMob templates — reads "Nv 1" in both.
+ func (d *Dispatcher) selCharsFrom(chars []world.CharSummary) []protocol.SelChar {
+ 	out := make([]protocol.SelChar, 0, len(chars))
+ 	for _, c := range chars {
+ 		sc := protocol.SelChar{
+ 			Slot:  c.Slot,
+ 			Name:  c.Name,
+-			Level: selCharWireLevel(c.Level),
++			Level: int32(c.Level),
+ 			Exp:   c.Exp,
+ 			Guild: c.GuildID,
+ 			Coin:  c.Coin,
+@@ -158,9 +158,3 @@ func (d *Dispatcher) selCharsFrom(chars []world.CharSummary) []protocol.SelChar
+ 	return out
+ }
+ 
+-func selCharWireLevel(level int) int32 {
+-	if level <= 0 {
+-		return 0
+-	}
+-	return int32(level - 1)
+-}
+diff --git a/tmserver/internal/handler/score_derive.go b/tmserver/internal/handler/score_derive.go
+index 218aef63..b247ade2 100644
+--- a/tmserver/internal/handler/score_derive.go
++++ b/tmserver/internal/handler/score_derive.go
+@@ -40,9 +40,10 @@ func playerBaseDamage(e *world.Entity) int32 {
+ // playerBaseAC reproduces BaseScore.Ac without persisting it. In the legacy the
+ // field is only ever written on creation (the per-tier baseline above) and on
+ // level-up, +1 per level for every tier (CMob.cpp:1133,1145,1150) — so it is a
+-// pure function of (tier, level). The Celestial turn resets the level to 1
+-// together with the baseline (_MSG_UseItem.cpp:3136 + handler.useIdealStone), so
+-// the same "baseline + (level−1)" holds for all three creation paths.
++// pure function of (tier, level). Every tier starts at level 0 with its
++// baseline: creation copies the BaseMob template (BaseScore.Level 0, Ac 4) and
++// the Celestial turn sets Level = 0 with Ac = 230 (_MSG_UseItem.cpp:3124-3135 +
++// handler.useIdealStone), so "baseline + level" holds for all three paths.
+ //
+ // This derivation exists because the DB contract carries no AC: api/db/v1
+ // Character has no `ac` field, so a login always reads CurrentScore.Ac == 0 and
+@@ -66,7 +67,7 @@ func playerBaseAC(e *world.Entity) int32 {
+ 			base += 20
+ 		}
+ 	}
+-	return base + max(e.Level-1, 0)
++	return base + max(e.Level, 0)
+ }
+ 
+ type weaponCoef struct {
+diff --git a/tmserver/internal/handler/score_derive_test.go b/tmserver/internal/handler/score_derive_test.go
+index 70eaa833..824bffce 100644
+--- a/tmserver/internal/handler/score_derive_test.go
++++ b/tmserver/internal/handler/score_derive_test.go
+@@ -148,18 +148,20 @@ func TestPlayerBaseAC(t *testing.T) {
+ 		level       int32
+ 		want        int32
+ 	}{
+-		{"mortal level 1", classMasterMortal, 1, 4},
+-		{"mortal level 100", classMasterMortal, 100, 103},
+-		{"mortal at cap", classMasterMortal, level.MaxLevel, 4 + level.MaxLevel - 1},
+-		{"arch level 1", classMasterArch, 1, 230},
+-		{"arch level 100", classMasterArch, 100, 329},
+-		{"celestial level 50", classMasterCelestial, 50, 279},
+-		{"scelestial level 1", classMasterSCelestial, 1, 230},
++		// A new character is level 0 with the template's Ac 4 ("Nv 1" on screen).
++		{"mortal level 0", classMasterMortal, 0, 4},
++		{"mortal level 1", classMasterMortal, 1, 5},
++		{"mortal level 100", classMasterMortal, 100, 104},
++		{"mortal at cap", classMasterMortal, level.MaxLevel, 4 + level.MaxLevel},
++		{"arch level 0", classMasterArch, 0, 230},
++		{"arch level 100", classMasterArch, 100, 330},
++		{"celestial level 50", classMasterCelestial, 50, 280},
++		{"scelestial level 0", classMasterSCelestial, 0, 230},
+ 		// A row written before ClassMaster was persisted reads back 0; login treats
+ 		// that as MORTAL, so the baseline must agree.
+-		{"unpersisted tier is mortal", 0, 10, 13},
+-		// Defensive: a level below the creation level must not underflow the baseline.
+-		{"level 0 floors at baseline", classMasterMortal, 0, 4},
++		{"unpersisted tier is mortal", 0, 10, 14},
++		// Defensive: a negative level must not underflow the baseline.
++		{"negative level floors at baseline", classMasterMortal, -1, 4},
+ 	}
+ 	for _, tt := range tests {
+ 		t.Run(tt.name, func(t *testing.T) {
+diff --git a/tmserver/internal/handler/starter_equip_test.go b/tmserver/internal/handler/starter_equip_test.go
+index 51769c8a..0d8391e5 100644
+--- a/tmserver/internal/handler/starter_equip_test.go
++++ b/tmserver/internal/handler/starter_equip_test.go
+@@ -80,21 +80,21 @@ func TestEquipScoreRoundTrip(t *testing.T) {
+ 	}
+ 	e.Equip[0] = world.Item{Index: 700} // chest
+ 	d.deriveBaseScore(e)
+-	// Base = current − chest: AC 150−50=100, Con 35−5=30.
+-	if e.BaseAC != 53 || e.BaseCon != 30 {
+-		t.Fatalf("derived base AC=%d Con=%d, want 53/30", e.BaseAC, e.BaseCon)
++	// Base AC is the level-50 Mortal baseline (4+50, playerBaseAC); Con 35−5=30.
++	if e.BaseAC != 54 || e.BaseCon != 30 {
++		t.Fatalf("derived base AC=%d Con=%d, want 54/30", e.BaseAC, e.BaseCon)
+ 	}
+ 	// refreshScore reproduces the loaded current exactly (gear unchanged).
+ 	d.refreshScore(e)
+-	if e.AC != 103 || e.Con != 35 {
+-		t.Fatalf("refresh produced AC=%d Con=%d, want 103/35", e.AC, e.Con)
++	if e.AC != 104 || e.Con != 35 {
++		t.Fatalf("refresh produced AC=%d Con=%d, want 104/35", e.AC, e.Con)
+ 	}
+ 
+ 	// Unequip the chest → AC/Con drop to base.
+ 	e.Equip[0] = world.Item{}
+ 	d.refreshScore(e)
+-	if e.AC != 53 || e.Con != 30 {
+-		t.Fatalf("after unequip AC=%d Con=%d, want 53/30", e.AC, e.Con)
++	if e.AC != 54 || e.Con != 30 {
++		t.Fatalf("after unequip AC=%d Con=%d, want 54/30", e.AC, e.Con)
+ 	}
+ 
+ 	// Equip the sword (right hand): weapon damage is separate, so e.Damage is
+-- 
+2.54.0.windows.1
+

@@ -38,11 +38,11 @@ import { freemem, totalmem } from 'node:os';
 import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { areaPair, checkAreaAttempt } from './area_checks.mjs';
-import { checkParty, checkPartyEvidence } from './party_checks.mjs';
+import { checkParty, checkPartyChat, checkPartyEvidence } from './party_checks.mjs';
 import { fsTraceInit, packageIndex, openedByDir } from './fs_trace.mjs';
 import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, itemAmount } from './world_checks.mjs';
+  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, checkBuff, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -62,6 +62,8 @@ const { values: opt } = parseArgs({
     phases: { type: 'string', default: 'badpass,login,create,enter,second,move,logout,mapchange,concurrent' },
     'class': { type: 'string', default: '0' },
     'grind-level': { type: 'string', default: '4' },
+    // learn: a SkillData index other than the class's first plan (buff/cure).
+    skill: { type: 'string', default: '' },
     headed: { type: 'boolean', default: false },
     // Record which package files each page opens (tools/fs_trace.mjs); the
     // list goes to .cache only, as the full asset manifest stays out of Git.
@@ -928,12 +930,14 @@ class Session {
   }
 
   // The chat box as a player uses it: Enter opens it, the text is typed,
-  // Enter sends (TMFieldScene OnKeyDown / OnCharEvent).
-  async say(text) {
+  // Enter sends (TMFieldScene OnKeyDown / OnCharEvent). After a "=" line the
+  // box reopens with the "=" prefix, so `clear` erases what is already there.
+  async say(text, { clear = false } = {}) {
     await this.closePanels();
     await this.page.focus('#canvas');
     await this.page.keyboard.press('Enter');
     await this.until('chat box', () => Module._wyd_field_chat_editing() === 1, 10000);
+    if (clear) for (let k = 0; k < 24; k++) await this.page.keyboard.press('Backspace');
     await this.page.keyboard.type(text, { delay: 120 });
     await this.frames(2);
     const sent0 = await this.outCount();
@@ -1000,7 +1004,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'trade', 'paidteleport'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') ? 60 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'partychat', 'trade', 'paidteleport'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') ? 60 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -1506,8 +1510,14 @@ async function main() {
         2: { skill: 5048, name: 'Fera_Flamejante', cost: 24, masters: ['archi'] },
         3: { skill: 5080, name: 'Golpe_Felino', cost: 18, masters: ['forelearner'] },
       };
-      const plan = PLANS[cls];
-      assert(plan, `no learn plan for class ${cls}`);
+      // Buff and cure (stage 5): BM Lobisomem (64, Type-16 transform) and
+      // Foema Cura (27, InstanceType 6 heal), SkillData.csv costs 33 and 48.
+      const EXTRA = {
+        64: { cls: 2, skill: 5064, name: 'Lobisomem', cost: 33, masters: ['archi'] },
+        27: { cls: 1, skill: 5027, name: 'Cura', cost: 48, masters: ['foema'] },
+      };
+      const plan = opt.skill ? EXTRA[opt.skill] : PLANS[cls];
+      assert(plan && (!opt.skill || plan.cls === cls), `no learn plan for class ${cls} skill ${opt.skill}`);
       const inClass = i => i >= 5000 + cls * 24 && i < 5024 + cls * 24;
       const name = classChar(cls);
       privateValues.push(name);
@@ -1821,6 +1831,109 @@ async function main() {
       await a.shot('cast');
       console.log(`    cast x${res.attempts}: MP ${res.mpTrail.join(',')} target HP ${res.hpTrail.join(',')} sent ${res.attacksSent} echoes ${res.echoes}`);
       checkCast(res);
+      return res;
+    });
+
+    // Stage 5, buff and cure. BM Lobisomem (64, TargetType 0) and Foema Cura
+    // (27, TargetType 2) are cast on oneself: the runtime sends TargetType 0
+    // without a target and turns TargetType 2 with nobody under the mouse into
+    // a self cast (TMFieldScene SkillUse). Everything after the right click is
+    // the server's: MP cost, the Type-16 affect and body mesh (transform.go),
+    // the heal (InstanceType 6). B, on the spawn, watches A.
+    await step('buff', async () => {
+      const PLANS = {
+        2: { skill: 64, pos: 16, name: 'Lobisomem', kind: 'transform' },
+        1: { skill: 27, pos: 3, name: 'Cura', kind: 'heal' },
+      };
+      const plan = PLANS[cls];
+      assert(plan, `no buff plan for class ${cls}`);
+      const name = classChar(cls);
+      privateValues.push(name);
+      const enterOwn = async s => {
+        const slot = (await s.slots()).findIndex(x => x.name === name);
+        assert(slot >= 0, `class ${cls} character missing`);
+        return s.enter(slot);
+      };
+      // B first, so A casts seconds after entering: the server regenerates
+      // Level+30 HP every 10 s (mobai.go regenPlayers) and would hide the cure.
+      b = await newSession('B-buff', B);
+      await b.loginToSelect();
+      const pin = await b.pin();
+      assert(pin.already || pin.result === 'lock1', 'B PIN rejected');
+      await b.enter(0);
+      if ((await a.eval(() => Module._wyd_get_game_state())) !== 0) await enterOwn(a);
+      const learned = await a.eval(() => Module._wyd_field_my_score(6) >>> 0);
+      assert(((learned >>> plan.pos) & 1) === 1, `skill ${plan.skill} not learned (run learn --skill first)`);
+      const watch = () => b.eval(id => Module._wyd_field_human_present(id) === 1 ? { hp: Module._wyd_field_human_hp(id),
+        maxHp: Module._wyd_field_human_max_hp(id) } : null, a.id);
+      await b.until('B sees A', id => Module._wyd_field_human_present(id) === 1, 60000, a.id);
+      const mine = () => a.eval(() => ({ hp: Module._wyd_field_my_score(0), maxHp: Module._wyd_field_my_score(1),
+        mp: Module._wyd_field_my_score(2), level: Module._wyd_field_my_score(4),
+        model: Module._wyd_field_myhuman_class_id() }));
+      const res = { cls, skill: plan.skill, name: plan.name, kind: plan.kind, attempts: 0 };
+      r.buff = res;
+      // The belt is saved by the server (0x0378): when the skill is already on
+      // slot 0, select it with the real "1" key and cast right away.
+      if ((await a.eval(() => Module._wyd_field_short_skill(0))) === plan.skill) {
+        await a.page.focus('#canvas');
+        await a.page.keyboard.press('Digit1'); await a.frames(2);
+        res.belt = plan.skill; res.beltSaved = true;
+        res.selected = await a.eval(() => Module._wyd_field_selected_short_skill());
+      } else Object.assign(res, await a.assignSkill(plan));
+      // Dialect combat diagnostics (ADR 006): the skill index A sends and the
+      // server's answer (HP/MP, targets) as both pages receive it.
+      for (const s of [a, b]) await s.eval(() => Module._wyd_combat_enable(1));
+      res.before = await mine();
+      res.observedBefore = await watch();
+      console.log(`    before: ${JSON.stringify(res.before)}, B sees ${JSON.stringify(res.observedBefore)}`);
+      // Right click on free ground next to the hero: TargetType 0 needs no
+      // target and TargetType 2 with nobody under the mouse is a self cast.
+      const cast = async () => {
+        const box = await a.page.locator('#canvas').boundingBox();
+        for (const [dx, dy] of [[60, 60], [-60, 60], [60, -40], [-60, -40]]) {
+          await a.page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, { steps: 3 });
+          await a.frames(2);
+          if ((await a.eval(() => Module._wyd_field_hover_human_id())) !== 0) continue;
+          await a.page.mouse.down({ button: 'right' });
+          try { await a.frames(2); } finally { await a.page.mouse.up({ button: 'right' }); }
+          return 'ground';
+        }
+        return null;
+      };
+      const out0 = await a.eval(() => window.clientProbe().dialect.outTranslated);
+      res.trail = [];
+      for (let k = 0; k < 4; k++) {
+        res.via = await cast();
+        if (res.via) res.attempts++;
+        const ok = await a.until('server MP cost', mp => Module._wyd_field_my_score(2) < mp, 6000, res.before.mp)
+          .then(() => true, () => false);
+        res.trail.push(await mine());
+        if (ok) break;
+      }
+      res.attacksSent = (await a.eval(() => window.clientProbe().dialect.outTranslated)) - out0;
+      res.logsA = await a.combatLog(); res.logsB = await b.combatLog();
+      await sleep(3000);
+      res.after = await mine();
+      // B sees A's score from the server's multicast: the cure raises HP, the
+      // wolf rescales MaxHP (transBonus minHP..maxHP).
+      res.observedAfter = await b.until('B sees the change on A', ([id, hp, maxHp]) => {
+        if (Module._wyd_field_human_present(id) !== 1) return false;
+        const v = { hp: Module._wyd_field_human_hp(id), maxHp: Module._wyd_field_human_max_hp(id) };
+        return (v.hp > hp || v.maxHp !== maxHp) && v;
+      }, 20000, [a.id, res.observedBefore?.hp ?? 0, res.observedBefore?.maxHp ?? 0]).catch(() => watch());
+      await a.shot('buff-cast'); await b.shot('buff-observed');
+      console.log(`    cast x${res.attempts} via ${res.via}: after ${JSON.stringify(res.after)}, B sees ${JSON.stringify(res.observedAfter)}`);
+      await a.healthy(); await b.healthy();
+      // Relogin: the skill stays learned; a live affect is saved with the character.
+      await a.close();
+      a = await newSession(`A-${plan.kind}-relogin`, A);
+      await a.loginToSelect();
+      const pin2 = await a.pin();
+      assert(pin2.already || pin2.result === 'lock1', 'A PIN rejected after the cast');
+      await enterOwn(a);
+      res.relogin = { ...(await mine()), learned: await a.eval(() => Module._wyd_field_my_score(6) >>> 0) };
+      await a.healthy(); await b.healthy();
+      checkBuff(res, plan);
       return res;
     });
 
@@ -2764,6 +2877,69 @@ async function main() {
         cleanup: { sold: res.cleanup.sold, b: hide(res.cleanup.b) }, before: { a: hide(a0), b: hide(b0) },
         unchanged: { fullA: JSON.stringify(res.full.a) === JSON.stringify(a0), fullB: JSON.stringify(res.full.b) === JSON.stringify(res.bFull),
           dropA: JSON.stringify(res.drop.a) === JSON.stringify(a0), dropB: JSON.stringify(res.drop.b) === JSON.stringify(res.bFull) } };
+    });
+
+    // Party chat (stage 5): "=text" goes out as 0x0334 with an empty MobName
+    // (TMFieldScene InsertInChatList); the server routes it to the party
+    // (_MSG_MessageWhisper.cpp "Chat Party"). "partychat" typed as speech is
+    // the legacy toggle (_MSG_MessageChat.cpp:117).
+    await step('partychat', async () => {
+      const res = {}; r.partychat = res;
+      const tag = `pc${Date.now() % 100000}`;
+      // A notice (0x0102) right after the line means the server took it as a
+      // whisper to an empty name.
+      const notice = s => s.until('notice', () => window.clientProbe().socket.lastRecvOpcode === 0x102, 4000)
+        .then(() => true, () => false);
+      // Which name the listener shows on the new lines (names stay out of the evidence).
+      const shown = (s, self, other, n0) => s.eval(([self, other, n0]) => {
+        const lines = [];
+        for (let k = 0; k < Module._wyd_field_chat_count() - n0; k++) lines.push(Module.UTF8ToString(Module._wyd_field_chat_line(k)));
+        return lines.some(l => l.includes(other)) ? 'sender' : lines.some(l => l.includes(self)) ? 'receiver' : 'none';
+      }, [self, other, n0]);
+      const line = async (from, to, fromName, toName, text) => {
+        const n0 = await to.eval(() => Module._wyd_field_chat_count());
+        const sent = await from.say(text, { clear: true });
+        const [heard, gotNotice] = await Promise.all([inChat(to, text.slice(1)), notice(from)]);
+        return { ...sent, heard, notice: gotNotice, senderShown: await shown(to, toName, fromName, n0) };
+      };
+      await a.waitParty([], 0); await b.waitParty([], 0);
+      await a.inviteParty(b); await b.partyRow(a.id);
+      res.party = { aId: a.id, bId: b.id, a: await a.waitParty([a.id, b.id], a.id), b: await b.waitParty([a.id, b.id], a.id) };
+      res.leaderSays = await line(a, b, A.char, B.char, `=${tag} lider`);
+      await b.shot('partychat-heard');
+      res.memberSays = await line(b, a, B.char, A.char, `=${tag} membro`);
+      // The original toggle is the B_CHAT_PARTY button (65678, TMFieldScene
+      // OnControlEvent sends "partychat"); typing the word is the fallback.
+      const toggle = async state => {
+        const out0 = await b.outCount();
+        let via = 'button';
+        try { await b.uiButton(65678); await b.frames(3); } catch { via = 'typed'; }
+        const res = via === 'button' ? { sent: (await b.outCount()) > out0, lastSent: '0x' + (await b.lastSent()).toString(16) }
+          : await b.say('partychat', { clear: true });
+        return { ...res, via, confirmed: await inChat(b, `Party Chatting : ${state}`) };
+      };
+      res.toggleOff = await toggle('Off');
+      res.silenced = await line(a, b, A.char, B.char, `=${tag} silencio`);
+      res.toggleOn = await toggle('On');
+      res.restored = await line(a, b, A.char, B.char, `=${tag} de volta`);
+      // Leave by the party window's "Sair do Grupo" (475139), with the chat box closed.
+      for (const s of [a, b]) if (await s.eval(() => Module._wyd_field_chat_editing()) === 1) {
+        await s.page.locator('#canvas').press('Escape'); await s.frames(2);
+      }
+      await b.shot('partychat-before-leave');
+      await b.uiButton(475139);
+      res.left = await b.waitParty([], 0).then(rows => ({ b: rows }), async () => {
+        await b.shot('partychat-leave-retry'); await b.uiButton(475139); return { retried: true, b: await b.waitParty([], 0) };
+      });
+      res.left.a = await a.waitParty([], 0);
+      res.afterLeave = await line(a, b, A.char, B.char, `=${tag} sem grupo`);
+      console.log(`    leader->B ${res.leaderSays.heard}, member->A ${res.memberSays.heard}, ` +
+        `off ${res.toggleOff.confirmed}/${res.silenced.heard}, on ${res.toggleOn.confirmed}/${res.restored.heard}, ` +
+        `after leave sent ${res.afterLeave.sent}`);
+      await a.healthy();
+      await b.healthy();
+      checkPartyChat(res);
+      return res;
     });
 
     await step('chat', async () => {

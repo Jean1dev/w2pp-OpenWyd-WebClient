@@ -1,0 +1,277 @@
+From 77ae8f960d8ee2703a619d5ecbf0e9a4ee6f396c Mon Sep 17 00:00:00 2001
+From: Jeanluca <jeanlucafp@gmail.com>
+Date: Thu, 1 Oct 2026 20:51:32 -0300
+Subject: [PATCH] fix(tmserver): route "=" party chat to the party like the
+ legacy server
+
+The client sends party chat as MSG_MessageWhisper with an empty MobName and
+the text prefixed by "=" (TMFieldScene InsertInChatList). messageWhisper took
+it as a whisper to an empty name and answered "not connected", so party chat
+never reached anyone.
+
+Port the "Chat Party" region of _MSG_MessageWhisper.cpp: MobName becomes the
+speaker's name, the leader receives the line unless it spoke, and so does the
+leader's PartyList except the speaker and members with partychat off. Port the
+"partychat" toggle of _MSG_MessageChat.cpp:117-126 with its confirmation line.
+The MuteChat gate and the chat_party log line stay unmodeled.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ tmserver/internal/handler/chat.go            |  55 +++++++
+ tmserver/internal/handler/party_chat_test.go | 151 +++++++++++++++++++
+ tmserver/internal/world/session.go           |   1 +
+ 3 files changed, 207 insertions(+)
+ create mode 100644 tmserver/internal/handler/party_chat_test.go
+
+diff --git a/tmserver/internal/handler/chat.go b/tmserver/internal/handler/chat.go
+index d3249b99..1b1ce247 100644
+--- a/tmserver/internal/handler/chat.go
++++ b/tmserver/internal/handler/chat.go
+@@ -24,6 +24,15 @@ func (d *Dispatcher) messageChat(w *world.World, s *world.Session, _ protocol.He
+ 	switch firstToken(text) {
+ 	case "whisper":
+ 		s.Whisper = !s.Whisper
++	case "partychat":
++		// _MSG_MessageChat.cpp:117-126: toggles whether this player receives the
++		// party channel; the legacy confirms with a client message.
++		s.PartyChat = !s.PartyChat
++		if s.PartyChat {
++			d.sendChatText(w, s, "Party Chatting : Off")
++		} else {
++			d.sendChatText(w, s, "Party Chatting : On")
++		}
+ 	case "guildon":
+ 		s.GuildDisable = false
+ 	case "guildoff":
+@@ -52,6 +61,10 @@ func (d *Dispatcher) messageWhisper(w *world.World, s *world.Session, _ protocol
+ 		return
+ 	}
+ 	name := cstr(body.MobName[:])
++	if name == "" && len(body.String) > 0 && body.String[0] == '=' {
++		d.partyChat(w, s, body)
++		return
++	}
+ 	if d.runCommand(w, s, name, body.String) {
+ 		// Freeze investigation: commands were invisible in the logs (the recv
+ 		// packet line only shows 0x0334), so incident timelines could not tell a
+@@ -71,6 +84,48 @@ func (d *Dispatcher) messageWhisper(w *world.World, s *world.Session, _ protocol
+ 	w.SendTo(target, protocol.Header{Type: protocol.MsgMessageWhisper, ID: uint16(s.Conn)}, payload)
+ }
+ 
++// partyChat routes a "=text" line (MobName empty) to the speaker's party, as the
++// "Chat Party" region of _MSG_MessageWhisper.cpp:1470-1510: MobName becomes the
++// speaker's name, the leader receives it unless it is the speaker, and so do the
++// leader's PartyList members except the speaker and those with partychat off.
++// A player outside any party is its own leader with an empty list, so nobody
++// receives it. Summons share the PartyList and are skipped (no session).
++//
++// Not reproduced: the MuteChat gate, which is not modeled yet (see magicTrumpet),
++// and the chat_party ChatLog line — the text is never logged.
++func (d *Dispatcher) partyChat(w *world.World, s *world.Session, body protocol.MsgWhisperBody) {
++	e := w.Entity(s.Conn)
++	if e == nil {
++		return
++	}
++	body.MobName = [16]byte{}
++	copy(body.MobName[:len(body.MobName)-1], e.Name)
++	out := body.Encode()
++	leaderConn := e.Leader
++	if leaderConn <= 0 {
++		leaderConn = s.Conn
++	}
++	le := w.Entity(leaderConn)
++	ls := w.Session(leaderConn)
++	if le == nil || ls == nil || ls.Mode != world.UserPlay {
++		return
++	}
++	h := protocol.Header{Type: protocol.MsgMessageWhisper, ID: uint16(s.Conn)}
++	if leaderConn != s.Conn {
++		w.SendTo(ls, h, out)
++	}
++	for _, m := range le.PartyList {
++		if m <= 0 || m == s.Conn {
++			continue
++		}
++		ms := w.Session(m)
++		if ms == nil || ms.Mode != world.UserPlay || ms.PartyChat {
++			continue
++		}
++		w.SendTo(ms, h, out)
++	}
++}
++
+ // teleportCmds maps a chat slash command to its destination tile. The client sends
+ // "/armia" as a whisper whose target name is "armia", so the command keyword IS the
+ // whisper name (_MSG_MessageWhisper.cpp). Coordinates are the peacetime ones; the
+diff --git a/tmserver/internal/handler/party_chat_test.go b/tmserver/internal/handler/party_chat_test.go
+new file mode 100644
+index 00000000..ff089885
+--- /dev/null
++++ b/tmserver/internal/handler/party_chat_test.go
+@@ -0,0 +1,151 @@
++package handler
++
++import (
++	"net"
++	"strings"
++	"testing"
++
++	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/protocol"
++)
++
++// partyOfTwo puts "tester" (Hero, conn 1, leader) and "tradeb" (HeroB, conn 2) in a
++// party and logs "third" (HeroC, conn 3) in outside of it.
++func partyOfTwo(t *testing.T) (a, b, c net.Conn, stop func()) {
++	t.Helper()
++	addr, stop, _ := startServerClock(t, partyDB())
++	a = enterWorldAs(t, addr, "tester")
++	b = enterWorldAs(t, addr, "tradeb")
++	c = enterWorldAs(t, addr, "third")
++	reqPartyFrame(t, a, 1, 2)
++	expectPartyFrame(t, b, protocol.MsgSendReqParty)
++	acceptPartyFrame(t, b, 1, "Hero")
++	drainRaw(t, a)
++	drainRaw(t, b)
++	drainRaw(t, c)
++	return a, b, c, stop
++}
++
++// expectPartyLine reads the party line a member receives: an MSG_MessageWhisper
++// from the speaker's conn, with MobName rewritten to the speaker's name and the
++// text kept with its '=' prefix (the client strips it, TMFieldScene.cpp:17906).
++func expectPartyLine(t *testing.T, c net.Conn, fromConn uint16, fromName, text string) {
++	t.Helper()
++	h, p, ok := readMaybeHeader(t, c)
++	if !ok || h.Type != protocol.MsgMessageWhisper {
++		t.Fatalf("got %#x ok=%v, want the party line", h.Type, ok)
++	}
++	var body protocol.MsgWhisperBody
++	if err := body.Decode(p); err != nil {
++		t.Fatal(err)
++	}
++	if h.ID != fromConn || cstr(body.MobName[:]) != fromName || !strings.HasPrefix(string(body.String), text) {
++		t.Fatalf("party line = ID %d %q %q, want ID %d %q %q", h.ID, cstr(body.MobName[:]), body.String, fromConn, fromName, text)
++	}
++}
++
++func expectNothing(t *testing.T, c net.Conn, who string) {
++	t.Helper()
++	if ty, _, ok := readMaybe(t, c); ok {
++		t.Errorf("%s received %#x, want nothing", who, ty)
++	}
++}
++
++// TestPartyChatMemberToLeader: a member's "=" line reaches the leader, not the
++// speaker and not a player outside the party (_MSG_MessageWhisper.cpp:1470-1510).
++func TestPartyChatMemberToLeader(t *testing.T) {
++	a, b, c, stop := partyOfTwo(t)
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	whisperFrame(t, b, "", "=ola grupo")
++	expectPartyLine(t, a, 2, "HeroB", "=ola grupo")
++	expectNothing(t, b, "speaker")
++	expectNothing(t, c, "outsider")
++}
++
++// TestPartyChatLeaderToMember: the leader's line goes to its PartyList.
++func TestPartyChatLeaderToMember(t *testing.T) {
++	a, b, c, stop := partyOfTwo(t)
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	whisperFrame(t, a, "", "=vamos")
++	expectPartyLine(t, b, 1, "Hero", "=vamos")
++	expectNothing(t, a, "speaker")
++	expectNothing(t, c, "outsider")
++}
++
++// TestPartyChatSpoofedName: the server, not the client, names the speaker.
++func TestPartyChatSpoofedName(t *testing.T) {
++	a, b, c, stop := partyOfTwo(t)
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	var body protocol.MsgWhisperBody
++	body.String = []byte("=sou o lider")
++	send(t, b, protocol.MsgMessageWhisper, body.Encode())
++	expectPartyLine(t, a, 2, "HeroB", "=sou o lider")
++}
++
++// TestPartyChatToggle: "partychat" switches the channel off for the player who
++// sent it (_MSG_MessageChat.cpp:117-126) and confirms with a chat line.
++func TestPartyChatToggle(t *testing.T) {
++	a, b, c, stop := partyOfTwo(t)
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	chatFrame(t, b, "partychat")
++	ty, p, ok := readMaybe(t, b)
++	if !ok || ty != protocol.MsgMessageChat || !strings.HasPrefix(string(p), "Party Chatting : Off") {
++		t.Fatalf("got %#x %q, want \"Party Chatting : Off\"", ty, p)
++	}
++	whisperFrame(t, a, "", "=alguem?")
++	expectNothing(t, b, "member with partychat off")
++
++	chatFrame(t, b, "partychat")
++	if ty, p, ok := readMaybe(t, b); !ok || !strings.HasPrefix(string(p), "Party Chatting : On") {
++		t.Fatalf("got %#x %q, want \"Party Chatting : On\"", ty, p)
++	}
++	whisperFrame(t, a, "", "=de volta")
++	expectPartyLine(t, b, 1, "Hero", "=de volta")
++}
++
++// TestPartyChatWithoutParty: outside a party nobody receives the line, and it is
++// not mistaken for a whisper to an empty name (no "not connected" notice).
++func TestPartyChatWithoutParty(t *testing.T) {
++	addr, stop, _ := startServerClock(t, partyDB())
++	defer stop()
++	a := enterWorldAs(t, addr, "tester")
++	defer a.Close()
++	b := enterWorldAs(t, addr, "tradeb")
++	defer b.Close()
++	drainRaw(t, a)
++	drainRaw(t, b)
++
++	whisperFrame(t, a, "", "=sozinho")
++	expectNothing(t, a, "speaker")
++	expectNothing(t, b, "player outside the party")
++}
++
++// TestPartyChatAfterLeave: once B leaves, the leader's line no longer reaches B.
++func TestPartyChatAfterLeave(t *testing.T) {
++	a, b, c, stop := partyOfTwo(t)
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	removePartyFrame(t, b, 2)
++	expectRemoveParty(t, b, 0)
++	expectRemoveParty(t, a, 2)
++	whisperFrame(t, a, "", "=ainda ai?")
++	expectNothing(t, b, "former member")
++}
+diff --git a/tmserver/internal/world/session.go b/tmserver/internal/world/session.go
+index 2e180b68..1edbdcbf 100644
+--- a/tmserver/internal/world/session.go
++++ b/tmserver/internal/world/session.go
+@@ -64,6 +64,7 @@ type Session struct {
+ 	IP                string
+ 	CrackError        int             // anti-cheat violation count (CUser.NumError)
+ 	Whisper           bool            // true blocks incoming whispers
++	PartyChat         bool            // true blocks the party channel (partychat)
+ 	GuildDisable      bool            // hide guild tag (guildon/guildoff)
+ 	TradeMode         int             // non-zero while in auto-trade (blocks attacks)
+ 	Trade             TradeState      // P2P direct-trade state (lote2-trade-autotrade.md)
+-- 
+2.54.0.windows.1
+

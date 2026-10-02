@@ -1,6 +1,6 @@
 # Progresso
 
-Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. A morte para os Trolls e a volta à cidade (caixa 11, `0x03AE`/`0x0289`, HP 2 no spawn) também foram aprovadas ([morte e respawn](evidence/05-gameplay/2026-09-29-death-respawn.md)). Também foram aprovados no Railway a poção (fatia 2) e a fatia 3: loja NPC (venda, compra, recusa, clique repetido), banco (item e ouro nos dois sentidos, recusas), chat (fala, sussurro, aviso de offline) e teleporte por comando `/cidade` ([fatia 3](evidence/05-gameplay/2026-09-30-shop-bank-chat.md)). O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. O grupo foi aprovado no Railway (recusa, aceite, saída, expulsão, desconexão e relogin; [fatia 4](evidence/05-gameplay/2026-09-30-party.md)). Em 30/09, a exclusão de personagem foi aprovada ponta a ponta no Railway ([etapa 3](evidence/03-protocolo/README.md#exclusão-de-personagem-ponta-a-ponta-30092026)). Em 01/10, com os PRs [#358](https://github.com/Jean1dev/w2pp-OpenWYD/pull/358) e [#359](https://github.com/Jean1dev/w2pp-OpenWYD/pull/359) integrados e implantados (`2e532afa`), foram aprovadas a recusa de exclusão com `0x011B` ([etapa 3](evidence/03-protocolo/README.md#recusa-de-exclusão-com-0x011b-01102026)) e a troca entre duas contas ([fatia 4](evidence/05-gameplay/2026-10-01-trade.md)). O cliente Windows já entrou no mundo junto com o web; faltam o relogin dele e o reinício do servidor.
+Atualização: 01/10/2026 (noite). O cliente web, via gateway próprio, faz no tm-server do operador (Railway) login, PIN (inclusive recusa de PIN errado), criação das quatro classes e entrada no Field com as entidades reais. Duas contas se veem e veem o movimento, o relogin e a troca de mapa uma da outra pelo servidor. O login duplicado segue o comportamento do backend fixado. No Railway, o combate básico foi aprovado de ponta a ponta ([execução 7](evidence/05-gameplay/2026-09-29-basic-combat.md#execução-7-combate-básico-e-relogin-aprovados)): A mata um Gremlin, B observa o mesmo dano e a morte, e o relogin preserva equipamento, nível e Exp, com protocolo limpo. A morte para os Trolls e a volta à cidade (caixa 11, `0x03AE`/`0x0289`, HP 2 no spawn) também foram aprovadas ([morte e respawn](evidence/05-gameplay/2026-09-29-death-respawn.md)). Também foram aprovados no Railway a poção (fatia 2) e a fatia 3: loja NPC (venda, compra, recusa, clique repetido), banco (item e ouro nos dois sentidos, recusas), chat (fala, sussurro, aviso de offline) e teleporte por comando `/cidade` ([fatia 3](evidence/05-gameplay/2026-09-30-shop-bank-chat.md)). O deploy no Railway com assets no bucket S3, senha e login pelo domínio público foi verificado; a CI está preparada. O grupo foi aprovado no Railway (recusa, aceite, saída, expulsão, desconexão e relogin; [fatia 4](evidence/05-gameplay/2026-09-30-party.md)). Em 30/09, a exclusão de personagem foi aprovada ponta a ponta no Railway ([etapa 3](evidence/03-protocolo/README.md#exclusão-de-personagem-ponta-a-ponta-30092026)). Em 01/10, com os PRs [#358](https://github.com/Jean1dev/w2pp-OpenWYD/pull/358) e [#359](https://github.com/Jean1dev/w2pp-OpenWYD/pull/359) integrados e implantados (`2e532afa`), foram aprovadas a recusa de exclusão com `0x011B` ([etapa 3](evidence/03-protocolo/README.md#recusa-de-exclusão-com-0x011b-01102026)) e a troca entre duas contas ([fatia 4](evidence/05-gameplay/2026-10-01-trade.md)). O cliente Windows já entrou no mundo junto com o web; faltam o relogin dele e o reinício do servidor. Na noite de 01/10, com o PR #363 implantado (`052cd5fe`), o HUD mostra o dano com a arma logo após o login. O chat de grupo e a divergência de nível são lacunas do servidor, com correção nos PRs [#364](https://github.com/Jean1dev/w2pp-OpenWYD/pull/364) e [#365](https://github.com/Jean1dev/w2pp-OpenWYD/pull/365), sem merge ([ADR 013](decisions/013-party-chat-and-level-seed.md)).
 
 | Etapa | Estado | Evidência |
 |---|---|---|
@@ -8,7 +8,7 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Validada (01/10: build limpo, importador com testes sintéticos e cena Field/Select Server em Chromium e Firefox; Field é fixture offline; Safari não testado) | [Cena real no navegador](evidence/02-build/README.md), [reprodução de 01/10](evidence/02-build/2026-10-01-reproduction.md) |
 | 3 Protocolo | Validada (01/10: vetores, streaming adversarial, login real e DeleteCharacter com recusa `0x011B` no Railway `2e532afa`; login real no tm-server do operador, não numa stack local) | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; faltam buff/cura e reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; chat de grupo bloqueado pelo servidor até o PR #364; em 02/10, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco; falta o reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
 | 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
@@ -17,9 +17,11 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
 
 1. Etapa 5:
    - fatia A (01/10): venda, ouro no banco entre sessões, teleporte pago e casos de troca confirmados. A execução 4 de `tradeedge` (01/10, 21:04) rodou todos os passos: aviso "Nao ha espaco no inventario." confirmado online e B limpo. Só a regra final reprovou, porque B começou cheio de sobra; regra corrigida e JSON reavaliado offline;
-   - PRs [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361) e [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362) implantados (`200f4824`). O ouro dos mobs foi confirmado em execução. O HUD com dano 21 após o login e 23 ao reequipar tem causa encontrada: o `CreateMob` próprio leva o score cru, sem a arma. A correção está no PR [#363](https://github.com/Jean1dev/w2pp-OpenWYD/pull/363) do servidor (`19b235e`), sem merge. Fica em aberto a diferença de nível entre a seleção e o mundo (`selCharWireLevel`, decisão do servidor);
-   - fatia 5: persistência após reinício controlado do servidor (exige combinar com o operador);
-   - buff e cura (nível 11+ ou 16–20).
+   - PRs #361, #362 e #363 implantados (`052cd5fe`). Ouro dos mobs e dano após o login foram confirmados em execução;
+   - operador: revisar, integrar e implantar o PR [#364](https://github.com/Jean1dev/w2pp-OpenWYD/pull/364) (chat de grupo). Depois, rodar `login,enter,second,partychat`. As correções do harness dessa fase (caixa de chat com prefixo e saída do grupo) ainda não foram validadas online;
+   - operador: decidir o PR [#365](https://github.com/Jean1dev/w2pp-OpenWYD/pull/365) (nível 0 na criação, +1 de defesa por nível e migração `0025` em dados vivos). Depois do deploy, conferir "Nv 1" nas duas telas com um personagem novo;
+   - fatia 5: persistência após reinício controlado do servidor. O usuário autorizou o reinício via Railway CLI quando a fatia entrar;
+   - buff e cura aprovados em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-buff-cure.md)). Em aberto: o modelo da BM volta ao humano no relogin com o afeto ainda ativo (hipótese: snapshot de login sem o override visual); cura em outro jogador.
 
    Rodar os cenários online em processos separados. Antes de abrir A e B, confirmar ≥ 2 GB livres: órfãos `tail`/`grep`, Docker e Chrome em segundo plano custaram ~1,3 GB nesta sessão ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar (os cenários de duas sessões passaram em 01/10, [evidência](evidence/04-login-mundo/2026-10-01-two-sessions.md)):
@@ -29,8 +31,8 @@ Atualização: 01/10/2026. O cliente web, via gateway próprio, faz no tm-server
 4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6.
 5. Servidor, entregas separadas (não feitas):
    - itens no chão: `0x026E`, CNF de 28 bytes, decay e dono ([ADR 007](decisions/007-inventory-dialect.md));
-   - score do login: PR [#361](https://github.com/Jean1dev/w2pp-OpenWYD/pull/361), aberto. O `0x0336` já era enviado; a divergência era o snapshot `0x0114` levar o score do template, enquanto o legado manda o `MOB` depois de `GetCurrentScore`;
-   - ouro dos mobs: PR [#362](https://github.com/Jean1dev/w2pp-OpenWYD/pull/362), aberto. `SpawnMobAt` passa a copiar o `Coin` @28;
+   - chat de grupo: PR #364, aberto;
+   - nível inicial e defesa por nível: PR #365, aberto;
    - aviso na recusa do teleporte pago (o original avisa, o Go fica em silêncio);
    - sussurro: gravar o nome de quem envia e reproduzir a reescrita legada; enviar aviso nas recusas de compra, venda, banco e teleporte; confirmar o layout de 57 bytes do `0x0339` ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
 6. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
@@ -636,3 +638,50 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - Sem commit.
 - **Memória (etapa 6, mesma data):** os 527 MiB do `performance.memory` são o pacote (305 MiB) mais o WASM (180 MiB), contados como backing store de `ArrayBuffer`. Os objetos JS somam ~4 MiB depois da coleta, não há cópia do pacote e os "220 MiB extras" eram o WASM. Por processo, com uma página: renderer 654 MiB, browser 140, GPU 137, utilitários 105 (1.036 no total). Carregar sob demanda economizaria até ~255 MiB por página; a escolha da abordagem fica para uma ADR.
 - **Arquivos abertos online (mesma data):** `--trace-files` no harness, com o `tools/fs_trace.mjs` compartilhado com a medição offline. Duas sessões no Railway (`loot` e `paidteleport`, ambas `ok`) abriram juntas 1.968 arquivos, 76,5 de 305 MiB; Noatum acrescentou 2,8 MiB. Opção nova registrada: pré-carregar o conjunto quente e ler o resto sob demanda com XHR síncrono por faixa de bytes (`createLazyFile`), economizando até ~225 MiB por página. [ADR 012](decisions/012-on-demand-asset-loading.md): o operador rejeitou a leitura sob demanda pela rede (travadas), e o preload integral continua. A issue #6 se resolve rodando o harness numa máquina com mais RAM.
+
+### 01/10/2026 (noite) — score após o #363, chat de grupo e nível inicial
+
+- **Pedido do usuário:** executar o orquestrador. No plano aprovado: conferir o #363, chat de grupo, buff e cura, e nível na seleção × no mundo. Na sessão, o usuário adiou buff e cura, e deixou o reinício controlado fora (autorizado via CLI quando entrar).
+- **Pré-condições:** deploy `bb798b1b` do `tm-server` em `052cd5fe` (merge do #363), `SUCCESS`; a Railway CLI foi religada à worktree (`railway link`) só para leitura.
+- **Servidor (entregas separadas, sem merge nem deploy), clone `external/server-pr`:**
+  - [PR #364](https://github.com/Jean1dev/w2pp-OpenWYD/pull/364) (`77ae8f96`): chat de grupo `=` e toggle `partychat`, como o legado. Seis testes novos, cinco falham sem a correção. Patch `patches/server/0003-party-chat.patch` (SHA-256 `92c11fe8…`);
+  - [PR #365](https://github.com/Jean1dev/w2pp-OpenWYD/pull/365) (`32e5114a`): criação no nível 0, SELCHAR com o nível armazenado, `playerBaseAC = baseline + level` e migração `0025`. Patch `patches/server/0004-level-zero-seed.patch` (SHA-256 `17bc00ff…`).
+- **Cliente:**
+  - `tools/verify_world.mjs`: fase `partychat`; `say` com a opção `clear`;
+  - `tools/party_checks{,.test}.mjs`: `checkPartyChat`;
+  - `tools/world_checks.mjs`: regra da fase;
+  - [ADR 013](decisions/013-party-chat-and-level-seed.md), [evidência](evidence/05-gameplay/2026-10-01-partychat-level.md), checklist da etapa 5, matriz e fatia A.
+- **Confirmado em teste:** `world:checks` 34/0. Servidor: testes de chat/grupo verdes e `go vet` limpo; falhas preexistentes ou de ambiente registradas na evidência.
+- **Confirmado em execução (Railway `052cd5fe`):**
+  - `login,enter,second,equip`: dano 28 após o login, 26 sem a arma e 28 com ela;
+  - `login,enter,second,partychat` reprovou contra o servidor sem o #364, como esperado: as linhas `=` voltam como `0x0102` e ninguém as recebe. A mesma execução revelou dois defeitos do harness, corrigidos mas não validados online.
+- **Não executado:** buff e cura (adiados); `partychat` aprovado (depende do #364); reinício controlado; cliente Windows. Sem rebuild do WASM. Sem commit no repositório do cliente.
+- **Próximo passo:** merge e deploy dos #364 e #365 pelo operador; depois, `partychat` e a conferência de "Nv 1" nas duas telas.
+
+### 02/10/2026 — buff e cura com nível ajustado no banco
+
+- **Pedido do usuário:** como o ambiente é de testes, ler a conexão do banco nas variáveis do Railway e ajustar o nível dos personagens para verificar buff e cura.
+- **Banco:**
+  - DSN `W2PP_DB_DSN` do serviço `db-server` (Postgres externo), só no ambiente do processo;
+  - utilitário temporário com `pgx`, fora do Git;
+  - escritas transacionais limitadas a uma linha da conta A;
+  - BM (id 209) no nível 11 e Foema (id 210) no 16, com a Exp e o HP/MP coerentes com a curva;
+  - um afeto residual do Lobo apagado;
+  - HP máximo da Foema em 1000 só durante a execução final da Cura, depois restaurado.
+
+  Detalhes na [evidência](evidence/05-gameplay/2026-10-02-buff-cure.md).
+- **Arquivos:**
+  - `tools/verify_world.mjs`: `--skill` no `learn`; fase `buff`; diagnóstico de combate;
+  - `tools/world_checks.mjs`: `checkBuff` e regras da fase;
+  - `tools/party_checks.test.mjs`;
+  - evidência e checklist da etapa 5.
+- **Confirmado em teste:** `world:checks` 35/0.
+- **Confirmado em execução (Railway `052cd5fe`):**
+  - `classes` 2 e 1 criaram a BM e a Foema;
+  - Lobisomem aprendido e usado: MP 126→95, modelo 4→26, HP máx. 115→110 visto por B;
+  - Cura aprendida e usada: resposta do servidor `Dam = −100` igual em A e B, MP 146→131.
+- **Falhas registradas:**
+  - Lobisomem, execução 1: sonda errada (`look_mesh`), corrigida;
+  - Cura, execuções 1 e 2: a regeneração encheu o HP antes do lançamento. Na execução 2, sem custo de MP visível, causa não determinada.
+- **Em aberto:** modelo humano no relogin com o afeto ativo (hipótese); cura em outro jogador; reinício controlado.
+- **Próximo passo:** merge e deploy dos #364/#365; investigar o modelo da BM no relogin; fatia 5.
