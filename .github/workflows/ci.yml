@@ -64,6 +64,8 @@ jobs:
         run: node --test 'tools/*.test.mjs'
       - name: Synthetic asset conversion tests
         run: python -m unittest discover -s tools -p test_asset_conversion.py -v
+      - name: Public export checker tests
+        run: python -m unittest discover -s tools -p test_public_exports.py -v
       - name: Harness scripts parse
         run: node --check tools/verify_world.mjs && node --check tools/verify_world_suite.mjs
       - name: Vectors and dialect fixtures are reproducible
@@ -144,6 +146,8 @@ jobs:
           # The root of a deployment is the connected client, not the offline scene.
           cmp <(curl -fsS -u "ci:$pass" http://127.0.0.1:8080/) <(curl -fsS -u "ci:$pass" http://127.0.0.1:8080/client.html)
           curl -fsS -u "ci:$pass" http://127.0.0.1:8080/runtime.js -o /dev/null
+          # Public build: the offline test scene (wyd_debug_* probes) is not published.
+          test "$(curl -s -o /dev/null -w '%{http_code}' -u "ci:$pass" http://127.0.0.1:8080/local-scene.html)" = 404
           wasm="$(curl -fsS -u "ci:$pass" http://127.0.0.1:8080/runtime.js | grep -o 'tmproject_startup\.[0-9]*\.wasm' | head -1)"
           test -n "$wasm"
           test "$(curl -s -o /dev/null -w '%{content_type}' -u "ci:$pass" "http://127.0.0.1:8080/$wasm")" = application/wasm

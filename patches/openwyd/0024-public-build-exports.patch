@@ -1,0 +1,81 @@
+Published build without the test-harness entry points (ADR 003, ADR 015).
+link_tmproject_wasm_startup.py --public links with -sEXPORT_KEEPALIVE=0 and
+an explicit EXPORTED_FUNCTIONS: the upstream list, the extra exports and the
+KEEPALIVE functions of wyd_client_entry.cpp and WydDialect.cpp, minus every
+_wyd_debug_* name (UI automation, fake time, camera and item probes). Objects
+are unchanged; without --public the link is identical to before.
+
+diff --git a/webclient/client-wasm/tools/link_tmproject_wasm_startup.py b/webclient/client-wasm/tools/link_tmproject_wasm_startup.py
+index 0308f9f..a686535 100755
+--- a/webclient/client-wasm/tools/link_tmproject_wasm_startup.py
++++ b/webclient/client-wasm/tools/link_tmproject_wasm_startup.py
+@@ -651,6 +651,45 @@ def capture_startup_link_contract(
+     return payload
+ 
+ 
++# Sources whose EMSCRIPTEN_KEEPALIVE (WYD_EXPORT) functions the page may call.
++PUBLIC_KEEPALIVE_SOURCES = (
++    "webclient/client-wasm/compat/src/wyd_client_entry.cpp",
++    "Projects/TMProject/WydDialect.cpp",
++)
++PUBLIC_EXCLUDED_PREFIX = "_wyd_debug_"
++_KEEPALIVE_EXPORT = re.compile(
++    r"\b(?:WYD_EXPORT|EMSCRIPTEN_KEEPALIVE)\b[^;{(]*?\b(wyd_[A-Za-z0-9_]+)\s*\("
++)
++
++
++def keepalive_exports(repo_root: Path) -> list[str]:
++    names: list[str] = []
++    for rel in PUBLIC_KEEPALIVE_SOURCES:
++        text = (repo_root / rel).read_text(encoding="utf-8", errors="replace")
++        names.extend(f"_{name}" for name in _KEEPALIVE_EXPORT.findall(text))
++    return names
++
++
++def apply_public_exports(repo_root: Path, link_cmd: list[str]) -> None:
++    """Published build: KEEPALIVE no longer exports by itself, so the export
++    list is explicit and every _wyd_debug_* entry point (UI automation, fake
++    time, camera and item probes used by the test harness) stays internal."""
++    for index, arg in enumerate(link_cmd):
++        if arg.startswith("-sEXPORTED_FUNCTIONS=["):
++            listed = re.findall(r"'([^']+)'", arg)
++            break
++    else:
++        raise RuntimeError("public build: -sEXPORTED_FUNCTIONS not found")
++    names = list(dict.fromkeys([*listed, *keepalive_exports(repo_root)]))
++    public = [name for name in names if not name.startswith(PUBLIC_EXCLUDED_PREFIX)]
++    link_cmd[index] = "-sEXPORTED_FUNCTIONS=[" + ",".join(repr(name) for name in public) + "]"
++    link_cmd.insert(index + 1, "-sEXPORT_KEEPALIVE=0")
++    print(
++        f"[startup-link] public exports: {len(public)} kept, "
++        f"{len(names) - len(public)} {PUBLIC_EXCLUDED_PREFIX}* removed"
++    )
++
++
+ def write_response_file(path: Path, args: list[str]) -> None:
+     """Write arguments in the format consumed by Emscripten response files.
+ 
+@@ -798,6 +837,14 @@ def main() -> int:
+         action="store_true",
+         help="Force all objects to rebuild (still leaves assets external).",
+     )
++    parser.add_argument(
++        "--public",
++        action="store_true",
++        help=(
++            "Published build: export an explicit list without any "
++            "_wyd_debug_* automation/probe entry point (EXPORT_KEEPALIVE=0)."
++        ),
++    )
+     parser.add_argument(
+         "--link-opt-level",
+         choices=sorted(VALID_OPT_LEVELS),
+@@ -1682,6 +1729,8 @@ def main() -> int:
+         if arg.startswith("-sEXPORTED_FUNCTIONS=["):
+             link_cmd[index] = arg[:-1] + "," + ",".join(repr(name) for name in extra_exports) + "]"
+             break
++    if args.public:
++        apply_public_exports(repo_root, link_cmd)
+ 
+     link_rsp_path = link_dir / "startup-link.rsp.utf-8"
+     write_response_file(link_rsp_path, link_cmd[1:])
