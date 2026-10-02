@@ -7,8 +7,37 @@
 <title>WYD</title>
 <link rel="stylesheet" href="client.css">
 <link rel="stylesheet" href="settings.css">
+<link rel="stylesheet" href="loader.css">
+<div id="loader" class="wyd-loader indeterminate" role="status" aria-live="polite" aria-busy="true">
+  <div class="wyd-loader-card">
+    <svg class="wyd-loader-emblem" viewBox="0 0 120 120" aria-hidden="true">
+      <defs>
+        <linearGradient id="wyd-loader-gold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#f4dc94"/>
+          <stop offset="1" stop-color="#9a7733"/>
+        </linearGradient>
+      </defs>
+      <g class="wyd-loader-ring" fill="none" stroke="url(#wyd-loader-gold)">
+        <circle cx="60" cy="60" r="55" stroke-width="1.6" stroke-dasharray="2 7"/>
+        <circle cx="60" cy="60" r="47" stroke-width="1" opacity=".55"/>
+      </g>
+      <g class="wyd-loader-core" stroke="url(#wyd-loader-gold)">
+        <path d="M60 17 84 60 60 103 36 60Z" fill="none" stroke-width="2.4"/>
+        <path d="M60 33 72 60 60 87 48 60Z" fill="url(#wyd-loader-gold)" stroke="none"/>
+        <path d="M20 60H34M86 60H100" stroke-width="2"/>
+      </g>
+    </svg>
+    <h2 class="wyd-loader-title">WYD</h2>
+    <p id="loader-stage" class="wyd-loader-stage">Carregando…</p>
+    <div id="loader-bar" class="wyd-loader-bar" role="progressbar" aria-label="Progresso do carregamento" aria-valuemin="0" aria-valuemax="100"><div class="wyd-loader-fill"></div></div>
+    <p id="loader-detail" class="wyd-loader-detail"></p>
+    <p id="loader-note" class="wyd-loader-note" hidden></p>
+    <button id="loader-retry" class="wyd-loader-retry" type="button" hidden>Tentar novamente</button>
+    <p id="loader-tip" class="wyd-loader-tip"></p>
+  </div>
+</div>
 <h1>WYD</h1>
-<p id="status">Carregando…</p>
+<p id="status"></p>
 <canvas id="canvas" width="800" height="600" tabindex="0" aria-label="Cliente WYD"></canvas>
 <p id="identity"></p>
 <script src="settings.js"></script>

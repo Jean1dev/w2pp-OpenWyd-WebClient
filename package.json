@@ -17,6 +17,7 @@
     "world:checks": "node --test tools/world_checks.test.mjs tools/area_checks.test.mjs tools/party_checks.test.mjs tools/trade_checks.test.mjs",
     "world": "node tools/verify_world_suite.mjs",
     "settings:ui": "node tools/verify_settings_ui.mjs",
+    "loading:ui": "node tools/verify_loading_ui.mjs",
     "measure": "python tools/build_local_scene.py --page-only && node tools/measure_scene.mjs"
   }
 }

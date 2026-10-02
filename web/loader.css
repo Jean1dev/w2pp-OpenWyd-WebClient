@@ -1,0 +1,59 @@
+/* Tela de carregamento do cliente (web/client.js, objeto Loader). Visual próprio:
+   só CSS e o SVG inline de client.html, sem imagens nem fontes externas. */
+.wyd-loader {
+  --gold: #e2bf68; --gold-deep: #8f6f2c; --text: #efe6d2; --muted: #a8a08e;
+  position: fixed; inset: 0; z-index: 5; box-sizing: border-box; display: grid; place-items: center;
+  padding: 16px; overflow-y: auto; color: var(--text); font: 15px/1.5 system-ui, sans-serif; text-align: center;
+  background: radial-gradient(ellipse at 50% 38%, #2b2417 0%, #17171a 52%, #0b0c0f 100%);
+  transition: opacity .45s ease;
+}
+.wyd-loader[hidden] { display: none; }
+.wyd-loader.leaving { opacity: 0; pointer-events: none; }
+.wyd-loader-card { width: min(440px, 100%); }
+
+.wyd-loader-emblem { width: 112px; height: 112px; filter: drop-shadow(0 0 18px rgba(226, 191, 104, .3)); }
+.wyd-loader-ring, .wyd-loader-core { transform-box: fill-box; transform-origin: center; }
+.wyd-loader-ring { animation: wyd-loader-spin 16s linear infinite; }
+.wyd-loader-core { animation: wyd-loader-pulse 2.6s ease-in-out infinite; }
+
+.wyd-loader-title { margin: 10px 0 0; font: 600 30px/1.1 Georgia, "Times New Roman", serif; letter-spacing: .32em;
+  text-indent: .32em; color: var(--gold); text-shadow: 0 2px 14px rgba(0, 0, 0, .7); }
+.wyd-loader-stage { margin: 22px 0 10px; min-height: 1.5em; font-weight: 500; }
+
+.wyd-loader-bar { position: relative; height: 10px; overflow: hidden; border: 1px solid var(--gold-deep);
+  border-radius: 6px; background: #19160f; box-shadow: inset 0 1px 3px rgba(0, 0, 0, .7); }
+.wyd-loader-fill { position: absolute; inset: 0; transform: scaleX(0); transform-origin: left;
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold)); transition: transform .3s ease-out; }
+.wyd-loader-fill::after { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 246, 214, .45) 50%, transparent 100%);
+  background-size: 50% 100%; background-repeat: no-repeat; animation: wyd-loader-shine 1.8s linear infinite; }
+.wyd-loader.indeterminate .wyd-loader-fill { transition: none; animation: wyd-loader-sweep 1.4s ease-in-out infinite; }
+
+.wyd-loader-detail { margin: 8px 0 0; min-height: 1.5em; font: 13px ui-monospace, monospace; color: var(--muted);
+  font-variant-numeric: tabular-nums; }
+.wyd-loader-note { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+.wyd-loader-tip { margin: 28px 0 0; min-height: 3em; font-size: 13px; font-style: italic; color: var(--muted);
+  transition: opacity .4s ease; }
+.wyd-loader-tip.fading { opacity: 0; }
+.wyd-loader-retry { margin-top: 18px; padding: 8px 22px; font: 600 15px system-ui, sans-serif; color: #1c160a;
+  cursor: pointer; background: linear-gradient(#ecd08a, #b38c3c); border: 1px solid #f3dca0; border-radius: 4px; }
+.wyd-loader-retry:focus-visible { outline: 2px solid #fff3cf; outline-offset: 2px; }
+
+.wyd-loader.failed .wyd-loader-stage { color: #f2a48e; }
+.wyd-loader.failed .wyd-loader-fill { transform: scaleX(1); background: #6e2f25; animation: none; }
+.wyd-loader.failed .wyd-loader-fill::after, .wyd-loader.failed .wyd-loader-tip { display: none; }
+.wyd-loader.failed .wyd-loader-ring,
+.wyd-loader.failed .wyd-loader-core { animation: none; }
+
+@keyframes wyd-loader-spin { to { transform: rotate(360deg); } }
+@keyframes wyd-loader-pulse { 50% { transform: scale(.9); opacity: .75; } }
+@keyframes wyd-loader-shine { from { background-position: -100% 0; } to { background-position: 200% 0; } }
+@keyframes wyd-loader-sweep {
+  from { transform: translateX(-30%) scaleX(.3); }
+  to { transform: translateX(100%) scaleX(.3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wyd-loader, .wyd-loader * { animation: none !important; transition: none !important; }
+  .wyd-loader.indeterminate .wyd-loader-fill { transform: scaleX(.3); }
+}

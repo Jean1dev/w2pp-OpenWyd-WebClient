@@ -10,7 +10,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
 | 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco, fatia 5 (reinício controlado) e cura em outro jogador aprovadas; o checklist não tem mais item pendente que dependa só do cliente) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
-| 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente; 02/10: painel de música, efeitos e resolução compilado e testado com runtime falso, áudio real ainda não verificado) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md), [painel de configurações](evidence/07-web/2026-10-02-settings.md) |
+| 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente; 02/10: painel de música, efeitos e resolução compilado e testado com runtime falso, áudio real ainda não verificado; tela de carregamento com progresso real, cache e erros testada com runtime falso, pacote real ainda não verificado) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md), [painel de configurações](evidence/07-web/2026-10-02-settings.md), [tela de carregamento](evidence/07-web/2026-10-02-loading-screen.md) |
 | 8 Entrega | Em andamento (02/10: gate por conta do portal no lugar do Basic Auth, implantado e confirmado no domínio público; falta o login real pelo portal) | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md), [gate do portal](evidence/08-entrega/2026-10-02-portal-gate.md) |
 
 ## Próxima ação
@@ -31,7 +31,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    Build público sem `wyd_debug_*` e IP do cliente pela primeira entrada do `X-Forwarded-For` ([ADR 016](decisions/016-public-build-and-client-ip.md)): implantados e confirmados em produção em 02/10. O operador testou o login pelo portal e o jogo no navegador com o build público, e está OK.
    Também: confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
 4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6.
-5. Etapa 7 — painel de configurações: com o dataset, verificar no Railway música e efeitos ao vivo, mudo na troca de zona, persistência no relogin e as resoluções 1024×768/1280×1024 ([roteiro](evidence/07-web/2026-10-02-settings.md#próximo-passo)).
+5. Etapa 7 — painel de configurações: com o dataset, verificar no Railway música e efeitos ao vivo, mudo na troca de zona, persistência no relogin e as resoluções 1024×768/1280×1024 ([roteiro](evidence/07-web/2026-10-02-settings.md#próximo-passo)). Tela de carregamento: `npm run assets:cache -- --real` e um primeiro acesso em rede lenta com o pacote real ([evidência](evidence/07-web/2026-10-02-loading-screen.md#próximo-passo)).
 6. Servidor, entregas separadas (não feitas):
    - itens no chão: `0x026E`, CNF de 28 bytes, decay e dono ([ADR 007](decisions/007-inventory-dialect.md));
    - aviso na recusa do teleporte pago (o original avisa, o Go fica em silêncio);
@@ -866,3 +866,14 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - O `.wasm` publicado tem 0 `wyd_debug_*` e todas as funções usadas pela página (946 exports).
   - `/local-scene.html` → 404.
   - O operador testou o login pelo portal e o jogo no navegador: OK.
+
+### 02/10/2026 — tela de carregamento (etapa 7)
+
+- **Pedido do usuário:** uma tela de carregamento amigável, como a do wyd.vektar.tech. Plano aprovado; visual próprio, sem copiar o site.
+- **Confirmado em fonte:** o `file_packager.py` do Emscripten 6.0.0 informa o progresso por `Module.setStatus("Downloading data... (recebidos/total)")` e marca `fromCache` antes de ler o IndexedDB. A falha de download fica sem tratamento, e a página antes travava em "Carregando…".
+- **Arquivos:** `web/client.html`, `web/client.js` (objeto `Loader`), `web/loader.css`, `tools/verify_loading_ui.mjs`, `package.json` (`loading:ui`) e a [evidência](evidence/07-web/2026-10-02-loading-screen.md).
+- **Comandos e resultados:**
+  - `npm run loading:ui`: 36/36 em Chromium e Firefox, com runtime e pacote falsos;
+  - `npm run settings:ui`: 36/36 (regressão).
+- **Não executado:** `assets:cache`, `--real` e Railway. Este worktree não tem emsdk nem dataset.
+- **Próximo passo:** validar com o pacote real e rede lenta; depois do deploy, o operador confere no domínio público.

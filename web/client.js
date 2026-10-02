@@ -8,6 +8,115 @@ const canvas = document.getElementById("canvas");
 const statusEl = document.getElementById("status");
 const identityEl = document.getElementById("identity");
 
+const SESSION_EXPIRED = "Sua sessão expirou. Entre novamente pelo portal.";
+const DOWNLOAD_FAILED = "Não foi possível baixar os dados do jogo. Verifique a conexão e tente novamente.";
+
+// Tela de carregamento: mostra só etapas e a contagem de bytes do pacote,
+// nunca conta, URL ou payload.
+const Loader = (() => {
+  const root = document.getElementById("loader");
+  const stageEl = document.getElementById("loader-stage");
+  const detailEl = document.getElementById("loader-detail");
+  const noteEl = document.getElementById("loader-note");
+  const tipEl = document.getElementById("loader-tip");
+  const retryEl = document.getElementById("loader-retry");
+  const bar = document.getElementById("loader-bar");
+  const fill = bar.firstElementChild;
+  const MIB = 1048576;
+  const TIPS = [
+    "Clique no chão para andar.",
+    "Música, efeitos e resolução ficam no botão de configurações, no canto da tela.",
+    "Depois do primeiro acesso, os dados do jogo ficam guardados no navegador.",
+    "Conta, senha e PIN são digitados só na tela do jogo; a página não os guarda."
+  ];
+  const mb = bytes => (bytes / MIB).toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+  const eta = s => s < 60 ? `${Math.max(1, Math.ceil(s))} s` : `${Math.ceil(s / 60)} min`;
+  let samples = [], painted = 0, finished = false, failed = false, tip = 0;
+
+  retryEl.addEventListener("click", () => location.reload());
+  tipEl.textContent = TIPS[0];
+  const tipTimer = setInterval(() => {
+    tipEl.classList.add("fading");
+    setTimeout(() => {
+      tip = (tip + 1) % TIPS.length;
+      tipEl.textContent = TIPS[tip];
+      tipEl.classList.remove("fading");
+    }, 400);
+  }, 7000);
+
+  function determinate(fraction) {
+    root.classList.remove("indeterminate");
+    fill.style.transform = `scaleX(${fraction})`;
+    bar.setAttribute("aria-valuenow", String(Math.round(fraction * 100)));
+  }
+
+  return {
+    get finished() { return finished || failed; },
+    stage(text, detail = "") {
+      if (finished || failed) return;
+      stageEl.textContent = text;
+      detailEl.textContent = detail;
+      root.classList.add("indeterminate");
+      fill.style.transform = "";
+      bar.removeAttribute("aria-valuenow");
+    },
+    // Chamado a cada bloco recebido; a tela é redesenhada no máximo a cada 100 ms.
+    progress(loaded, total) {
+      if (finished || failed || !(total > 0)) return;
+      const now = performance.now();
+      samples.push([now, loaded]);
+      while (samples.length > 2 && now - samples[0][0] > 4000) samples.shift();
+      if (loaded < total && now - painted < 100) return;
+      painted = now;
+      const [t0, b0] = samples[0];
+      const rate = now - t0 > 1000 ? (loaded - b0) / ((now - t0) / 1000) : 0;
+      let detail = `${mb(loaded)} / ${mb(total)} MB`;
+      if (rate > 0) {
+        detail += ` · ${(rate / MIB).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB/s`;
+        if (loaded < total) detail += ` · ~${eta((total - loaded) / rate)}`;
+      }
+      stageEl.textContent = loaded < total ? "Baixando dados do jogo…" : "Guardando os dados no navegador…";
+      detailEl.textContent = detail;
+      determinate(Math.min(1, loaded / total));
+      noteEl.textContent = `O primeiro acesso baixa cerca de ${mb(total)} MB. ` +
+        "Nas próximas vezes o jogo abre a partir dos dados guardados no navegador.";
+      noteEl.hidden = false;
+    },
+    fail(message) {
+      if (failed) return;
+      failed = true;
+      clearInterval(tipTimer);
+      root.hidden = false;
+      root.classList.remove("leaving", "indeterminate");
+      root.classList.add("failed");
+      root.setAttribute("aria-busy", "false");
+      bar.removeAttribute("aria-valuenow");
+      stageEl.textContent = message;
+      detailEl.textContent = "";
+      retryEl.hidden = false;
+      retryEl.focus();
+    },
+    done() {
+      if (finished || failed) return;
+      finished = true;
+      clearInterval(tipTimer);
+      determinate(1);
+      root.setAttribute("aria-busy", "false");
+      root.classList.add("leaving");
+      setTimeout(() => { if (!failed) root.hidden = true; }, 500);
+    }
+  };
+})();
+
+// O file_packager não trata a falha do download no build não-ES6 (Emscripten
+// 6.0.0, fetchRemotePackage): sem isto a página ficaria carregando para sempre.
+window.addEventListener("unhandledrejection", event => {
+  if (Loader.finished) return;
+  const reason = String(event.reason?.message ?? event.reason);
+  clientEvidence.errors.push(reason);
+  Loader.fail(/^401\b/.test(reason) ? SESSION_EXPIRED : DOWNLOAD_FAILED);
+});
+
 const SELECTSERVER_STATE = 7; // ObjectManager::TM_SELECTSERVER_STATE
 const WM = { MOUSEMOVE: 0x0200, LBUTTONDOWN: 0x0201, LBUTTONUP: 0x0202, RBUTTONDOWN: 0x0204,
   RBUTTONUP: 0x0205, MOUSEWHEEL: 0x020a, KEYDOWN: 0x0100, KEYUP: 0x0101, CHAR: 0x0102 };
@@ -164,14 +273,16 @@ function loadScript(src) {
     const s = document.createElement("script");
     s.src = src;
     s.onload = resolve;
-    s.onerror = () => reject(new Error(`falha ao carregar ${src}`));
+    s.onerror = () => reject(new Error(`Não foi possível baixar ${src}. Verifique a conexão e tente novamente.`));
     document.body.appendChild(s);
   });
 }
 
 async function start() {
+  Loader.stage("Verificando acesso…");
   const response = await fetch("config.json", { cache: "no-store" });
-  if (!response.ok) throw new Error(`config.json: HTTP ${response.status}`);
+  if (response.status === 401) throw new Error(SESSION_EXPIRED);
+  if (!response.ok) throw new Error(`Não foi possível ler a configuração (HTTP ${response.status}).`);
   const cfg = await response.json();
   if (typeof cfg.wsUrl !== "string" || !/^wss?:\/\//.test(cfg.wsUrl) || !(cfg.clientVersion > 0)) {
     throw new Error("config.json inválido");
@@ -185,11 +296,18 @@ async function start() {
     wydSocketProxyUrl: cfg.wsUrl,
     print: diagnostic,
     printErr: diagnostic,
+    // O file_packager informa "Downloading data... (recebidos/total)" a cada bloco.
+    setStatus(text) {
+      const m = /\((\d+)\/(\d+)\)/.exec(text);
+      if (m) Loader.progress(Number(m[1]), Number(m[2]));
+      else if (text === "Downloading data...") Loader.stage("Baixando dados do jogo…");
+    },
     onAbort() {
       clientEvidence.errors.push("WASM abort");
-      statusEl.textContent = "Falha no runtime.";
+      Loader.fail("O jogo parou por um erro interno. Tente novamente.");
     },
     onRuntimeInitialized() {
+      clearInterval(cacheWatch);
       try {
         clientEvidence.ready = true;
         clientEvidence.assetPreload = {
@@ -208,7 +326,7 @@ async function start() {
         const frame = () => {
           try {
             if (Module._wyd_tick_client() < 0) throw new Error("Falha no tick");
-            clientEvidence.frames++;
+            if (clientEvidence.frames++ === 0) Loader.done();
             if (clientEvidence.frames % 15 === 1) {
               clientEvidence.probe = probe();
               identityEl.textContent = describe(clientEvidence.probe);
@@ -216,22 +334,36 @@ async function start() {
             requestAnimationFrame(frame);
           } catch (error) {
             clientEvidence.errors.push(String(error));
-            statusEl.textContent = "Falha ao renderizar.";
+            Loader.fail("Falha ao desenhar o jogo. Tente novamente.");
           }
         };
         statusEl.textContent = `Canal ${cfg.channel}`;
         requestAnimationFrame(frame);
       } catch (error) {
         clientEvidence.errors.push(String(error));
-        statusEl.textContent = "Falha ao iniciar.";
+        Loader.fail("Falha ao iniciar o jogo. Tente novamente.");
       }
     }
   };
-  await loadScript("openwyd_assets.js");
-  await loadScript("runtime.js");
+  // O file_packager marca fromCache antes de ler o IndexedDB; a leitura do
+  // cache não informa progresso.
+  const cacheWatch = setInterval(() => {
+    if (Module.preloadResults?.["openwyd_assets.data"]?.fromCache) {
+      clearInterval(cacheWatch);
+      Loader.stage("Abrindo os dados guardados no navegador…");
+    }
+  }, 200);
+  Loader.stage("Baixando o jogo…");
+  try {
+    await loadScript("openwyd_assets.js");
+    await loadScript("runtime.js");
+  } catch (error) {
+    clearInterval(cacheWatch);
+    throw error;
+  }
 }
 
 start().catch(error => {
   clientEvidence.errors.push(String(error));
-  statusEl.textContent = String(error.message ?? error);
+  Loader.fail(String(error.message ?? error));
 });
