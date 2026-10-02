@@ -43,7 +43,7 @@ Todas as rotas, exceto `/healthz`, exigem a credencial Basic, inclusive a abertu
 | `WYD_ASSET_S3_ACCESS_KEY_ID`, `WYD_ASSET_S3_SECRET_ACCESS_KEY` | secretas | definidas por stdin a partir da CLI; se forem rotacionadas (`--reset`), redefina-as |
 | `WYD_ASSET_S3_PREFIX`, `WYD_ASSET_MANIFEST` | `assets-f4c03289374bd614`, `f4c03289374bd614` | versão ativa dos assets |
 
-Gate por conta do portal ([ADR 015](decisions/015-portal-account-gate.md)), alternativa exclusiva ao Basic. As variáveis foram **registradas** no Railway e no Vercel em 02/10, mas o gate só passa a valer com o deploy desta versão e a remoção de `WYD_BASIC_AUTH_*`:
+Gate por conta do portal ([ADR 015](decisions/015-portal-account-gate.md)), alternativa exclusiva ao Basic. **Ativo em produção desde 02/10** (deploy `82f3850`); `WYD_BASIC_AUTH_*` foram removidas:
 - `WYD_PORTAL_URL`: origem do portal, por exemplo `https://wyd-ten.vercel.app`;
 - `WYD_PORTAL_TICKET_SECRET`: ≥ 32 caracteres, o mesmo valor de `PLAY_TICKET_SECRET` no Vercel.
 

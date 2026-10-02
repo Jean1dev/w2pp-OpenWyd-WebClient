@@ -1,6 +1,6 @@
 # ADR 015: acesso ao cliente web pela conta do portal
 
-Data: 02/10/2026. Estado: gateway e portal implementados e **confirmados em teste** (unitários e fluxo HTTP local entre os dois, [evidência](../evidence/08-entrega/2026-10-02-portal-gate.md)). **Não implantado:** o Railway segue com Basic Auth até a troca descrita abaixo.
+Data: 02/10/2026. Estado: **implantado em 02/10/2026.** Portal [#34](https://github.com/Jean1dev/wyd-plataforma/pull/34) (`329f5aa`) e gateway [#19](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/pull/19) (`82f3850`, deploy `3504ab4c`); `WYD_BASIC_AUTH_*` removidas do Railway. O gate está **confirmado em execução** no domínio público com um ticket assinado com o segredo do Railway ([evidência](../evidence/08-entrega/2026-10-02-portal-gate.md#produção-02102026)). **Pendente:** um ticket emitido pelo próprio Vercel após um login real, porque o valor *Sensitive* não pode ser lido de volta.
 
 ## Contexto
 
