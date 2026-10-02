@@ -1,6 +1,6 @@
 # ADR 015: acesso ao cliente web pela conta do portal
 
-Data: 02/10/2026. Estado: **implantado em 02/10/2026.** Portal [#34](https://github.com/Jean1dev/wyd-plataforma/pull/34) (`329f5aa`) e gateway [#19](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/pull/19) (`82f3850`, deploy `3504ab4c`); `WYD_BASIC_AUTH_*` removidas do Railway. O gate está **confirmado em execução** no domínio público com um ticket assinado com o segredo do Railway ([evidência](../evidence/08-entrega/2026-10-02-portal-gate.md#produção-02102026)). **Pendente:** um ticket emitido pelo próprio Vercel após um login real, porque o valor *Sensitive* não pode ser lido de volta.
+Data: 02/10/2026. Estado: **implantado em 02/10/2026.** Portal [#34](https://github.com/Jean1dev/wyd-plataforma/pull/34) (`329f5aa`) e gateway [#19](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/pull/19) (`82f3850`, deploy `3504ab4c`); `WYD_BASIC_AUTH_*` removidas do Railway. O gate está **confirmado em execução** no domínio público com um ticket assinado com o segredo do Railway ([evidência](../evidence/08-entrega/2026-10-02-portal-gate.md#produção-02102026)). Em 02/10, o operador testou o login real pelo portal até o jogo e confirmou que funciona; os segredos do Vercel e do Railway conferem.
 
 ## Contexto
 
