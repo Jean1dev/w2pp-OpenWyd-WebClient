@@ -859,4 +859,5 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - `assemble_site --public` com link falso: o build limpo passa, sem a cena offline; o build com `wyd_debug_selchar_pin` falha;
   - gateway: `go vet` e `go test ./...` passam.
 - **Railway:** `WYD_FORWARDED_FOR=first` e `WYD_MAX_CONNS_PER_IP=4` registradas com `--skip-deploys`.
+- **CI do PR #20:** a 1ª versão (`-sEXPORT_KEEPALIVE=0`) foi barrada pelo verificador, com 13 `wyd_debug_*` `KEEPALIVE` ainda exportadas. Corrigido no próprio código: `WYD_DEBUG_EXPORT` sem `KEEPALIVE`, exportação pelo nome e `--public` filtrando a lista.
 - **Não executado:** build real da imagem (sem Docker ou emsdk locais), que fica com a CI e o Railway.

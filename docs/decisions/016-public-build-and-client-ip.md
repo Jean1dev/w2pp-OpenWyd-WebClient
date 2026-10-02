@@ -13,9 +13,9 @@ O limite de conexões por IP também depende de identificar o cliente. Em 02/10,
 ## Decisão
 
 - **Build público** (`patches/openwyd/0024-public-build-exports.patch`):
-  - `link_tmproject_wasm_startup.py --public` linka com `-sEXPORT_KEEPALIVE=0` e um `EXPORTED_FUNCTIONS` explícito;
-  - essa lista junta a lista do upstream, as `extra_exports` e as funções `KEEPALIVE` de `wyd_client_entry.cpp` e `WydDialect.cpp`, sem nenhum nome `_wyd_debug_*`;
-  - os objetos não mudam, e sem `--public` o link é idêntico ao anterior. O harness continua usando o build local (`.cache/local-scene`), sem a opção.
+  - as 13 funções `wyd_debug_*` de `wyd_client_entry.cpp` deixam de ser `KEEPALIVE` e passam a usar `WYD_DEBUG_EXPORT`, vazio. O script de link as exporta pelo nome, então o build padrão (harness) não muda;
+  - `link_tmproject_wasm_startup.py --public` tira todo nome `_wyd_debug_*` de `EXPORTED_FUNCTIONS`, incluindo os do upstream (tempo falso, câmera).
+  - **Confirmado na CI (PR #20, 1ª execução):** a primeira versão, com `-sEXPORT_KEEPALIVE=0`, não removia as funções `KEEPALIVE`. No Emscripten 6.0.0 a exportação fica marcada no objeto já na compilação. O verificador detectou as 13 exports e barrou a imagem.
 - **Site público** (`tools/assemble_site.py --public`):
   - não copia `local-scene.*`, porque a cena offline de teste usa `wyd_debug_camera_*`;
   - roda `tools/check_public_exports.py`, que lê a seção de exports do `.wasm` e falha o build se houver `wyd_debug_*` ou se uma função `_wyd_*` usada por um script da página não estiver exportada.
