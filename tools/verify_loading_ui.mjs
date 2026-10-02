@@ -73,6 +73,8 @@ const fakeRuntime = scenario => `
     _wyd_field_has_my_human: () => 0,
     _wyd_mouse_event: (msg, f, x, y) => { fake.mouse.push([msg, x, y]); return 1; },
     _wyd_key_event: () => 1,
+    // Patch 0025: 0 enquanto não está pronto, 1 abriu o login, -1 não se aplica.
+    _wyd_selectserver_auto: () => { fake.autoCalls = (fake.autoCalls ?? 0) + 1; return window.fakeAuto ?? 0; },
   });
   if (${JSON.stringify(scenario)} === 'abort') { setTimeout(() => Module.onAbort('x'), 300); return; }
   for (const fn of Module.preRun || []) await fn();
@@ -154,6 +156,18 @@ try {
         const box = await page.locator('#canvas').boundingBox();
         await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
         check('cold: clique chega ao canvas', (await page.evaluate(() => fake.mouse.some(m => m[0] === 0x0201))));
+        // Seleção automática do servidor: insiste enquanto 0, conta o 1, para no -1.
+        const calls = () => page.evaluate(() => fake.autoCalls ?? 0);
+        const c0 = await calls();
+        await new Promise(r => setTimeout(r, 600));
+        check('auto: chamada enquanto não está pronto', (await calls()) > c0, `${c0} → ${await calls()}`);
+        await page.evaluate(() => { window.fakeAuto = 1; });
+        check('auto: login aberto registrado', await until(page, () => clientEvidence.autoServer >= 1));
+        await page.evaluate(() => { window.fakeAuto = -1; });
+        await new Promise(r => setTimeout(r, 600));
+        const c1 = await calls();
+        await new Promise(r => setTimeout(r, 600));
+        check('auto: para quando não se aplica', (await calls()) === c1, `${c1} → ${await calls()}`);
         check('cold: sem erros', page.errors.length === 0 && (await page.evaluate(() => clientEvidence.errors.length)) === 0,
           page.errors.join('; '));
         await page.context().close();

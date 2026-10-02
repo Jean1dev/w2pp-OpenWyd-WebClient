@@ -323,11 +323,19 @@ async function start() {
         call("_wyd_d3d9_set_debug_flags", 0);
         wireInput();
         canvas.focus();
+        // Com um único servidor, a lista é pulada e o painel de login abre direto
+        // (patch 0025). -1: não se aplica; null: runtime sem a exportação.
+        let autoServer = true;
         const frame = () => {
           try {
             if (Module._wyd_tick_client() < 0) throw new Error("Falha no tick");
             if (clientEvidence.frames++ === 0) Loader.done();
             if (clientEvidence.frames % 15 === 1) {
+              if (autoServer) {
+                const result = call("_wyd_selectserver_auto");
+                if (result === 1) clientEvidence.autoServer = (clientEvidence.autoServer ?? 0) + 1;
+                if (result === null || result === -1) autoServer = false;
+              }
               clientEvidence.probe = probe();
               identityEl.textContent = describe(clientEvidence.probe);
             }

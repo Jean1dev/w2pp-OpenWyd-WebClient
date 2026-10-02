@@ -1,0 +1,2548 @@
+Etapa 7: wyd_selectserver_auto lets the page skip the server selection when
+every channel of every group in the server list points to the same address.
+It drives the original controls in the order a player clicks them (first
+group, first channel, OK); nothing is typed or sent, and the player still
+logs in on the original panel.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -1,1245 +1,1293 @@
+-#include "windows.h"
+-
+-#include "d3d9.h"
+-#include "d3dx9.h"
+-#include "CFrame.h"
+-#include "CMesh.h"
+-#include "DirShow.h"
+-#include "dsutil.h"
+-#include "MeshManager.h"
+-#include "NewApp.h"
+-#include "ObjectManager.h"
+-#include "ResourceControl.h"
+-#include "SControl.h"
+-#include "SControlContainer.h"
+-#include "TimerManager.h"
+-#include "TMGlobal.h"
+-#include "TMGround.h"
+-#include "TMHuman.h"
+-#include "TMScene.h"
+-#include "TMSelectCharScene.h"
+-#include "TMSelectServerScene.h"
+-#include "TMFieldScene.h"
+-#include "SGrid.h"
+-#include "TMSkinMesh.h"
+-
+-#include <cstring>
+-#include <cstdio>
+-#include <cstdlib>
+-
+-#if defined(__EMSCRIPTEN__)
+-#include <emscripten/console.h>
+-#endif
+-
+-bool CheckOS();
+-char ReadNameFiltraDataBase();
+-char ReadChatFiltraDataBase();
+-
+-extern char g_szOS[3];
+-extern ObjectManager* g_pObjectManager;
+-extern NewApp* g_pApp;
+-extern char g_pServerList[MAX_SERVERGROUP][MAX_SERVERNUMBER][64];
+-extern "C" void wyd_wasm_set_direct_state_request(int active);
+-
+-// Real client entrypoint from Projects/TMProject/NewApp.cpp
+-int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow);
+-
+-namespace {
+-
+-NewApp* g_wyd_app = nullptr;
+-MSG g_wyd_msg{};
+-bool g_wyd_msg_initialized = false;
+-bool g_wyd_boot_in_progress = false;
+-unsigned int g_wyd_compare_present_state_sequence = 0;
+-bool g_wyd_compare_present_game_state_valid = false;
+-int g_wyd_compare_present_game_state = 0;
+-bool g_wyd_compare_present_scene_type_valid = false;
+-int g_wyd_compare_present_scene_type = 0;
+-
+-constexpr unsigned int kWydMkShift = 0x0004u;
+-constexpr unsigned int kWydMkControl = 0x0008u;
+-
+-void WydBootLog(const char* msg) {
+-#if defined(__EMSCRIPTEN__)
+-  emscripten_console_log(msg ? msg : "(null)");
+-#else
+-  std::fprintf(stderr, "%s\n", msg ? msg : "(null)");
+-#endif
+-}
+-
+-void WydResetComparePresentState() {
+-  g_wyd_compare_present_state_sequence = 0;
+-  g_wyd_compare_present_game_state_valid = false;
+-  g_wyd_compare_present_game_state = 0;
+-  g_wyd_compare_present_scene_type_valid = false;
+-  g_wyd_compare_present_scene_type = 0;
+-}
+-
+-}  // namespace
+-
+-extern "C" void wyd_dinput_mouse_event(unsigned int msg, unsigned int wParam, int x, int y, int wheel_delta);
+-extern "C" void wyd_dinput_key_event(unsigned int msg, unsigned int key);
+-
+-extern "C" int wyd_mouse_event(unsigned int msg, unsigned int wParam, int x, int y, int wheel_delta) {
+-  wyd_dinput_mouse_event(msg, wParam, x, y, wheel_delta);
+-
+-  if (!g_wyd_app || !g_pEventTranslator) return 0;
+-
+-  g_pEventTranslator->m_bShift = (wParam & kWydMkShift) ? 1 : 0;
+-  g_pEventTranslator->m_bCtrl = (wParam & kWydMkControl) ? 1 : 0;
+-
+-  // Keep the browser on the same source path as the native client: the
+-  // Win32 message updates cursor/control state where the original MsgProc
+-  // handles it, while button presses are observed once through DirectInput
+-  // during ReadInputEventData. Calling OnMouseEvent here as well duplicates
+-  // a click in scenes which consume both paths.
+-  g_wyd_app->MsgProc(
+-      g_wyd_app->m_hWnd,
+-      msg,
+-      static_cast<DWORD>(wParam),
+-      static_cast<int>(
+-          MAKELONG(static_cast<WORD>(x), static_cast<WORD>(y))));
+-
+-  return 1;
+-}
+-
+-extern "C" int wyd_key_event(unsigned int msg, unsigned int wParam, int lParam) {
+-  wyd_dinput_key_event(msg, wParam);
+-  if (!g_wyd_app) return 0;
+-  return static_cast<int>(
+-      g_wyd_app->MsgProc(g_wyd_app->m_hWnd, msg, static_cast<WPARAM>(wParam), lParam));
+-}
+-
+-static bool WydControlEffectivelyInteractive(
+-    const SControlContainer* controls,
+-    const SControl* control) {
+-  if (!controls || !control) return false;
+-
+-  const TreeNode* node = control;
+-  while (node) {
+-    const auto* current = static_cast<const SControl*>(node);
+-    if (!current->m_bVisible || !current->m_bEnable) return false;
+-    if (current == controls->m_pControlRoot) return true;
+-    node = node->m_pTop;
+-  }
+-  return false;
+-}
+-
+-extern "C" int wyd_text_input_active() {
+-  if (!g_pObjectManager) return 0;
+-
+-  TMScene* scene = g_pObjectManager->GetCurrentScene();
+-  SControlContainer* controls = scene ? scene->GetCtrlContainer() : nullptr;
+-  SControl* focus = controls ? controls->m_pFocusControl : nullptr;
+-  return focus &&
+-         focus->m_eCtrlType == CONTROL_TYPE::CTRL_TYPE_EDITABLETEXT &&
+-         focus->m_bFocused &&
+-         WydControlEffectivelyInteractive(controls, focus);
+-}
+-
+-extern "C" const char* wyd_text_input_value() {
+-  static const char empty[] = "";
+-  if (!wyd_text_input_active()) return empty;
+-
+-  TMScene* scene = g_pObjectManager->GetCurrentScene();
+-  SControlContainer* controls = scene ? scene->GetCtrlContainer() : nullptr;
+-  SControl* focus = controls ? controls->m_pFocusControl : nullptr;
+-  return focus ? static_cast<SEditableText*>(focus)->GetText() : empty;
+-}
+-
+-extern "C" int wyd_boot_client(int fullscreen) {
+-  if (g_wyd_boot_in_progress) {
+-    WydBootLog("[wyd_boot] already in progress");
+-    return 0;
+-  }
+-  g_wyd_boot_in_progress = true;
+-  WydBootLog("[wyd_boot] begin");
+-
+-  if (g_wyd_app) {
+-    g_wyd_boot_in_progress = false;
+-    return 1;
+-  }
+-
+-  WydResetComparePresentState();
+-
+-  WydBootLog("[wyd_boot] os-check");
+-  if (CheckOS()) {
+-    std::sprintf(g_szOS, "98");
+-  } else {
+-    std::sprintf(g_szOS, "NT");
+-  }
+-
+-  WydBootLog("[wyd_boot] read-name-filter");
+-  if (!ReadNameFiltraDataBase()) {
+-    WydBootLog("[wyd_boot] read-name-filter failed");
+-    g_wyd_boot_in_progress = false;
+-    return 0;
+-  }
+-  WydBootLog("[wyd_boot] read-chat-filter");
+-  if (!ReadChatFiltraDataBase()) {
+-    WydBootLog("[wyd_boot] read-chat-filter failed");
+-    g_wyd_boot_in_progress = false;
+-    return 0;
+-  }
+-
+-  WydBootLog("[wyd_boot] new NewApp");
+-  g_wyd_app = new NewApp();
+-  if (!g_wyd_app) {
+-    WydBootLog("[wyd_boot] new NewApp failed");
+-    g_wyd_boot_in_progress = false;
+-    return 0;
+-  }
+-
+-  const int full = fullscreen ? 1 : 0;
+-  WydBootLog("[wyd_boot] Initialize");
+-  if (!g_wyd_app->Initialize(reinterpret_cast<HINSTANCE>(1), full)) {
+-    WydBootLog("[wyd_boot] Initialize failed");
+-    delete g_wyd_app;
+-    g_wyd_app = nullptr;
+-    g_wyd_boot_in_progress = false;
+-    return 0;
+-  }
+-
+-  WydBootLog("[wyd_boot] initialize message");
+-  PeekMessage(&g_wyd_msg, 0, 0, 0, 0);
+-  g_wyd_msg_initialized = true;
+-  g_wyd_boot_in_progress = false;
+-  WydBootLog("[wyd_boot] success");
+-  return 1;
+-}
+-
+-extern "C" int wyd_tick_client() {
+-  if (!g_wyd_app) return -1;
+-  if (!g_wyd_msg_initialized) {
+-    PeekMessage(&g_wyd_msg, 0, 0, 0, 0);
+-    g_wyd_msg_initialized = true;
+-  }
+-
+-  return static_cast<int>(g_wyd_app->RunTick(&g_wyd_msg));
+-}
+-
+-extern "C" int wyd_render_client() {
+-  if (!g_wyd_app || !g_pObjectManager || !g_pCurrentScene) return -1;
+-  return SUCCEEDED(g_wyd_app->RenderScene()) ? 1 : 0;
+-}
+-
+-extern "C" int wyd_shutdown_client() {
+-  if (!g_wyd_app) return 0;
+-
+-  g_wyd_app->Finalize();
+-  delete g_wyd_app;
+-  g_wyd_app = nullptr;
+-  g_wyd_msg_initialized = false;
+-  std::memset(&g_wyd_msg, 0, sizeof(g_wyd_msg));
+-  return 1;
+-}
+-
+-extern "C" int wyd_get_game_state() {
+-  if (!g_pObjectManager) return static_cast<int>(ObjectManager::TM_GAME_STATE::TM_NONE_STATE);
+-  return static_cast<int>(g_pObjectManager->m_eCurrentState);
+-}
+-
+-extern "C" void wyd_compare_latch_present_state() {
+-  g_wyd_compare_present_game_state_valid = g_pObjectManager != nullptr;
+-  if (g_pObjectManager) {
+-    g_wyd_compare_present_game_state =
+-        static_cast<int>(g_pObjectManager->m_eCurrentState);
+-  }
+-
+-  g_wyd_compare_present_scene_type_valid = g_pCurrentScene != nullptr;
+-  if (g_pCurrentScene) {
+-    g_wyd_compare_present_scene_type =
+-        static_cast<int>(g_pCurrentScene->m_eSceneType);
+-  }
+-
+-  g_wyd_compare_present_state_sequence += 1;
+-}
+-
+-extern "C" unsigned int wyd_compare_present_state_sequence() {
+-  return g_wyd_compare_present_state_sequence;
+-}
+-
+-extern "C" int wyd_compare_present_game_state_valid() {
+-  return g_wyd_compare_present_game_state_valid ? 1 : 0;
+-}
+-
+-extern "C" int wyd_compare_present_game_state() {
+-  return g_wyd_compare_present_game_state;
+-}
+-
+-extern "C" int wyd_compare_present_scene_type_valid() {
+-  return g_wyd_compare_present_scene_type_valid ? 1 : 0;
+-}
+-
+-extern "C" int wyd_compare_present_scene_type() {
+-  return g_wyd_compare_present_scene_type;
+-}
+-
+-extern "C" int wyd_cursor_visible() {
+-  return g_pCursor && g_pCursor->m_bVisible ? 1 : 0;
+-}
+-
+-extern "C" int wyd_set_game_state(int state) {
+-  if (!g_pObjectManager) return 0;
+-  if (state < static_cast<int>(ObjectManager::TM_GAME_STATE::TM_NONE_STATE) ||
+-      state > static_cast<int>(ObjectManager::TM_GAME_STATE::TM_FIELD2_STATE)) {
+-    return 0;
+-  }
+-  if (static_cast<int>(g_pObjectManager->m_eCurrentState) != state) {
+-    // Direct harness navigation can bypass the original transition packet
+-    // that invalidates the cached BGM index. Let the destination scene choose
+-    // and start its official track again.
+-    DS_SOUND_MANAGER::m_nMusicIndex = -1;
+-  }
+-  wyd_wasm_set_direct_state_request(1);
+-  g_pObjectManager->SetCurrentState(static_cast<ObjectManager::TM_GAME_STATE>(state));
+-  wyd_wasm_set_direct_state_request(0);
+-  return 1;
+-}
+-
+-extern "C" int wyd_selchar_initialized() {
+-  if (!g_pObjectManager) return 0;
+-  TMScene* scene = g_pObjectManager->GetCurrentScene();
+-  return scene && scene->GetSceneType() == ESCENE_TYPE::ESCENE_SELCHAR ? 1 : 0;
+-}
+-
+-extern "C" int wyd_selchar_char_count() {
+-  if (!g_pObjectManager) return 0;
+-  int count = 0;
+-  for (int i = 0; i < 4; ++i) {
+-    if (g_pObjectManager->m_stSelCharData.MobName[i][0] != 0) ++count;
+-  }
+-  return count;
+-}
+-
+-extern "C" int wyd_selchar_human_present(int slot) {
+-  if (!g_pObjectManager || slot < 0 || slot >= 4) return 0;
+-  TMScene* scene = g_pObjectManager->GetCurrentScene();
+-  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELCHAR) return 0;
+-  auto* sel_char = static_cast<TMSelectCharScene*>(scene);
+-  return sel_char->m_pHuman[slot] != nullptr ? 1 : 0;
+-}
+-
+-extern "C" const char* wyd_selchar_name(int slot) {
+-  static char empty[1] = {0};
+-  if (!g_pObjectManager || slot < 0 || slot >= 4) return empty;
+-  return g_pObjectManager->m_stSelCharData.MobName[slot];
+-}
+-
+-static TMHuman* WydSelectCharSampleHuman(int slot) {
+-  if (!g_pObjectManager || slot < 0 || slot >= 4) return nullptr;
+-  TMScene* scene = g_pObjectManager->GetCurrentScene();
+-  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELCHAR) return nullptr;
+-  return static_cast<TMSelectCharScene*>(scene)->m_pSampleHuman[slot];
+-}
+-
+-static int WydCountFrameMeshes(CFrame* frame) {
+-  int count = 0;
+-  for (CFrame* node = frame; node; node = node->m_pSibling) {
+-    if (node->m_pMesh) ++count;
+-    if (node->m_pFirstChild) count += WydCountFrameMeshes(node->m_pFirstChild);
+-  }
+-  return count;
+-}
+-
+-extern "C" int wyd_selchar_sample_present(int slot) {
+-  return WydSelectCharSampleHuman(slot) ? 1 : 0;
+-}
+-
+-extern "C" int wyd_selchar_sample_skin_present(int slot) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  return human && human->m_pSkinMesh ? 1 : 0;
+-}
+-
+-extern "C" int wyd_selchar_sample_visible(int slot) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  return human ? static_cast<int>(human->m_bVisible) : 0;
+-}
+-
+-extern "C" float wyd_selchar_sample_x(int slot) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  return human ? human->m_vecPosition.x : 0.0f;
+-}
+-
+-extern "C" float wyd_selchar_sample_y(int slot) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  return human ? human->m_vecPosition.y : 0.0f;
+-}
+-
+-extern "C" float wyd_selchar_sample_height(int slot) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  return human ? human->m_fHeight : 0.0f;
+-}
+-
+-extern "C" int wyd_selchar_sample_animation(int slot) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  return human && human->m_pSkinMesh ? human->m_pSkinMesh->m_nAniIndex : -1;
+-}
+-
+-extern "C" int wyd_selchar_sample_mesh_type(int slot) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  return human ? human->m_nSkinMeshType : -1;
+-}
+-
+-extern "C" int wyd_selchar_sample_mesh_generated(int slot) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  return human && human->m_pSkinMesh ? human->m_pSkinMesh->m_bMeshGenerated : 0;
+-}
+-
+-extern "C" int wyd_selchar_sample_frame_meshes(int slot) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  return human && human->m_pSkinMesh ? WydCountFrameMeshes(human->m_pSkinMesh->m_pRoot) : 0;
+-}
+-
+-extern "C" int wyd_selchar_sample_bone_animation(int slot) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  return human && human->m_pSkinMesh ? human->m_pSkinMesh->m_nBoneAniIndex : -1;
+-}
+-
+-extern "C" int wyd_selchar_sample_look_mesh(int slot, int part) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  if (!human || part < 0 || part >= 8) return -1;
+-  const short* look = reinterpret_cast<const short*>(&human->m_stLookInfo);
+-  return static_cast<int>(look[part * 2]);
+-}
+-
+-extern "C" int wyd_selchar_sample_look_skin(int slot, int part) {
+-  TMHuman* human = WydSelectCharSampleHuman(slot);
+-  if (!human || part < 0 || part >= 8) return -1;
+-  const short* look = reinterpret_cast<const short*>(&human->m_stLookInfo);
+-  return static_cast<int>(look[part * 2 + 1]);
+-}
+-
+-extern "C" int wyd_skin_animation_num_parts(int bone_animation) {
+-  if (bone_animation < 0 || bone_animation >= MAX_BONE_ANIMATION_LIST) return -1;
+-  return static_cast<int>(MeshManager::m_BoneAnimationList[bone_animation].numParts);
+-}
+-
+-extern "C" int wyd_skin_animation_num_bones(int bone_animation) {
+-  if (bone_animation < 0 || bone_animation >= MAX_BONE_ANIMATION_LIST) return -1;
+-  return static_cast<int>(MeshManager::m_BoneAnimationList[bone_animation].numBone);
+-}
+-
+-extern "C" const char* wyd_serverlist_entry(int group, int index) {
+-  static char empty[1] = {0};
+-  if (group < 0 || group >= MAX_SERVERGROUP || index < 0 || index >= MAX_SERVERNUMBER) return empty;
+-  return g_pServerList[group][index];
+-}
+-
+-extern "C" int wyd_debug_selectserver_login(const char* account, const char* password, const char* host) {
+-  if (!g_pObjectManager || !g_pApp || !account || !password) return 0;
+-  TMScene* scene = g_pObjectManager->GetCurrentScene();
+-  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELECT_SERVER) return 0;
+-
+-  auto* select_server = static_cast<TMSelectServerScene*>(scene);
+-  if (!select_server->m_pEditID || !select_server->m_pEditPW || !select_server->m_pLoginPanel ||
+-      !select_server->m_pLoginBtns[0]) {
+-    return 0;
+-  }
+-
+-  if (host && host[0]) {
+-    std::snprintf(g_pApp->m_szServerIP, sizeof(g_pApp->m_szServerIP), "%s", host);
+-  }
+-  if (!g_pApp->m_szServerIP[0]) return 0;
+-
+-  char account_buf[16] = {0};
+-  char password_buf[16] = {0};
+-  std::snprintf(account_buf, sizeof(account_buf), "%s", account);
+-  std::snprintf(password_buf, sizeof(password_buf), "%s", password);
+-
+-  select_server->m_pEditID->SetText(account_buf);
+-  select_server->m_pEditPW->SetText(password_buf);
+-  select_server->m_pLoginPanel->SetVisible(1);
+-  select_server->m_pLoginBtns[0]->SetVisible(1);
+-  select_server->m_pLoginBtns[0]->SetEnable(1);
+-  static_cast<SControl*>(select_server->m_pEditPW)->SetEnable(1);
+-  select_server->m_cLogin = 1;
+-  if (g_pTimerManager && g_pTimerManager->GetServerTime() < 2000) {
+-    g_pTimerManager->SetServerTime(2000);
+-  }
+-  const unsigned int live_time = g_pTimerManager ? g_pTimerManager->GetServerTime() : 2000;
+-  select_server->LastSendMsgTime = live_time > 1500 ? live_time - 1501 : 0;
+-  select_server->m_dwLastClickLoginBtnTime = 0;
+-
+-  const int result = select_server->OnControlEvent(B_LOGIN_OK, 0);
+-  volatile char* scrub = password_buf;
+-  for (size_t i = 0; i < sizeof(password_buf); ++i) scrub[i] = 0;
+-  return result;
+-}
+-
+-extern "C" int wyd_public_demo_unlock_select_character() {
+-  if (!g_pObjectManager) return 0;
+-  TMScene* scene = g_pObjectManager->GetCurrentScene();
+-  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELCHAR) return 0;
+-
+-  auto* select_character = static_cast<TMSelectCharScene*>(scene);
+-  g_AccountLock = 1;
+-  if (select_character->m_pAccountLockDlg) {
+-    select_character->m_pAccountLockDlg->SetVisible(0);
+-  }
+-  if (select_character->m_pAccountLock) {
+-    select_character->m_pAccountLock->SetVisible(0);
+-  }
+-  if (select_character->m_pInputPWPanel) {
+-    select_character->m_pInputPWPanel->SetVisible(0);
+-  }
+-  return 1;
+-}
+-
+-// ---- Online automation (etapa 4) ----
+-// Each helper drives the original scene controls through OnControlEvent, the
+-// same path a click takes, so the scene builds and sends its own packets. None
+-// of them fabricate a packet or read one back. Selecting a class sample and a
+-// character slot replaces the 3D mouse pick; the rest is the original UI flow.
+-#if defined(__EMSCRIPTEN__)
+-#include <emscripten/emscripten.h>
+-#define WYD_EXPORT EMSCRIPTEN_KEEPALIVE
+-#else
+-#define WYD_EXPORT
+-#endif
+-// Test-harness entry points are not KEEPALIVE: the link exports them by name
+-// (link_tmproject_wasm_startup.py), and the published build (--public) leaves
+-// them out, since KEEPALIVE cannot be undone at link time.
+-#define WYD_DEBUG_EXPORT
+-
+-static TMSelectCharScene* WydSelectCharScene() {
+-  if (!g_pObjectManager) return nullptr;
+-  TMScene* scene = g_pObjectManager->GetCurrentScene();
+-  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELCHAR) return nullptr;
+-  return static_cast<TMSelectCharScene*>(scene);
+-}
+-
+-// 0 locked, 1 unlocked, 2 verify sent, 3..5 PIN change steps.
+-extern "C" WYD_EXPORT int wyd_selchar_account_lock() { return g_AccountLock; }
+-
+-// Types the PIN on the shuffled keypad (buttons 66437..66446 show keybuf[])
+-// and presses the verify button (66433). The digits are not kept.
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_pin(const char* pin) {
+-  TMSelectCharScene* scene = WydSelectCharScene();
+-  if (!scene || !pin || g_AccountLock != 0) return 0;
+-  const size_t len = std::strlen(pin);
+-  if (len < 4 || len > 6) return 0;
+-  std::memset(scene->keypass, 0, sizeof(scene->keypass));
+-  for (size_t i = 0; i < len; ++i) {
+-    if (pin[i] < '0' || pin[i] > '9') return 0;
+-    int button = -1;
+-    for (int b = 0; b < 10; ++b) {
+-      if (scene->keybuf[b] == pin[i] - '0') button = b;
+-    }
+-    if (button < 0) return 0;
+-    scene->OnControlEvent(66437 + button, 0);
+-  }
+-  return scene->OnControlEvent(66433, 0);
+-}
+-
+-// Opens the creation view as the "Criar" button does: control 4613 runs
+-// VisibleSelectCreate(0) (CreCamAction). 5673 is "Voltar": in the selection
+-// view it asks to return to server selection.
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_open_create() {
+-  TMSelectCharScene* scene = WydSelectCharScene();
+-  if (!scene || g_AccountLock != 1) return 0;
+-  return scene->OnControlEvent(4613, 0);
+-}
+-
+-// Picks the class sample, types the name into edit 4626 and presses create
+-// (1545). The server's CNFNewCharacter/NewCharacterFail decides the outcome.
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_create(const char* name, int class_index) {
+-  TMSelectCharScene* scene = WydSelectCharScene();
+-  if (!scene || !name || class_index < 0 || class_index >= 4 || g_AccountLock != 1) return 0;
+-  if (!scene->m_pSampleHuman[class_index]) return 0;
+-  auto* edit = static_cast<SEditableText*>(scene->m_pControlContainer->FindControl(4626));
+-  if (!edit) return 0;
+-  char buf[16] = {0};
+-  std::snprintf(buf, sizeof(buf), "%s", name);
+-  g_pObjectManager->m_pTargetObject = scene->m_pSampleHuman[class_index];
+-  edit->SetText(buf);
+-  if (scene->m_pBtnCreate) scene->m_pBtnCreate->SetEnable(1);
+-  return scene->OnControlEvent(1545, 0);
+-}
+-
+-// Selects the slot and presses "enter" (4612): the scene sends CharacterLogin.
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_enter(int slot) {
+-  TMSelectCharScene* scene = WydSelectCharScene();
+-  if (!scene || slot < 0 || slot >= 4 || g_AccountLock != 1) return 0;
+-  if (!scene->m_pHuman[slot] || !g_pObjectManager->m_stSelCharData.MobName[slot][0]) return 0;
+-  g_pObjectManager->m_cCharacterSlot = static_cast<char>(slot);
+-  scene->m_dwLastClickLoginBtnTime = 0;
+-  return scene->OnControlEvent(4612, 0);
+-}
+-
+-// Preview of a selection slot, as the scene shows it (read-only).
+-extern "C" WYD_EXPORT int wyd_selchar_level(int slot) {
+-  if (!g_pObjectManager || slot < 0 || slot >= 4) return -1;
+-  return g_pObjectManager->m_stSelCharData.Score[slot].Level;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_selchar_score(int slot, int field) {
+-  if (!g_pObjectManager || slot < 0 || slot >= 4) return 0;
+-  const STRUCT_SCORE& s = g_pObjectManager->m_stSelCharData.Score[slot];
+-  switch (field) {
+-    case 0: return s.MaxHp;
+-    case 1: return s.Hp;
+-    case 2: return s.MaxMp;
+-    case 3: return s.Mp;
+-    case 4: return s.Str;
+-    case 5: return s.Int;
+-    case 6: return s.Dex;
+-    case 7: return s.Con;
+-    default: return 0;
+-  }
+-}
+-
+-extern "C" WYD_EXPORT int wyd_selchar_equip(int slot, int index) {
+-  if (!g_pObjectManager || slot < 0 || slot >= 4 || index < 0 || index >= 18) return -1;
+-  return g_pObjectManager->m_stSelCharData.Equip[slot][index].sIndex;
+-}
+-
+-// The current scene's message panel (notices, login errors), read-only.
+-extern "C" WYD_EXPORT int wyd_scene_message_visible() {
+-  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
+-  return scene && scene->m_pMessagePanel ? static_cast<int>(scene->m_pMessagePanel->m_bVisible) : 0;
+-}
+-
+-extern "C" WYD_EXPORT const char* wyd_scene_message_text() {
+-  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
+-  if (!scene || !scene->m_pMessagePanel || !scene->m_pMessagePanel->m_pText) return "";
+-  return scene->m_pMessagePanel->m_pText->GetText();
+-}
+-
+-// Id of the scene's visible message box (0 when hidden), and its OK button:
+-// the box forwards to the scene exactly as a click on OK does.
+-extern "C" WYD_EXPORT unsigned int wyd_scene_msgbox_message() {
+-  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
+-  if (!scene || !scene->m_pMessageBox || !scene->m_pMessageBox->IsVisible()) return 0;
+-  return scene->m_pMessageBox->m_dwMessage;
+-}
+-
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_scene_msgbox_ok() {
+-  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
+-  if (!scene || !scene->m_pMessageBox || !scene->m_pMessageBox->IsVisible()) return 0;
+-  // SMessageBox::OnControlEvent on OK: hide, then notify the scene with the
+-  // box's own control id and event 0.
+-  scene->m_pMessageBox->SetVisible(0);
+-  return scene->OnControlEvent(scene->m_pMessageBox->GetControlID(), 0);
+-}
+-
+-// Texture diagnostics (read-only): the size the renderer sees for a UI
+-// texture (which = 0 width, 1 height), and item table fields used by icons.
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_ui_texture_size(int index, int which) {
+-  if (!g_pTextureManager) return -1;
+-  IDirect3DTexture9* tex = g_pTextureManager->GetUITexture(index, 2000);
+-  if (!tex) return -2;
+-  D3DSURFACE_DESC desc{};
+-  if (FAILED(tex->GetLevelDesc(0, &desc))) return -3;
+-  return which == 0 ? static_cast<int>(desc.Width) : static_cast<int>(desc.Height);
+-}
+-
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_item_field(int item, int field) {
+-  if (item < 0 || item >= MAX_ITEMLIST) return -99999;
+-  const STRUCT_ITEMLIST& it = g_pItemList[item];
+-  switch (field) {
+-    case 0: return g_itemicon[item];
+-    case 1: return it.nGrade;
+-    case 2: return it.nIndexMesh;
+-    case 3: return it.nIndexTexture;
+-    case 4: return it.nPos;
+-    case 5: return it.nPrice;
+-    default: return -99999;
+-  }
+-}
+-
+-// Texture file, multi (sanc) and legend type of the n-th mesh of the own
+-// character's skin (read-only; "" past the last mesh).
+-static CMesh* WydNthMesh(CFrame* frame, int* n) {
+-  for (CFrame* node = frame; node; node = node->m_pSibling) {
+-    if (node->m_pMesh && (*n)-- == 0) return node->m_pMesh;
+-    if (node->m_pFirstChild) {
+-      if (CMesh* m = WydNthMesh(node->m_pFirstChild, n)) return m;
+-    }
+-  }
+-  return nullptr;
+-}
+-
+-extern "C" WYD_DEBUG_EXPORT const char* wyd_debug_myhuman_mesh_texture(int index) {
+-  static char out[300];
+-  out[0] = 0;
+-  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
+-  TMHuman* human = scene ? scene->m_pMyHuman : nullptr;
+-  if (!human || !human->m_pSkinMesh || !g_pTextureManager) return out;
+-  int n = index;
+-  CMesh* mesh = WydNthMesh(human->m_pSkinMesh->m_pRoot, &n);
+-  if (!mesh) return out;
+-  const int tex = mesh->m_nTextureIndex;
+-  const char* name = tex >= 0 && tex < MAX_MODEL_TEXTURE ? g_pTextureManager->m_stModelTextureList[tex].szFileName : "?";
+-  std::snprintf(out, sizeof(out), "%d|%s|multi=%d|legend=%d", tex, name, mesh->m_sMultiType, mesh->m_sLegendType);
+-  return out;
+-}
+-
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_my_item(int place, int slot) {
+-  if (!g_pObjectManager) return -1;
+-  if (place == 0 && slot >= 0 && slot < 18) return g_pObjectManager->m_stMobData.Equip[slot].sIndex;
+-  if (place == 1 && slot >= 0 && slot < 64) return g_pObjectManager->m_stMobData.Carry[slot].sIndex;
+-  return -1;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_character_class() {
+-  if (!g_pObjectManager) return -1;
+-  return static_cast<int>(g_pObjectManager->m_stMobData.Class);
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_hover_entity() {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
+-    return -1;
+-  return g_pCurrentScene->m_pMouseOverHuman || g_pCurrentScene->m_pMouseOverItem ? 1 : 0;
+-}
+-
+-// Loaded terrain block (TMGround offset index, 128x128 cells per block). This is
+-// the map the client actually rendered, unlike HomeTownX/Y which a teleport keeps.
+-extern "C" WYD_EXPORT int wyd_field_ground_index_x() {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || !g_pCurrentScene->m_pGround)
+-    return -1;
+-  return g_pCurrentScene->m_pGround->m_vecOffsetIndex.x;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_ground_index_y() {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || !g_pCurrentScene->m_pGround)
+-    return -1;
+-  return g_pCurrentScene->m_pGround->m_vecOffsetIndex.y;
+-}
+-
+-// Other entities in the field, by server id (read-only).
+-static TMHuman* WydFieldHuman(unsigned int id) {
+-  if (!g_pObjectManager || !g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
+-    return nullptr;
+-  return g_pObjectManager->GetHumanByID(id);
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_human_present(unsigned int id) { return WydFieldHuman(id) ? 1 : 0; }
+-
+-extern "C" WYD_EXPORT float wyd_field_human_x(unsigned int id) {
+-  TMHuman* h = WydFieldHuman(id);
+-  return h ? h->m_vecPosition.x : 0.0f;
+-}
+-
+-extern "C" WYD_EXPORT float wyd_field_human_y(unsigned int id) {
+-  TMHuman* h = WydFieldHuman(id);
+-  return h ? h->m_vecPosition.y : 0.0f;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_human_target_x(unsigned int id) {
+-  TMHuman* h = WydFieldHuman(id);
+-  return h ? h->m_vecTargetPos.x : -1;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_human_target_y(unsigned int id) {
+-  TMHuman* h = WydFieldHuman(id);
+-  return h ? h->m_vecTargetPos.y : -1;
+-}
+-
+-extern "C" WYD_EXPORT float wyd_field_human_angle(unsigned int id) {
+-  TMHuman* h = WydFieldHuman(id);
+-  return h ? h->m_fAngle : 0.0f;
+-}
+-
+-extern "C" WYD_EXPORT const char* wyd_field_human_name(unsigned int id) {
+-  TMHuman* h = WydFieldHuman(id);
+-  return h ? h->m_szName : "";
+-}
+-
+-// HUMAN_LOOKINFO as {mesh, skin} shorts; part 0..7.
+-extern "C" WYD_EXPORT int wyd_field_human_look_mesh(unsigned int id, int part) {
+-  TMHuman* h = WydFieldHuman(id);
+-  if (!h || part < 0 || part >= 8) return -1;
+-  return reinterpret_cast<const short*>(&h->m_stLookInfo)[part * 2];
+-}
+-
+-// Combat probes (read-only). HP is what the runtime shows: CreateMob score
+-// minus the server's Dam[] from 0x367 echoes; nothing here computes damage.
+-extern "C" WYD_EXPORT int wyd_field_human_hp(unsigned int id) {
+-  TMHuman* h = WydFieldHuman(id);
+-  return h ? h->m_stScore.Hp : -1;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_human_max_hp(unsigned int id) {
+-  TMHuman* h = WydFieldHuman(id);
+-  return h ? h->m_stScore.MaxHp : -1;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_human_die(unsigned int id) {
+-  TMHuman* h = WydFieldHuman(id);
+-  return h ? h->m_cDie : -1;
+-}
+-
+-// Smallest live human id greater than `after` (0 when none): lets the harness
+-// enumerate the scene without a buffer protocol. Same walk as
+-// ObjectManager::GetHumanByID.
+-extern "C" WYD_EXPORT unsigned int wyd_field_human_next(unsigned int after) {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
+-    return 0;
+-  TreeNode* root = g_pCurrentScene->m_pHumanContainer;
+-  TreeNode* node = root;
+-  unsigned int best = 0;
+-  if (!node) return 0;
+-  do {
+-    if (!node->m_cDeleted) {
+-      if (node->m_dwID > after && (!best || node->m_dwID < best)) best = node->m_dwID;
+-      if (node->m_pDown) {
+-        node = node->m_pDown;
+-        continue;
+-      }
+-    }
+-    do {
+-      if (node->m_pNextLink) {
+-        node = node->m_pNextLink;
+-        break;
+-      }
+-      node = node->m_pTop;
+-    } while (node != root && node);
+-  } while (node != root && node);
+-  return best;
+-}
+-
+-// Screen position (device pixels, which = 0 x, 1 y) of a human's chest, the
+-// same projection the scene uses for damage numbers; -1 when off screen.
+-extern "C" WYD_EXPORT int wyd_field_human_screen(unsigned int id, int which) {
+-  TMHuman* h = WydFieldHuman(id);
+-  if (!h) return -1;
+-  int x = 0, y = 0;
+-  if (!BASE_Get3DTo2DPos(h->m_vecPosition.x, h->m_fHeight + 1.0f, h->m_vecPosition.y, &x, &y)) return -1;
+-  return which == 0 ? x : y;
+-}
+-
+-extern "C" WYD_EXPORT unsigned int wyd_field_hover_human_id() {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || !g_pCurrentScene->m_pMouseOverHuman)
+-    return 0;
+-  return g_pCurrentScene->m_pMouseOverHuman->m_dwID;
+-}
+-
+-// Own score as the client holds it (field 0 Hp, 1 MaxHp, 2 Mp, 3 MaxMp,
+-// 4 Level, 5 Coin, 6 LearnedSkill mask, 7 Class) and experience (double: exact up to 2^53).
+-extern "C" WYD_EXPORT int wyd_field_my_score(int field) {
+-  if (!g_pObjectManager) return -1;
+-  const STRUCT_MOB& m = g_pObjectManager->m_stMobData;
+-  switch (field) {
+-    case 0: return m.CurrentScore.Hp;
+-    case 1: return m.CurrentScore.MaxHp;
+-    case 2: return m.CurrentScore.Mp;
+-    case 3: return m.CurrentScore.MaxMp;
+-    case 4: return m.CurrentScore.Level;
+-    case 5: return m.Coin;
+-    case 6: return static_cast<int>(m.LearnedSkill[0]);
+-    case 7: return static_cast<int>(m.Class);
+-    default: return -1;
+-  }
+-}
+-
+-// Field panels currently visible, as a bitmask in TMFieldScene::OnESC order
+-// (bit i = panels[i]). Automation must not click the world through a panel
+-// that a stray click opened; ESC closes the topmost one, as for a player.
+-extern "C" WYD_EXPORT unsigned int wyd_field_open_panels() {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
+-    return 0;
+-  auto* f = static_cast<TMFieldScene*>(g_pCurrentScene);
+-  SControl* panels[] = {f->m_pAutoTrade, f->m_pPGTPanel, f->m_pQuestPanel, f->m_pShopPanel,
+-    f->m_pCargoPanel, f->m_pTradePanel, f->m_pSkillPanel, f->m_pInvenPanel, f->m_pCPanel,
+-    f->m_pPartyPanel, f->m_pHelpPanel, f->m_pTotoPanel, f->m_pServerPanel, f->m_pPotalPanel,
+-    f->m_pSystemPanel, f->m_pInputGoldPanel, f->m_pFireWorkPanel};
+-  unsigned int mask = 0;
+-  for (unsigned int i = 0; i < sizeof(panels) / sizeof(panels[0]); ++i)
+-    if (panels[i] && panels[i]->IsVisible()) mask |= 1u << i;
+-  return mask;
+-}
+-
+-extern "C" WYD_EXPORT double wyd_field_my_exp() {
+-  return g_pObjectManager ? static_cast<double>(g_pObjectManager->m_stMobData.Exp) : -1.0;
+-}
+-
+-// Skill master window (stage 5 skills, read-only). A click on a class-master
+-// NPC sends 0x027B and records the NPC in m_dwMerchantID; the server's ShopType
+-// 3 list fills m_pGridSkillMaster. The harness reads which skills are offered
+-// and where each is drawn, then clicks it with the real mouse (SGrid.cpp
+-// GRID_SKILLM -> box 4 -> ApplyBonus). Nothing here sends or selects.
+-static SGridControl* WydSkillMasterGrid() {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
+-    return nullptr;
+-  return static_cast<TMFieldScene*>(g_pCurrentScene)->m_pGridSkillMaster;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_skillmaster_visible() {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
+-    return 0;
+-  auto* f = static_cast<TMFieldScene*>(g_pCurrentScene);
+-  return f->m_pSkillMPanel && f->m_pSkillMPanel->IsVisible() ? 1 : 0;
+-}
+-
+-extern "C" WYD_EXPORT unsigned int wyd_field_skillmaster_merchant() {
+-  SGridControl* g = WydSkillMasterGrid();
+-  return g ? g->m_dwMerchantID : 0;
+-}
+-
+-// Item slot k (0..127) of the grid: its item index (5000+skill), 0 if empty.
+-extern "C" WYD_EXPORT int wyd_field_skillmaster_item(int k) {
+-  SGridControl* g = WydSkillMasterGrid();
+-  if (!g || k < 0 || k >= 128 || !g->m_pItemList[k] || !g->m_pItemList[k]->m_pItem) return 0;
+-  return g->m_pItemList[k]->m_pItem->sIndex;
+-}
+-
+-// Center of slot k's icon as last drawn (SGridControl::FrameMove2 lays the
+-// skill icon out in m_GCObj; m_GCEnable is only the cooldown mask), in canvas
+-// pixels (which = 0 x, 1 y); -1 if the slot is empty or not laid out yet.
+-extern "C" WYD_EXPORT int wyd_field_skillmaster_item_screen(int k, int which) {
+-  SGridControl* g = WydSkillMasterGrid();
+-  if (!g || k < 0 || k >= 128 || !g->m_pItemList[k]) return -1;
+-  const GeomControl& gc = g->m_pItemList[k]->m_GCObj;
+-  if (gc.nWidth <= 0 || gc.nHeight <= 0) return -1;
+-  return static_cast<int>(which == 0 ? gc.nPosX + gc.nWidth / 2 : gc.nPosY + gc.nHeight / 2);
+-}
+-
+-// Free skill points as the server last sent them (MSG_UpdateEtc SkillBonus).
+-extern "C" WYD_EXPORT int wyd_field_my_skill_bonus() {
+-  return g_pObjectManager ? g_pObjectManager->m_stMobData.SkillBonus : -1;
+-}
+-
+-// Skill window "S" and the skill belt (stage 5 skill use, read-only). The
+-// original assigns a skill by hovering it in the skill window and pressing
+-// Shift+digit (OnKeyShortSkill -> SetShortSkill -> 0x0378); the harness does
+-// exactly that with real input and reads the result here.
+-extern "C" WYD_EXPORT int wyd_field_skill_panel_visible() {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
+-    return 0;
+-  auto* f = static_cast<TMFieldScene*>(g_pCurrentScene);
+-  return f->m_pSkillPanel && f->m_pSkillPanel->IsVisible() ? 1 : 0;
+-}
+-
+-// Learned-skill cell i (0..23, the class skill position): its item (5000+idx)
+-// and the center of its panel as last laid out (which = 0 x, 1 y), canvas px.
+-extern "C" WYD_EXPORT int wyd_field_skill_cell_item(int i) {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || i < 0 || i >= 24)
+-    return 0;
+-  SGridControl* g = static_cast<TMFieldScene*>(g_pCurrentScene)->m_pSkillSecGrid[i];
+-  SGridControlItem* it = g ? g->GetItem(0, 0) : nullptr;
+-  return it && it->m_pItem ? it->m_pItem->sIndex : 0;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_skill_cell_screen(int i, int which) {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || i < 0 || i >= 24)
+-    return -1;
+-  SGridControl* g = static_cast<TMFieldScene*>(g_pCurrentScene)->m_pSkillSecGrid[i];
+-  if (!g || g->m_GCPanel.nWidth <= 0 || g->m_GCPanel.nHeight <= 0) return -1;
+-  return static_cast<int>(which == 0 ? g->m_GCPanel.nPosX + g->m_GCPanel.nWidth / 2
+-                                     : g->m_GCPanel.nPosY + g->m_GCPanel.nHeight / 2);
+-}
+-
+-// Belt slot 0..19 (skill index, 255 = empty) and the selected slot.
+-extern "C" WYD_EXPORT int wyd_field_short_skill(int slot) {
+-  if (!g_pObjectManager || slot < 0 || slot >= 20) return -1;
+-  return static_cast<unsigned char>(g_pObjectManager->m_cShortSkill[slot]);
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_selected_short_skill() {
+-  return g_pObjectManager ? g_pObjectManager->m_cSelectShortSkill : -1;
+-}
+-
+-// Inventory and equipment (stage 5 items, read-only). The harness drags and
+-// right-clicks cells with real mouse input; these only locate cells and read
+-// the client's view of the slots, which the server corrects with 0x0182.
+-namespace {
+-SGridControl* WydEquipGrid(TMFieldScene* f, int slot) {
+-  // Same table as TMFieldScene::OnPacketSwapItem (equip place 0).
+-  SGridControl* g[16] = {f->m_pGridInv, f->m_pGridHelm, f->m_pGridCoat, f->m_pGridPants,
+-                         f->m_pGridGloves, f->m_pGridBoots, f->m_pGridLeft, f->m_pGridRight,
+-                         f->m_pGridRing, f->m_pGridNecklace, f->m_pGridOrb, f->m_pGridCabuncle,
+-                         f->m_pGridGuild, f->m_pGridEvent, f->m_pGridDRing, f->m_pGridMantua};
+-  return slot >= 0 && slot < 16 ? g[slot] : nullptr;
+-}
+-
+-TMFieldScene* WydField() {
+-  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD) return nullptr;
+-  return static_cast<TMFieldScene*>(g_pCurrentScene);
+-}
+-
+-int WydCellCenter(SGridControl* g, int x, int y, int which) {
+-  if (!g || !g->IsVisible() || g->m_nColumnGridCount <= 0 || g->m_nRowGridCount <= 0 ||
+-      x < 0 || y < 0 || x >= g->m_nColumnGridCount || y >= g->m_nRowGridCount ||
+-      g->m_GCPanel.nWidth <= 0 || g->m_GCPanel.nHeight <= 0)
+-    return -1;
+-  const float cw = g->m_GCPanel.nWidth / g->m_nColumnGridCount;
+-  const float ch = g->m_GCPanel.nHeight / g->m_nRowGridCount;
+-  return static_cast<int>(which == 0 ? g->m_GCPanel.nPosX + cw * (x + 0.5f)
+-                                     : g->m_GCPanel.nPosY + ch * (y + 0.5f));
+-}
+-}  // namespace
+-
+-// Visible carry page (0..3, control 67072+page) or -1.
+-extern "C" WYD_EXPORT int wyd_field_inv_page() {
+-  TMFieldScene* f = WydField();
+-  if (!f || !f->m_pGridInv) return -1;
+-  return static_cast<int>(f->m_pGridInv->m_dwControlID) - 67072;
+-}
+-
+-// Center of carry cell (x 0..4, y 0..2) on the given page, canvas px; -1 when
+-// that page is not the one on screen.
+-extern "C" WYD_EXPORT int wyd_field_inv_cell_screen(int page, int x, int y, int which) {
+-  TMFieldScene* f = WydField();
+-  if (!f || page < 0 || page >= 4 || f->m_pGridInv != f->m_pGridInvList[page]) return -1;
+-  return WydCellCenter(f->m_pGridInvList[page], x, y, which);
+-}
+-
+-// Center of equip slot 1..15 (0 is the character cell, not an item slot).
+-extern "C" WYD_EXPORT int wyd_field_equip_cell_screen(int slot, int which) {
+-  TMFieldScene* f = WydField();
+-  if (!f || slot < 1) return -1;
+-  return WydCellCenter(WydEquipGrid(f, slot), 0, 0, which);
+-}
+-
+-// Effect pair k (0..2) of an own slot: which 0 = effect, 1 = value. Effect 61
+-// (EF_AMOUNT) carries the stack size. place 0 equip (0..17), 1 carry (0..63).
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_my_item_ef(int place, int slot, int k, int which) {
+-  if (!g_pObjectManager || k < 0 || k >= 3) return -1;
+-  const STRUCT_ITEM* it = nullptr;
+-  if (place == 0 && slot >= 0 && slot < 18) it = &g_pObjectManager->m_stMobData.Equip[slot];
+-  if (place == 1 && slot >= 0 && slot < 64) it = &g_pObjectManager->m_stMobData.Carry[slot];
+-  if (!it) return -1;
+-  return which == 0 ? it->stEffect[k].cEffect : it->stEffect[k].cValue;
+-}
+-
+-// Own Damage (0) and Ac (1) as the server last sent them (0x0336): an
+-// equip change is visible here only after the server recomputes the score.
+-extern "C" WYD_EXPORT int wyd_field_my_attack(int field) {
+-  if (!g_pObjectManager) return -1;
+-  const STRUCT_SCORE& s = g_pObjectManager->m_stMobData.CurrentScore;
+-  return field == 0 ? s.Damage : field == 1 ? s.Ac : -1;
+-}
+-
+-// Item index attached to the cursor (a drag in progress), 0 when none.
+-extern "C" WYD_EXPORT int wyd_field_cursor_item() {
+-  if (!g_pCursor || !g_pCursor->m_pAttachedItem || !g_pCursor->m_pAttachedItem->m_pItem) return 0;
+-  return g_pCursor->m_pAttachedItem->m_pItem->sIndex;
+-}
+-
+-// NPC shop, cargo and chat (stage 5 slice 3, read-only). The harness buys,
+-// sells, stores and chats with real mouse and keyboard input; these only
+-// locate cells and read what the client shows. Nothing here sends a packet.
+-extern "C" WYD_EXPORT int wyd_field_shop_visible() {
+-  TMFieldScene* f = WydField();
+-  return f && f->m_pShopPanel && f->m_pShopPanel->IsVisible() ? 1 : 0;
+-}
+-
+-extern "C" WYD_EXPORT unsigned int wyd_field_shop_merchant() {
+-  TMFieldScene* f = WydField();
+-  return f && f->m_pGridShop ? f->m_pGridShop->m_dwMerchantID : 0;
+-}
+-
+-// Shop cell (x 0..4, y 0..7 of the visible grid): item index and center.
+-extern "C" WYD_EXPORT int wyd_field_shop_cell_item(int x, int y) {
+-  TMFieldScene* f = WydField();
+-  if (!f || !f->m_pGridShop) return -1;
+-  SGridControlItem* it = f->m_pGridShop->GetItem(x, y);
+-  return it && it->m_pItem ? it->m_pItem->sIndex : 0;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_shop_cell_screen(int x, int y, int which) {
+-  TMFieldScene* f = WydField();
+-  return f ? WydCellCenter(f->m_pGridShop, x, y, which) : -1;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_shop_grid_size(int which) {
+-  TMFieldScene* f = WydField();
+-  if (!f || !f->m_pGridShop) return -1;
+-  return which == 0 ? f->m_pGridShop->m_nColumnGridCount : f->m_pGridShop->m_nRowGridCount;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_cargo_visible() {
+-  TMFieldScene* f = WydField();
+-  return f && f->m_pCargoPanel && f->m_pCargoPanel->IsVisible() ? 1 : 0;
+-}
+-
+-// Account cargo gold as the client holds it (0x0339 and the deposit/withdraw
+-// echoes), and the visible cargo page (0..2, control 67328+page) or -1.
+-extern "C" WYD_EXPORT int wyd_field_cargo_coin() {
+-  return g_pObjectManager ? g_pObjectManager->m_nCargoCoin : -1;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_cargo_page() {
+-  TMFieldScene* f = WydField();
+-  if (!f) return -1;
+-  for (int i = 0; i < 3; ++i)
+-    if (f->m_pCargoGridList[i] && f->m_pCargoGridList[i]->IsVisible()) return i;
+-  return -1;
+-}
+-
+-// Cargo slot as the client holds it (0..127) and a cell center on a page.
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_cargo_item(int slot) {
+-  if (!g_pObjectManager || slot < 0 || slot >= MAX_CARGO) return -1;
+-  return g_pObjectManager->m_stItemCargo[slot].sIndex;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_cargo_cell_screen(int page, int x, int y, int which) {
+-  TMFieldScene* f = WydField();
+-  if (!f || page < 0 || page >= 3) return -1;
+-  return WydCellCenter(f->m_pCargoGridList[page], x, y, which);
+-}
+-
+-// Chat window: number of lines and line k counted from the newest (0).
+-extern "C" WYD_EXPORT int wyd_field_chat_count() {
+-  TMFieldScene* f = WydField();
+-  return f && f->m_pChatList ? f->m_pChatList->m_nNumItem : -1;
+-}
+-
+-extern "C" WYD_EXPORT const char* wyd_field_chat_line(int k) {
+-  TMFieldScene* f = WydField();
+-  if (!f || !f->m_pChatList || k < 0 || k >= f->m_pChatList->m_nNumItem) return "";
+-  SListBoxItem* it = f->m_pChatList->m_pItemList[f->m_pChatList->m_nNumItem - 1 - k];
+-  return it && it->GetText() ? it->GetText() : "";
+-}
+-
+-// Gold buttons of the inventory/cargo windows and the amount box OK
+-// (B_MONEY 65563, B_CARGO_MONEY 65688, B_IG_OK 65886): center as drawn, or -1.
+-extern "C" WYD_EXPORT int wyd_field_button_screen(unsigned int id, int which) {
+-  TMFieldScene* f = WydField();
+-  if (!f || (id != 65563u && id != 65688u && id != 65886u && id != 641u && id != 475139u &&
+-                id != 643u && id != 617u && (id < 67076u || id > 67079u))) return -1;
+-  auto* b = static_cast<SPanel*>(f->m_pControlContainer->FindControl(id));
+-  if (!b || !b->IsVisible() || b->m_GCPanel.nWidth <= 0 || b->m_GCPanel.nHeight <= 0) return -1;
+-  return static_cast<int>(which == 0 ? b->m_GCPanel.nPosX + b->m_GCPanel.nWidth / 2
+-                                     : b->m_GCPanel.nPosY + b->m_GCPanel.nHeight / 2);
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_gold_input_visible() {
+-  TMFieldScene* f = WydField();
+-  return f && f->m_pInputGoldPanel && f->m_pInputGoldPanel->IsVisible() ? 1 : 0;
+-}
+-
+-// The client's catalog price of an item (ItemList nPrice). The harness uses it
+-// only to choose what to try; the server charges from its own table.
+-extern "C" WYD_EXPORT int wyd_item_price(int index) {
+-  return index > 0 && index < MAX_ITEMLIST ? g_pItemList[index].nPrice : -1;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_field_chat_editing() {
+-  TMFieldScene* f = WydField();
+-  return f && f->m_pEditChatPanel && f->m_pEditChatPanel->IsVisible() ? 1 : 0;
+-}
+-
+-extern "C" int wyd_start_client() {
+-  wchar_t empty_cmdline[] = L"";
+-  return wWinMain(reinterpret_cast<HINSTANCE>(1), nullptr, empty_cmdline, 1);
+-}
+-
+-// Party probes: snapshots and the rendered row center, never input shortcuts.
+-extern "C" WYD_EXPORT int wyd_field_party_count() {
+-  auto* f = WydField();
+-  return f && f->m_pPartyList ? f->m_pPartyList->m_nNumItem : 0;
+-}
+-extern "C" WYD_EXPORT int wyd_field_party_value(int row, int field) {
+-  auto* f = WydField();
+-  if (!f || !f->m_pPartyList || row < 0 || row >= f->m_pPartyList->m_nNumItem) return -1;
+-  auto* p = static_cast<SListBoxPartyItem*>(f->m_pPartyList->m_pItemList[row]);
+-  if (!p) return -1;
+-  switch (field) {
+-    case 0: return p->m_dwCharID;
+-    case 1: return p->m_nState; // 1 invite, 2 leader, 0 member
+-    case 2: return p->m_nLevel;
+-    case 3: return p->m_nClass;
+-    case 4: return static_cast<int>(p->m_GCText.nPosX + 25);
+-    case 5: return static_cast<int>(p->m_GCText.nPosY + 7);
+-  }
+-  return -1;
+-}
+-extern "C" WYD_EXPORT int wyd_field_party_member(unsigned int id) {
+-  auto* p = g_pObjectManager ? static_cast<TMHuman*>(g_pObjectManager->GetHumanByID(id)) : nullptr;
+-  return p ? p->m_bParty : -1;
+-}
+-extern "C" WYD_EXPORT int wyd_field_party_menu_target() {
+-  auto* f = WydField();
+-  return f && f->m_pPGTPanel && f->m_pPGTPanel->IsVisible() ? f->m_dwOpID : 0;
+-}
+-
+-// Trade probes: snapshots of the original trade window, never input shortcuts.
+-// Fields: 0 visible, 1 opponent, 2 my check (617), 3 opponent check (601),
+-// 4 my money, 5 opponent money as drawn (603).
+-extern "C" WYD_EXPORT int wyd_field_trade_value(int field) {
+-  auto* f = WydField();
+-  if (!f || !f->m_pTradePanel || !g_pObjectManager) return -1;
+-  auto* c = f->m_pControlContainer;
+-  switch (field) {
+-    case 0: return f->m_pTradePanel->IsVisible() ? 1 : 0;
+-    case 1: return static_cast<int>(g_pObjectManager->m_stTrade.OpponentID);
+-    case 2: { auto* b = static_cast<SButton*>(c->FindControl(617u)); return b ? b->m_bSelected : -1; }
+-    case 3: { auto* b = static_cast<SButton*>(c->FindControl(601u)); return b ? b->m_bSelected : -1; }
+-    case 4: return g_pObjectManager->m_stTrade.TradeMoney;
+-    case 5: { auto* t = static_cast<SText*>(c->FindControl(603u)); return t && t->GetText() ? std::atoi(t->GetText()) : -1; }
+-  }
+-  return -1;
+-}
+-// side 0: my offer grid (8448+k), 1: opponent grid (8192+k): item index or 0.
+-// side 2: carry slot recorded for my offer k (-1 when empty).
+-extern "C" WYD_EXPORT int wyd_field_trade_item(int side, int k) {
+-  auto* f = WydField();
+-  if (!f || !g_pObjectManager || k < 0 || k >= 15) return -1;
+-  if (side == 2) return g_pObjectManager->m_stTrade.CarryPos[k];
+-  if (side != 0 && side != 1) return -1;
+-  auto* g = static_cast<SGridControl*>(f->m_pControlContainer->FindControl((side ? 8192u : 8448u) + k));
+-  if (!g) return -1;
+-  auto* it = g->GetItem(0, 0);
+-  return it && it->m_pItem ? it->m_pItem->sIndex : 0;
+-}
+-
+-// Character deletion through the original controls: 4615 opens box 4615, the
+-// harness confirms it with wyd_debug_scene_msgbox_ok, which opens the password
+-// panel. The password is typed into the original field and cleared after 65886.
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_open_delete(int slot) {
+-  TMSelectCharScene* scene = WydSelectCharScene();
+-  if (!scene || slot < 0 || slot >= 4 || g_AccountLock != 1) return 0;
+-  if (!scene->m_pHuman[slot] || !g_pObjectManager->m_stSelCharData.MobName[slot][0]) return 0;
+-  g_pObjectManager->m_cCharacterSlot = static_cast<char>(slot);
+-  scene->OnControlEvent(4615, 0);
+-  return scene->m_pMessageBox && scene->m_pMessageBox->IsVisible() && scene->m_pMessageBox->m_dwMessage == 4615 ? 1 : 0;
+-}
+-extern "C" WYD_EXPORT int wyd_selchar_delete_panel_visible() {
+-  TMSelectCharScene* scene = WydSelectCharScene();
+-  return scene && scene->m_pInputPWPanel && scene->m_pInputPWPanel->IsVisible() ? 1 : 0;
+-}
+-extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_delete(const char* password) {
+-  TMSelectCharScene* scene = WydSelectCharScene();
+-  if (!scene || !password || !scene->m_pPWEdit || !scene->m_pInputPWPanel || !scene->m_pInputPWPanel->IsVisible()) return 0;
+-  char buf[16] = {0};
+-  std::snprintf(buf, sizeof(buf), "%s", password);
+-  scene->m_pPWEdit->SetText(buf);
+-  std::memset(buf, 0, sizeof(buf));
+-  const int r = scene->OnControlEvent(65886, 0);
+-  std::memset(scene->m_pPWEdit->m_strText, 0, sizeof(scene->m_pPWEdit->m_strText));
+-  return r;
+-}
+-
+-// ---- Settings panel: sound effects and music levels (etapa 7) ----
+-// Levels use the Config.bin scale (0..100; 0 = off). Before boot they are kept
+-// for NewApp::Initialize; after boot they go to the live managers with the
+-// original curves: effects 25 * n - 2500, music 30 * n - 3000 (hundredths of dB).
+-static int g_wydAudioPendingLevel[2] = {-1, -1};
+-
+-extern "C" int wyd_audio_pending_level(int which) {
+-  return which == 0 || which == 1 ? g_wydAudioPendingLevel[which] : -1;
+-}
+-
+-extern "C" WYD_EXPORT int wyd_audio_set_levels(int sound, int music) {
+-  sound = sound < 0 ? 0 : (sound > 100 ? 100 : sound);
+-  music = music < 0 ? 0 : (music > 100 ? 100 : music);
+-  g_wydAudioPendingLevel[0] = sound;
+-  g_wydAudioPendingLevel[1] = music;
+-  if (!g_pApp) return 0;
+-  g_pApp->m_nSound = sound;
+-  g_pApp->m_nMusic = music;
+-  if (g_pApp->m_pSoundManager)
+-    g_pApp->m_pSoundManager->SetSoundVolume(sound > 0 ? 25 * sound - 2500 : -10000);
+-  if (g_pApp->m_pBGMManager)
+-    g_pApp->m_pBGMManager->SetVolume(0, music > 0 ? 30 * music - 3000 : -10000);
+-  return 1;
+-}
+-
+-// 0 effects, 1 music: the level in use (the pending one before boot), or -1.
+-extern "C" WYD_EXPORT int wyd_audio_get_level(int which) {
+-  if (which != 0 && which != 1) return -1;
+-  if (!g_pApp) return g_wydAudioPendingLevel[which];
+-  return which == 0 ? g_pApp->m_nSound : g_pApp->m_nMusic;
+-}
++#include "windows.h"
++
++#include "d3d9.h"
++#include "d3dx9.h"
++#include "CFrame.h"
++#include "CMesh.h"
++#include "DirShow.h"
++#include "dsutil.h"
++#include "MeshManager.h"
++#include "NewApp.h"
++#include "ObjectManager.h"
++#include "ResourceControl.h"
++#include "SControl.h"
++#include "SControlContainer.h"
++#include "TimerManager.h"
++#include "TMGlobal.h"
++#include "TMGround.h"
++#include "TMHuman.h"
++#include "TMScene.h"
++#include "TMSelectCharScene.h"
++#include "TMSelectServerScene.h"
++#include "TMFieldScene.h"
++#include "SGrid.h"
++#include "TMSkinMesh.h"
++
++#include <cstring>
++#include <cstdio>
++#include <cstdlib>
++
++#if defined(__EMSCRIPTEN__)
++#include <emscripten/console.h>
++#endif
++
++bool CheckOS();
++char ReadNameFiltraDataBase();
++char ReadChatFiltraDataBase();
++
++extern char g_szOS[3];
++extern ObjectManager* g_pObjectManager;
++extern NewApp* g_pApp;
++extern char g_pServerList[MAX_SERVERGROUP][MAX_SERVERNUMBER][64];
++extern "C" void wyd_wasm_set_direct_state_request(int active);
++
++// Real client entrypoint from Projects/TMProject/NewApp.cpp
++int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow);
++
++namespace {
++
++NewApp* g_wyd_app = nullptr;
++MSG g_wyd_msg{};
++bool g_wyd_msg_initialized = false;
++bool g_wyd_boot_in_progress = false;
++unsigned int g_wyd_compare_present_state_sequence = 0;
++bool g_wyd_compare_present_game_state_valid = false;
++int g_wyd_compare_present_game_state = 0;
++bool g_wyd_compare_present_scene_type_valid = false;
++int g_wyd_compare_present_scene_type = 0;
++
++constexpr unsigned int kWydMkShift = 0x0004u;
++constexpr unsigned int kWydMkControl = 0x0008u;
++
++void WydBootLog(const char* msg) {
++#if defined(__EMSCRIPTEN__)
++  emscripten_console_log(msg ? msg : "(null)");
++#else
++  std::fprintf(stderr, "%s\n", msg ? msg : "(null)");
++#endif
++}
++
++void WydResetComparePresentState() {
++  g_wyd_compare_present_state_sequence = 0;
++  g_wyd_compare_present_game_state_valid = false;
++  g_wyd_compare_present_game_state = 0;
++  g_wyd_compare_present_scene_type_valid = false;
++  g_wyd_compare_present_scene_type = 0;
++}
++
++}  // namespace
++
++extern "C" void wyd_dinput_mouse_event(unsigned int msg, unsigned int wParam, int x, int y, int wheel_delta);
++extern "C" void wyd_dinput_key_event(unsigned int msg, unsigned int key);
++
++extern "C" int wyd_mouse_event(unsigned int msg, unsigned int wParam, int x, int y, int wheel_delta) {
++  wyd_dinput_mouse_event(msg, wParam, x, y, wheel_delta);
++
++  if (!g_wyd_app || !g_pEventTranslator) return 0;
++
++  g_pEventTranslator->m_bShift = (wParam & kWydMkShift) ? 1 : 0;
++  g_pEventTranslator->m_bCtrl = (wParam & kWydMkControl) ? 1 : 0;
++
++  // Keep the browser on the same source path as the native client: the
++  // Win32 message updates cursor/control state where the original MsgProc
++  // handles it, while button presses are observed once through DirectInput
++  // during ReadInputEventData. Calling OnMouseEvent here as well duplicates
++  // a click in scenes which consume both paths.
++  g_wyd_app->MsgProc(
++      g_wyd_app->m_hWnd,
++      msg,
++      static_cast<DWORD>(wParam),
++      static_cast<int>(
++          MAKELONG(static_cast<WORD>(x), static_cast<WORD>(y))));
++
++  return 1;
++}
++
++extern "C" int wyd_key_event(unsigned int msg, unsigned int wParam, int lParam) {
++  wyd_dinput_key_event(msg, wParam);
++  if (!g_wyd_app) return 0;
++  return static_cast<int>(
++      g_wyd_app->MsgProc(g_wyd_app->m_hWnd, msg, static_cast<WPARAM>(wParam), lParam));
++}
++
++static bool WydControlEffectivelyInteractive(
++    const SControlContainer* controls,
++    const SControl* control) {
++  if (!controls || !control) return false;
++
++  const TreeNode* node = control;
++  while (node) {
++    const auto* current = static_cast<const SControl*>(node);
++    if (!current->m_bVisible || !current->m_bEnable) return false;
++    if (current == controls->m_pControlRoot) return true;
++    node = node->m_pTop;
++  }
++  return false;
++}
++
++extern "C" int wyd_text_input_active() {
++  if (!g_pObjectManager) return 0;
++
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  SControlContainer* controls = scene ? scene->GetCtrlContainer() : nullptr;
++  SControl* focus = controls ? controls->m_pFocusControl : nullptr;
++  return focus &&
++         focus->m_eCtrlType == CONTROL_TYPE::CTRL_TYPE_EDITABLETEXT &&
++         focus->m_bFocused &&
++         WydControlEffectivelyInteractive(controls, focus);
++}
++
++extern "C" const char* wyd_text_input_value() {
++  static const char empty[] = "";
++  if (!wyd_text_input_active()) return empty;
++
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  SControlContainer* controls = scene ? scene->GetCtrlContainer() : nullptr;
++  SControl* focus = controls ? controls->m_pFocusControl : nullptr;
++  return focus ? static_cast<SEditableText*>(focus)->GetText() : empty;
++}
++
++extern "C" int wyd_boot_client(int fullscreen) {
++  if (g_wyd_boot_in_progress) {
++    WydBootLog("[wyd_boot] already in progress");
++    return 0;
++  }
++  g_wyd_boot_in_progress = true;
++  WydBootLog("[wyd_boot] begin");
++
++  if (g_wyd_app) {
++    g_wyd_boot_in_progress = false;
++    return 1;
++  }
++
++  WydResetComparePresentState();
++
++  WydBootLog("[wyd_boot] os-check");
++  if (CheckOS()) {
++    std::sprintf(g_szOS, "98");
++  } else {
++    std::sprintf(g_szOS, "NT");
++  }
++
++  WydBootLog("[wyd_boot] read-name-filter");
++  if (!ReadNameFiltraDataBase()) {
++    WydBootLog("[wyd_boot] read-name-filter failed");
++    g_wyd_boot_in_progress = false;
++    return 0;
++  }
++  WydBootLog("[wyd_boot] read-chat-filter");
++  if (!ReadChatFiltraDataBase()) {
++    WydBootLog("[wyd_boot] read-chat-filter failed");
++    g_wyd_boot_in_progress = false;
++    return 0;
++  }
++
++  WydBootLog("[wyd_boot] new NewApp");
++  g_wyd_app = new NewApp();
++  if (!g_wyd_app) {
++    WydBootLog("[wyd_boot] new NewApp failed");
++    g_wyd_boot_in_progress = false;
++    return 0;
++  }
++
++  const int full = fullscreen ? 1 : 0;
++  WydBootLog("[wyd_boot] Initialize");
++  if (!g_wyd_app->Initialize(reinterpret_cast<HINSTANCE>(1), full)) {
++    WydBootLog("[wyd_boot] Initialize failed");
++    delete g_wyd_app;
++    g_wyd_app = nullptr;
++    g_wyd_boot_in_progress = false;
++    return 0;
++  }
++
++  WydBootLog("[wyd_boot] initialize message");
++  PeekMessage(&g_wyd_msg, 0, 0, 0, 0);
++  g_wyd_msg_initialized = true;
++  g_wyd_boot_in_progress = false;
++  WydBootLog("[wyd_boot] success");
++  return 1;
++}
++
++extern "C" int wyd_tick_client() {
++  if (!g_wyd_app) return -1;
++  if (!g_wyd_msg_initialized) {
++    PeekMessage(&g_wyd_msg, 0, 0, 0, 0);
++    g_wyd_msg_initialized = true;
++  }
++
++  return static_cast<int>(g_wyd_app->RunTick(&g_wyd_msg));
++}
++
++extern "C" int wyd_render_client() {
++  if (!g_wyd_app || !g_pObjectManager || !g_pCurrentScene) return -1;
++  return SUCCEEDED(g_wyd_app->RenderScene()) ? 1 : 0;
++}
++
++extern "C" int wyd_shutdown_client() {
++  if (!g_wyd_app) return 0;
++
++  g_wyd_app->Finalize();
++  delete g_wyd_app;
++  g_wyd_app = nullptr;
++  g_wyd_msg_initialized = false;
++  std::memset(&g_wyd_msg, 0, sizeof(g_wyd_msg));
++  return 1;
++}
++
++extern "C" int wyd_get_game_state() {
++  if (!g_pObjectManager) return static_cast<int>(ObjectManager::TM_GAME_STATE::TM_NONE_STATE);
++  return static_cast<int>(g_pObjectManager->m_eCurrentState);
++}
++
++extern "C" void wyd_compare_latch_present_state() {
++  g_wyd_compare_present_game_state_valid = g_pObjectManager != nullptr;
++  if (g_pObjectManager) {
++    g_wyd_compare_present_game_state =
++        static_cast<int>(g_pObjectManager->m_eCurrentState);
++  }
++
++  g_wyd_compare_present_scene_type_valid = g_pCurrentScene != nullptr;
++  if (g_pCurrentScene) {
++    g_wyd_compare_present_scene_type =
++        static_cast<int>(g_pCurrentScene->m_eSceneType);
++  }
++
++  g_wyd_compare_present_state_sequence += 1;
++}
++
++extern "C" unsigned int wyd_compare_present_state_sequence() {
++  return g_wyd_compare_present_state_sequence;
++}
++
++extern "C" int wyd_compare_present_game_state_valid() {
++  return g_wyd_compare_present_game_state_valid ? 1 : 0;
++}
++
++extern "C" int wyd_compare_present_game_state() {
++  return g_wyd_compare_present_game_state;
++}
++
++extern "C" int wyd_compare_present_scene_type_valid() {
++  return g_wyd_compare_present_scene_type_valid ? 1 : 0;
++}
++
++extern "C" int wyd_compare_present_scene_type() {
++  return g_wyd_compare_present_scene_type;
++}
++
++extern "C" int wyd_cursor_visible() {
++  return g_pCursor && g_pCursor->m_bVisible ? 1 : 0;
++}
++
++extern "C" int wyd_set_game_state(int state) {
++  if (!g_pObjectManager) return 0;
++  if (state < static_cast<int>(ObjectManager::TM_GAME_STATE::TM_NONE_STATE) ||
++      state > static_cast<int>(ObjectManager::TM_GAME_STATE::TM_FIELD2_STATE)) {
++    return 0;
++  }
++  if (static_cast<int>(g_pObjectManager->m_eCurrentState) != state) {
++    // Direct harness navigation can bypass the original transition packet
++    // that invalidates the cached BGM index. Let the destination scene choose
++    // and start its official track again.
++    DS_SOUND_MANAGER::m_nMusicIndex = -1;
++  }
++  wyd_wasm_set_direct_state_request(1);
++  g_pObjectManager->SetCurrentState(static_cast<ObjectManager::TM_GAME_STATE>(state));
++  wyd_wasm_set_direct_state_request(0);
++  return 1;
++}
++
++extern "C" int wyd_selchar_initialized() {
++  if (!g_pObjectManager) return 0;
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  return scene && scene->GetSceneType() == ESCENE_TYPE::ESCENE_SELCHAR ? 1 : 0;
++}
++
++extern "C" int wyd_selchar_char_count() {
++  if (!g_pObjectManager) return 0;
++  int count = 0;
++  for (int i = 0; i < 4; ++i) {
++    if (g_pObjectManager->m_stSelCharData.MobName[i][0] != 0) ++count;
++  }
++  return count;
++}
++
++extern "C" int wyd_selchar_human_present(int slot) {
++  if (!g_pObjectManager || slot < 0 || slot >= 4) return 0;
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELCHAR) return 0;
++  auto* sel_char = static_cast<TMSelectCharScene*>(scene);
++  return sel_char->m_pHuman[slot] != nullptr ? 1 : 0;
++}
++
++extern "C" const char* wyd_selchar_name(int slot) {
++  static char empty[1] = {0};
++  if (!g_pObjectManager || slot < 0 || slot >= 4) return empty;
++  return g_pObjectManager->m_stSelCharData.MobName[slot];
++}
++
++static TMHuman* WydSelectCharSampleHuman(int slot) {
++  if (!g_pObjectManager || slot < 0 || slot >= 4) return nullptr;
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELCHAR) return nullptr;
++  return static_cast<TMSelectCharScene*>(scene)->m_pSampleHuman[slot];
++}
++
++static int WydCountFrameMeshes(CFrame* frame) {
++  int count = 0;
++  for (CFrame* node = frame; node; node = node->m_pSibling) {
++    if (node->m_pMesh) ++count;
++    if (node->m_pFirstChild) count += WydCountFrameMeshes(node->m_pFirstChild);
++  }
++  return count;
++}
++
++extern "C" int wyd_selchar_sample_present(int slot) {
++  return WydSelectCharSampleHuman(slot) ? 1 : 0;
++}
++
++extern "C" int wyd_selchar_sample_skin_present(int slot) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  return human && human->m_pSkinMesh ? 1 : 0;
++}
++
++extern "C" int wyd_selchar_sample_visible(int slot) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  return human ? static_cast<int>(human->m_bVisible) : 0;
++}
++
++extern "C" float wyd_selchar_sample_x(int slot) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  return human ? human->m_vecPosition.x : 0.0f;
++}
++
++extern "C" float wyd_selchar_sample_y(int slot) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  return human ? human->m_vecPosition.y : 0.0f;
++}
++
++extern "C" float wyd_selchar_sample_height(int slot) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  return human ? human->m_fHeight : 0.0f;
++}
++
++extern "C" int wyd_selchar_sample_animation(int slot) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  return human && human->m_pSkinMesh ? human->m_pSkinMesh->m_nAniIndex : -1;
++}
++
++extern "C" int wyd_selchar_sample_mesh_type(int slot) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  return human ? human->m_nSkinMeshType : -1;
++}
++
++extern "C" int wyd_selchar_sample_mesh_generated(int slot) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  return human && human->m_pSkinMesh ? human->m_pSkinMesh->m_bMeshGenerated : 0;
++}
++
++extern "C" int wyd_selchar_sample_frame_meshes(int slot) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  return human && human->m_pSkinMesh ? WydCountFrameMeshes(human->m_pSkinMesh->m_pRoot) : 0;
++}
++
++extern "C" int wyd_selchar_sample_bone_animation(int slot) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  return human && human->m_pSkinMesh ? human->m_pSkinMesh->m_nBoneAniIndex : -1;
++}
++
++extern "C" int wyd_selchar_sample_look_mesh(int slot, int part) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  if (!human || part < 0 || part >= 8) return -1;
++  const short* look = reinterpret_cast<const short*>(&human->m_stLookInfo);
++  return static_cast<int>(look[part * 2]);
++}
++
++extern "C" int wyd_selchar_sample_look_skin(int slot, int part) {
++  TMHuman* human = WydSelectCharSampleHuman(slot);
++  if (!human || part < 0 || part >= 8) return -1;
++  const short* look = reinterpret_cast<const short*>(&human->m_stLookInfo);
++  return static_cast<int>(look[part * 2 + 1]);
++}
++
++extern "C" int wyd_skin_animation_num_parts(int bone_animation) {
++  if (bone_animation < 0 || bone_animation >= MAX_BONE_ANIMATION_LIST) return -1;
++  return static_cast<int>(MeshManager::m_BoneAnimationList[bone_animation].numParts);
++}
++
++extern "C" int wyd_skin_animation_num_bones(int bone_animation) {
++  if (bone_animation < 0 || bone_animation >= MAX_BONE_ANIMATION_LIST) return -1;
++  return static_cast<int>(MeshManager::m_BoneAnimationList[bone_animation].numBone);
++}
++
++extern "C" const char* wyd_serverlist_entry(int group, int index) {
++  static char empty[1] = {0};
++  if (group < 0 || group >= MAX_SERVERGROUP || index < 0 || index >= MAX_SERVERNUMBER) return empty;
++  return g_pServerList[group][index];
++}
++
++extern "C" int wyd_debug_selectserver_login(const char* account, const char* password, const char* host) {
++  if (!g_pObjectManager || !g_pApp || !account || !password) return 0;
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELECT_SERVER) return 0;
++
++  auto* select_server = static_cast<TMSelectServerScene*>(scene);
++  if (!select_server->m_pEditID || !select_server->m_pEditPW || !select_server->m_pLoginPanel ||
++      !select_server->m_pLoginBtns[0]) {
++    return 0;
++  }
++
++  if (host && host[0]) {
++    std::snprintf(g_pApp->m_szServerIP, sizeof(g_pApp->m_szServerIP), "%s", host);
++  }
++  if (!g_pApp->m_szServerIP[0]) return 0;
++
++  char account_buf[16] = {0};
++  char password_buf[16] = {0};
++  std::snprintf(account_buf, sizeof(account_buf), "%s", account);
++  std::snprintf(password_buf, sizeof(password_buf), "%s", password);
++
++  select_server->m_pEditID->SetText(account_buf);
++  select_server->m_pEditPW->SetText(password_buf);
++  select_server->m_pLoginPanel->SetVisible(1);
++  select_server->m_pLoginBtns[0]->SetVisible(1);
++  select_server->m_pLoginBtns[0]->SetEnable(1);
++  static_cast<SControl*>(select_server->m_pEditPW)->SetEnable(1);
++  select_server->m_cLogin = 1;
++  if (g_pTimerManager && g_pTimerManager->GetServerTime() < 2000) {
++    g_pTimerManager->SetServerTime(2000);
++  }
++  const unsigned int live_time = g_pTimerManager ? g_pTimerManager->GetServerTime() : 2000;
++  select_server->LastSendMsgTime = live_time > 1500 ? live_time - 1501 : 0;
++  select_server->m_dwLastClickLoginBtnTime = 0;
++
++  const int result = select_server->OnControlEvent(B_LOGIN_OK, 0);
++  volatile char* scrub = password_buf;
++  for (size_t i = 0; i < sizeof(password_buf); ++i) scrub[i] = 0;
++  return result;
++}
++
++extern "C" int wyd_public_demo_unlock_select_character() {
++  if (!g_pObjectManager) return 0;
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELCHAR) return 0;
++
++  auto* select_character = static_cast<TMSelectCharScene*>(scene);
++  g_AccountLock = 1;
++  if (select_character->m_pAccountLockDlg) {
++    select_character->m_pAccountLockDlg->SetVisible(0);
++  }
++  if (select_character->m_pAccountLock) {
++    select_character->m_pAccountLock->SetVisible(0);
++  }
++  if (select_character->m_pInputPWPanel) {
++    select_character->m_pInputPWPanel->SetVisible(0);
++  }
++  return 1;
++}
++
++// ---- Online automation (etapa 4) ----
++// Each helper drives the original scene controls through OnControlEvent, the
++// same path a click takes, so the scene builds and sends its own packets. None
++// of them fabricate a packet or read one back. Selecting a class sample and a
++// character slot replaces the 3D mouse pick; the rest is the original UI flow.
++#if defined(__EMSCRIPTEN__)
++#include <emscripten/emscripten.h>
++#define WYD_EXPORT EMSCRIPTEN_KEEPALIVE
++#else
++#define WYD_EXPORT
++#endif
++// Test-harness entry points are not KEEPALIVE: the link exports them by name
++// (link_tmproject_wasm_startup.py), and the published build (--public) leaves
++// them out, since KEEPALIVE cannot be undone at link time.
++#define WYD_DEBUG_EXPORT
++
++static TMSelectCharScene* WydSelectCharScene() {
++  if (!g_pObjectManager) return nullptr;
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELCHAR) return nullptr;
++  return static_cast<TMSelectCharScene*>(scene);
++}
++
++// 0 locked, 1 unlocked, 2 verify sent, 3..5 PIN change steps.
++extern "C" WYD_EXPORT int wyd_selchar_account_lock() { return g_AccountLock; }
++
++// Etapa 7: when every channel of every group points to the same address the
++// list offers no real choice, so the page skips it. Entry [group][0] is the
++// status URL; channels start at 1. Returns 1 when the login panel opened, 0
++// when not ready yet (other scene, opening animation, panel hidden, message
++// box, or the player went back to the list), and -1 when it does not apply
++// (no channel, different addresses, or the original OK refused the channel).
++static int WydServerListSingleAddress() {
++  const char* first = nullptr;
++  for (int group = 0; group < MAX_SERVERGROUP; ++group) {
++    for (int channel = 1; channel < MAX_SERVERNUMBER; ++channel) {
++      const char* address = g_pServerList[group][channel];
++      if (!address[0]) continue;
++      if (!first) first = address;
++      else if (std::strncmp(first, address, sizeof g_pServerList[0][0]) != 0) return 0;
++    }
++  }
++  return first ? 1 : 0;
++}
++
++// It drives the original controls in the order a player clicks them (first
++// group, first channel, OK), so B_SERVER_SEL_OK picks the address and shows
++// the login panel itself. Nothing is typed or sent.
++extern "C" WYD_EXPORT int wyd_selectserver_auto() {
++  if (!g_pObjectManager) return 0;
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELECT_SERVER) return 0;
++
++  auto* select_server = static_cast<TMSelectServerScene*>(scene);
++  if (!select_server->m_pNServerSelect || !select_server->m_pNServerGroupList ||
++      !select_server->m_pNServerList) {
++    return -1;
++  }
++  if (select_server->m_cLogin != 0 || select_server->m_bGameGradePlay ||
++      !select_server->m_pNServerSelect->IsVisible()) {
++    return 0;
++  }
++  if (select_server->m_pMessageBox && select_server->m_pMessageBox->IsVisible()) return 0;
++  if (!WydServerListSingleAddress() || select_server->m_pNServerGroupList->m_nNumItem < 1) return -1;
++
++  select_server->m_pNServerGroupList->SetSelectedIndex(0);
++  select_server->OnControlEvent(L_SELECT_SERVERG, 0);
++  if (select_server->m_pNServerList->m_nNumItem < 1) return -1;
++
++  select_server->m_pNServerList->SetSelectedIndex(0);
++  select_server->OnControlEvent(B_SERVER_SEL_OK, 0);
++  return select_server->m_cLogin == 1 ? 1 : -1;
++}
++
++// Types the PIN on the shuffled keypad (buttons 66437..66446 show keybuf[])
++// and presses the verify button (66433). The digits are not kept.
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_pin(const char* pin) {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || !pin || g_AccountLock != 0) return 0;
++  const size_t len = std::strlen(pin);
++  if (len < 4 || len > 6) return 0;
++  std::memset(scene->keypass, 0, sizeof(scene->keypass));
++  for (size_t i = 0; i < len; ++i) {
++    if (pin[i] < '0' || pin[i] > '9') return 0;
++    int button = -1;
++    for (int b = 0; b < 10; ++b) {
++      if (scene->keybuf[b] == pin[i] - '0') button = b;
++    }
++    if (button < 0) return 0;
++    scene->OnControlEvent(66437 + button, 0);
++  }
++  return scene->OnControlEvent(66433, 0);
++}
++
++// Opens the creation view as the "Criar" button does: control 4613 runs
++// VisibleSelectCreate(0) (CreCamAction). 5673 is "Voltar": in the selection
++// view it asks to return to server selection.
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_open_create() {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || g_AccountLock != 1) return 0;
++  return scene->OnControlEvent(4613, 0);
++}
++
++// Picks the class sample, types the name into edit 4626 and presses create
++// (1545). The server's CNFNewCharacter/NewCharacterFail decides the outcome.
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_create(const char* name, int class_index) {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || !name || class_index < 0 || class_index >= 4 || g_AccountLock != 1) return 0;
++  if (!scene->m_pSampleHuman[class_index]) return 0;
++  auto* edit = static_cast<SEditableText*>(scene->m_pControlContainer->FindControl(4626));
++  if (!edit) return 0;
++  char buf[16] = {0};
++  std::snprintf(buf, sizeof(buf), "%s", name);
++  g_pObjectManager->m_pTargetObject = scene->m_pSampleHuman[class_index];
++  edit->SetText(buf);
++  if (scene->m_pBtnCreate) scene->m_pBtnCreate->SetEnable(1);
++  return scene->OnControlEvent(1545, 0);
++}
++
++// Selects the slot and presses "enter" (4612): the scene sends CharacterLogin.
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_enter(int slot) {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || slot < 0 || slot >= 4 || g_AccountLock != 1) return 0;
++  if (!scene->m_pHuman[slot] || !g_pObjectManager->m_stSelCharData.MobName[slot][0]) return 0;
++  g_pObjectManager->m_cCharacterSlot = static_cast<char>(slot);
++  scene->m_dwLastClickLoginBtnTime = 0;
++  return scene->OnControlEvent(4612, 0);
++}
++
++// Preview of a selection slot, as the scene shows it (read-only).
++extern "C" WYD_EXPORT int wyd_selchar_level(int slot) {
++  if (!g_pObjectManager || slot < 0 || slot >= 4) return -1;
++  return g_pObjectManager->m_stSelCharData.Score[slot].Level;
++}
++
++extern "C" WYD_EXPORT int wyd_selchar_score(int slot, int field) {
++  if (!g_pObjectManager || slot < 0 || slot >= 4) return 0;
++  const STRUCT_SCORE& s = g_pObjectManager->m_stSelCharData.Score[slot];
++  switch (field) {
++    case 0: return s.MaxHp;
++    case 1: return s.Hp;
++    case 2: return s.MaxMp;
++    case 3: return s.Mp;
++    case 4: return s.Str;
++    case 5: return s.Int;
++    case 6: return s.Dex;
++    case 7: return s.Con;
++    default: return 0;
++  }
++}
++
++extern "C" WYD_EXPORT int wyd_selchar_equip(int slot, int index) {
++  if (!g_pObjectManager || slot < 0 || slot >= 4 || index < 0 || index >= 18) return -1;
++  return g_pObjectManager->m_stSelCharData.Equip[slot][index].sIndex;
++}
++
++// The current scene's message panel (notices, login errors), read-only.
++extern "C" WYD_EXPORT int wyd_scene_message_visible() {
++  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
++  return scene && scene->m_pMessagePanel ? static_cast<int>(scene->m_pMessagePanel->m_bVisible) : 0;
++}
++
++extern "C" WYD_EXPORT const char* wyd_scene_message_text() {
++  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
++  if (!scene || !scene->m_pMessagePanel || !scene->m_pMessagePanel->m_pText) return "";
++  return scene->m_pMessagePanel->m_pText->GetText();
++}
++
++// Id of the scene's visible message box (0 when hidden), and its OK button:
++// the box forwards to the scene exactly as a click on OK does.
++extern "C" WYD_EXPORT unsigned int wyd_scene_msgbox_message() {
++  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
++  if (!scene || !scene->m_pMessageBox || !scene->m_pMessageBox->IsVisible()) return 0;
++  return scene->m_pMessageBox->m_dwMessage;
++}
++
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_scene_msgbox_ok() {
++  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
++  if (!scene || !scene->m_pMessageBox || !scene->m_pMessageBox->IsVisible()) return 0;
++  // SMessageBox::OnControlEvent on OK: hide, then notify the scene with the
++  // box's own control id and event 0.
++  scene->m_pMessageBox->SetVisible(0);
++  return scene->OnControlEvent(scene->m_pMessageBox->GetControlID(), 0);
++}
++
++// Texture diagnostics (read-only): the size the renderer sees for a UI
++// texture (which = 0 width, 1 height), and item table fields used by icons.
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_ui_texture_size(int index, int which) {
++  if (!g_pTextureManager) return -1;
++  IDirect3DTexture9* tex = g_pTextureManager->GetUITexture(index, 2000);
++  if (!tex) return -2;
++  D3DSURFACE_DESC desc{};
++  if (FAILED(tex->GetLevelDesc(0, &desc))) return -3;
++  return which == 0 ? static_cast<int>(desc.Width) : static_cast<int>(desc.Height);
++}
++
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_item_field(int item, int field) {
++  if (item < 0 || item >= MAX_ITEMLIST) return -99999;
++  const STRUCT_ITEMLIST& it = g_pItemList[item];
++  switch (field) {
++    case 0: return g_itemicon[item];
++    case 1: return it.nGrade;
++    case 2: return it.nIndexMesh;
++    case 3: return it.nIndexTexture;
++    case 4: return it.nPos;
++    case 5: return it.nPrice;
++    default: return -99999;
++  }
++}
++
++// Texture file, multi (sanc) and legend type of the n-th mesh of the own
++// character's skin (read-only; "" past the last mesh).
++static CMesh* WydNthMesh(CFrame* frame, int* n) {
++  for (CFrame* node = frame; node; node = node->m_pSibling) {
++    if (node->m_pMesh && (*n)-- == 0) return node->m_pMesh;
++    if (node->m_pFirstChild) {
++      if (CMesh* m = WydNthMesh(node->m_pFirstChild, n)) return m;
++    }
++  }
++  return nullptr;
++}
++
++extern "C" WYD_DEBUG_EXPORT const char* wyd_debug_myhuman_mesh_texture(int index) {
++  static char out[300];
++  out[0] = 0;
++  TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
++  TMHuman* human = scene ? scene->m_pMyHuman : nullptr;
++  if (!human || !human->m_pSkinMesh || !g_pTextureManager) return out;
++  int n = index;
++  CMesh* mesh = WydNthMesh(human->m_pSkinMesh->m_pRoot, &n);
++  if (!mesh) return out;
++  const int tex = mesh->m_nTextureIndex;
++  const char* name = tex >= 0 && tex < MAX_MODEL_TEXTURE ? g_pTextureManager->m_stModelTextureList[tex].szFileName : "?";
++  std::snprintf(out, sizeof(out), "%d|%s|multi=%d|legend=%d", tex, name, mesh->m_sMultiType, mesh->m_sLegendType);
++  return out;
++}
++
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_my_item(int place, int slot) {
++  if (!g_pObjectManager) return -1;
++  if (place == 0 && slot >= 0 && slot < 18) return g_pObjectManager->m_stMobData.Equip[slot].sIndex;
++  if (place == 1 && slot >= 0 && slot < 64) return g_pObjectManager->m_stMobData.Carry[slot].sIndex;
++  return -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_character_class() {
++  if (!g_pObjectManager) return -1;
++  return static_cast<int>(g_pObjectManager->m_stMobData.Class);
++}
++
++extern "C" WYD_EXPORT int wyd_field_hover_entity() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return -1;
++  return g_pCurrentScene->m_pMouseOverHuman || g_pCurrentScene->m_pMouseOverItem ? 1 : 0;
++}
++
++// Loaded terrain block (TMGround offset index, 128x128 cells per block). This is
++// the map the client actually rendered, unlike HomeTownX/Y which a teleport keeps.
++extern "C" WYD_EXPORT int wyd_field_ground_index_x() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || !g_pCurrentScene->m_pGround)
++    return -1;
++  return g_pCurrentScene->m_pGround->m_vecOffsetIndex.x;
++}
++
++extern "C" WYD_EXPORT int wyd_field_ground_index_y() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || !g_pCurrentScene->m_pGround)
++    return -1;
++  return g_pCurrentScene->m_pGround->m_vecOffsetIndex.y;
++}
++
++// Other entities in the field, by server id (read-only).
++static TMHuman* WydFieldHuman(unsigned int id) {
++  if (!g_pObjectManager || !g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return nullptr;
++  return g_pObjectManager->GetHumanByID(id);
++}
++
++extern "C" WYD_EXPORT int wyd_field_human_present(unsigned int id) { return WydFieldHuman(id) ? 1 : 0; }
++
++extern "C" WYD_EXPORT float wyd_field_human_x(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_vecPosition.x : 0.0f;
++}
++
++extern "C" WYD_EXPORT float wyd_field_human_y(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_vecPosition.y : 0.0f;
++}
++
++extern "C" WYD_EXPORT int wyd_field_human_target_x(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_vecTargetPos.x : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_human_target_y(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_vecTargetPos.y : -1;
++}
++
++extern "C" WYD_EXPORT float wyd_field_human_angle(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_fAngle : 0.0f;
++}
++
++extern "C" WYD_EXPORT const char* wyd_field_human_name(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_szName : "";
++}
++
++// HUMAN_LOOKINFO as {mesh, skin} shorts; part 0..7.
++extern "C" WYD_EXPORT int wyd_field_human_look_mesh(unsigned int id, int part) {
++  TMHuman* h = WydFieldHuman(id);
++  if (!h || part < 0 || part >= 8) return -1;
++  return reinterpret_cast<const short*>(&h->m_stLookInfo)[part * 2];
++}
++
++// Combat probes (read-only). HP is what the runtime shows: CreateMob score
++// minus the server's Dam[] from 0x367 echoes; nothing here computes damage.
++extern "C" WYD_EXPORT int wyd_field_human_hp(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_stScore.Hp : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_human_max_hp(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_stScore.MaxHp : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_human_die(unsigned int id) {
++  TMHuman* h = WydFieldHuman(id);
++  return h ? h->m_cDie : -1;
++}
++
++// Smallest live human id greater than `after` (0 when none): lets the harness
++// enumerate the scene without a buffer protocol. Same walk as
++// ObjectManager::GetHumanByID.
++extern "C" WYD_EXPORT unsigned int wyd_field_human_next(unsigned int after) {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return 0;
++  TreeNode* root = g_pCurrentScene->m_pHumanContainer;
++  TreeNode* node = root;
++  unsigned int best = 0;
++  if (!node) return 0;
++  do {
++    if (!node->m_cDeleted) {
++      if (node->m_dwID > after && (!best || node->m_dwID < best)) best = node->m_dwID;
++      if (node->m_pDown) {
++        node = node->m_pDown;
++        continue;
++      }
++    }
++    do {
++      if (node->m_pNextLink) {
++        node = node->m_pNextLink;
++        break;
++      }
++      node = node->m_pTop;
++    } while (node != root && node);
++  } while (node != root && node);
++  return best;
++}
++
++// Screen position (device pixels, which = 0 x, 1 y) of a human's chest, the
++// same projection the scene uses for damage numbers; -1 when off screen.
++extern "C" WYD_EXPORT int wyd_field_human_screen(unsigned int id, int which) {
++  TMHuman* h = WydFieldHuman(id);
++  if (!h) return -1;
++  int x = 0, y = 0;
++  if (!BASE_Get3DTo2DPos(h->m_vecPosition.x, h->m_fHeight + 1.0f, h->m_vecPosition.y, &x, &y)) return -1;
++  return which == 0 ? x : y;
++}
++
++extern "C" WYD_EXPORT unsigned int wyd_field_hover_human_id() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || !g_pCurrentScene->m_pMouseOverHuman)
++    return 0;
++  return g_pCurrentScene->m_pMouseOverHuman->m_dwID;
++}
++
++// Own score as the client holds it (field 0 Hp, 1 MaxHp, 2 Mp, 3 MaxMp,
++// 4 Level, 5 Coin, 6 LearnedSkill mask, 7 Class) and experience (double: exact up to 2^53).
++extern "C" WYD_EXPORT int wyd_field_my_score(int field) {
++  if (!g_pObjectManager) return -1;
++  const STRUCT_MOB& m = g_pObjectManager->m_stMobData;
++  switch (field) {
++    case 0: return m.CurrentScore.Hp;
++    case 1: return m.CurrentScore.MaxHp;
++    case 2: return m.CurrentScore.Mp;
++    case 3: return m.CurrentScore.MaxMp;
++    case 4: return m.CurrentScore.Level;
++    case 5: return m.Coin;
++    case 6: return static_cast<int>(m.LearnedSkill[0]);
++    case 7: return static_cast<int>(m.Class);
++    default: return -1;
++  }
++}
++
++// Field panels currently visible, as a bitmask in TMFieldScene::OnESC order
++// (bit i = panels[i]). Automation must not click the world through a panel
++// that a stray click opened; ESC closes the topmost one, as for a player.
++extern "C" WYD_EXPORT unsigned int wyd_field_open_panels() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return 0;
++  auto* f = static_cast<TMFieldScene*>(g_pCurrentScene);
++  SControl* panels[] = {f->m_pAutoTrade, f->m_pPGTPanel, f->m_pQuestPanel, f->m_pShopPanel,
++    f->m_pCargoPanel, f->m_pTradePanel, f->m_pSkillPanel, f->m_pInvenPanel, f->m_pCPanel,
++    f->m_pPartyPanel, f->m_pHelpPanel, f->m_pTotoPanel, f->m_pServerPanel, f->m_pPotalPanel,
++    f->m_pSystemPanel, f->m_pInputGoldPanel, f->m_pFireWorkPanel};
++  unsigned int mask = 0;
++  for (unsigned int i = 0; i < sizeof(panels) / sizeof(panels[0]); ++i)
++    if (panels[i] && panels[i]->IsVisible()) mask |= 1u << i;
++  return mask;
++}
++
++extern "C" WYD_EXPORT double wyd_field_my_exp() {
++  return g_pObjectManager ? static_cast<double>(g_pObjectManager->m_stMobData.Exp) : -1.0;
++}
++
++// Skill master window (stage 5 skills, read-only). A click on a class-master
++// NPC sends 0x027B and records the NPC in m_dwMerchantID; the server's ShopType
++// 3 list fills m_pGridSkillMaster. The harness reads which skills are offered
++// and where each is drawn, then clicks it with the real mouse (SGrid.cpp
++// GRID_SKILLM -> box 4 -> ApplyBonus). Nothing here sends or selects.
++static SGridControl* WydSkillMasterGrid() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return nullptr;
++  return static_cast<TMFieldScene*>(g_pCurrentScene)->m_pGridSkillMaster;
++}
++
++extern "C" WYD_EXPORT int wyd_field_skillmaster_visible() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return 0;
++  auto* f = static_cast<TMFieldScene*>(g_pCurrentScene);
++  return f->m_pSkillMPanel && f->m_pSkillMPanel->IsVisible() ? 1 : 0;
++}
++
++extern "C" WYD_EXPORT unsigned int wyd_field_skillmaster_merchant() {
++  SGridControl* g = WydSkillMasterGrid();
++  return g ? g->m_dwMerchantID : 0;
++}
++
++// Item slot k (0..127) of the grid: its item index (5000+skill), 0 if empty.
++extern "C" WYD_EXPORT int wyd_field_skillmaster_item(int k) {
++  SGridControl* g = WydSkillMasterGrid();
++  if (!g || k < 0 || k >= 128 || !g->m_pItemList[k] || !g->m_pItemList[k]->m_pItem) return 0;
++  return g->m_pItemList[k]->m_pItem->sIndex;
++}
++
++// Center of slot k's icon as last drawn (SGridControl::FrameMove2 lays the
++// skill icon out in m_GCObj; m_GCEnable is only the cooldown mask), in canvas
++// pixels (which = 0 x, 1 y); -1 if the slot is empty or not laid out yet.
++extern "C" WYD_EXPORT int wyd_field_skillmaster_item_screen(int k, int which) {
++  SGridControl* g = WydSkillMasterGrid();
++  if (!g || k < 0 || k >= 128 || !g->m_pItemList[k]) return -1;
++  const GeomControl& gc = g->m_pItemList[k]->m_GCObj;
++  if (gc.nWidth <= 0 || gc.nHeight <= 0) return -1;
++  return static_cast<int>(which == 0 ? gc.nPosX + gc.nWidth / 2 : gc.nPosY + gc.nHeight / 2);
++}
++
++// Free skill points as the server last sent them (MSG_UpdateEtc SkillBonus).
++extern "C" WYD_EXPORT int wyd_field_my_skill_bonus() {
++  return g_pObjectManager ? g_pObjectManager->m_stMobData.SkillBonus : -1;
++}
++
++// Skill window "S" and the skill belt (stage 5 skill use, read-only). The
++// original assigns a skill by hovering it in the skill window and pressing
++// Shift+digit (OnKeyShortSkill -> SetShortSkill -> 0x0378); the harness does
++// exactly that with real input and reads the result here.
++extern "C" WYD_EXPORT int wyd_field_skill_panel_visible() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD)
++    return 0;
++  auto* f = static_cast<TMFieldScene*>(g_pCurrentScene);
++  return f->m_pSkillPanel && f->m_pSkillPanel->IsVisible() ? 1 : 0;
++}
++
++// Learned-skill cell i (0..23, the class skill position): its item (5000+idx)
++// and the center of its panel as last laid out (which = 0 x, 1 y), canvas px.
++extern "C" WYD_EXPORT int wyd_field_skill_cell_item(int i) {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || i < 0 || i >= 24)
++    return 0;
++  SGridControl* g = static_cast<TMFieldScene*>(g_pCurrentScene)->m_pSkillSecGrid[i];
++  SGridControlItem* it = g ? g->GetItem(0, 0) : nullptr;
++  return it && it->m_pItem ? it->m_pItem->sIndex : 0;
++}
++
++extern "C" WYD_EXPORT int wyd_field_skill_cell_screen(int i, int which) {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD || i < 0 || i >= 24)
++    return -1;
++  SGridControl* g = static_cast<TMFieldScene*>(g_pCurrentScene)->m_pSkillSecGrid[i];
++  if (!g || g->m_GCPanel.nWidth <= 0 || g->m_GCPanel.nHeight <= 0) return -1;
++  return static_cast<int>(which == 0 ? g->m_GCPanel.nPosX + g->m_GCPanel.nWidth / 2
++                                     : g->m_GCPanel.nPosY + g->m_GCPanel.nHeight / 2);
++}
++
++// Belt slot 0..19 (skill index, 255 = empty) and the selected slot.
++extern "C" WYD_EXPORT int wyd_field_short_skill(int slot) {
++  if (!g_pObjectManager || slot < 0 || slot >= 20) return -1;
++  return static_cast<unsigned char>(g_pObjectManager->m_cShortSkill[slot]);
++}
++
++extern "C" WYD_EXPORT int wyd_field_selected_short_skill() {
++  return g_pObjectManager ? g_pObjectManager->m_cSelectShortSkill : -1;
++}
++
++// Inventory and equipment (stage 5 items, read-only). The harness drags and
++// right-clicks cells with real mouse input; these only locate cells and read
++// the client's view of the slots, which the server corrects with 0x0182.
++namespace {
++SGridControl* WydEquipGrid(TMFieldScene* f, int slot) {
++  // Same table as TMFieldScene::OnPacketSwapItem (equip place 0).
++  SGridControl* g[16] = {f->m_pGridInv, f->m_pGridHelm, f->m_pGridCoat, f->m_pGridPants,
++                         f->m_pGridGloves, f->m_pGridBoots, f->m_pGridLeft, f->m_pGridRight,
++                         f->m_pGridRing, f->m_pGridNecklace, f->m_pGridOrb, f->m_pGridCabuncle,
++                         f->m_pGridGuild, f->m_pGridEvent, f->m_pGridDRing, f->m_pGridMantua};
++  return slot >= 0 && slot < 16 ? g[slot] : nullptr;
++}
++
++TMFieldScene* WydField() {
++  if (!g_pCurrentScene || g_pCurrentScene->GetSceneType() != ESCENE_TYPE::ESCENE_FIELD) return nullptr;
++  return static_cast<TMFieldScene*>(g_pCurrentScene);
++}
++
++int WydCellCenter(SGridControl* g, int x, int y, int which) {
++  if (!g || !g->IsVisible() || g->m_nColumnGridCount <= 0 || g->m_nRowGridCount <= 0 ||
++      x < 0 || y < 0 || x >= g->m_nColumnGridCount || y >= g->m_nRowGridCount ||
++      g->m_GCPanel.nWidth <= 0 || g->m_GCPanel.nHeight <= 0)
++    return -1;
++  const float cw = g->m_GCPanel.nWidth / g->m_nColumnGridCount;
++  const float ch = g->m_GCPanel.nHeight / g->m_nRowGridCount;
++  return static_cast<int>(which == 0 ? g->m_GCPanel.nPosX + cw * (x + 0.5f)
++                                     : g->m_GCPanel.nPosY + ch * (y + 0.5f));
++}
++}  // namespace
++
++// Visible carry page (0..3, control 67072+page) or -1.
++extern "C" WYD_EXPORT int wyd_field_inv_page() {
++  TMFieldScene* f = WydField();
++  if (!f || !f->m_pGridInv) return -1;
++  return static_cast<int>(f->m_pGridInv->m_dwControlID) - 67072;
++}
++
++// Center of carry cell (x 0..4, y 0..2) on the given page, canvas px; -1 when
++// that page is not the one on screen.
++extern "C" WYD_EXPORT int wyd_field_inv_cell_screen(int page, int x, int y, int which) {
++  TMFieldScene* f = WydField();
++  if (!f || page < 0 || page >= 4 || f->m_pGridInv != f->m_pGridInvList[page]) return -1;
++  return WydCellCenter(f->m_pGridInvList[page], x, y, which);
++}
++
++// Center of equip slot 1..15 (0 is the character cell, not an item slot).
++extern "C" WYD_EXPORT int wyd_field_equip_cell_screen(int slot, int which) {
++  TMFieldScene* f = WydField();
++  if (!f || slot < 1) return -1;
++  return WydCellCenter(WydEquipGrid(f, slot), 0, 0, which);
++}
++
++// Effect pair k (0..2) of an own slot: which 0 = effect, 1 = value. Effect 61
++// (EF_AMOUNT) carries the stack size. place 0 equip (0..17), 1 carry (0..63).
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_my_item_ef(int place, int slot, int k, int which) {
++  if (!g_pObjectManager || k < 0 || k >= 3) return -1;
++  const STRUCT_ITEM* it = nullptr;
++  if (place == 0 && slot >= 0 && slot < 18) it = &g_pObjectManager->m_stMobData.Equip[slot];
++  if (place == 1 && slot >= 0 && slot < 64) it = &g_pObjectManager->m_stMobData.Carry[slot];
++  if (!it) return -1;
++  return which == 0 ? it->stEffect[k].cEffect : it->stEffect[k].cValue;
++}
++
++// Own Damage (0) and Ac (1) as the server last sent them (0x0336): an
++// equip change is visible here only after the server recomputes the score.
++extern "C" WYD_EXPORT int wyd_field_my_attack(int field) {
++  if (!g_pObjectManager) return -1;
++  const STRUCT_SCORE& s = g_pObjectManager->m_stMobData.CurrentScore;
++  return field == 0 ? s.Damage : field == 1 ? s.Ac : -1;
++}
++
++// Item index attached to the cursor (a drag in progress), 0 when none.
++extern "C" WYD_EXPORT int wyd_field_cursor_item() {
++  if (!g_pCursor || !g_pCursor->m_pAttachedItem || !g_pCursor->m_pAttachedItem->m_pItem) return 0;
++  return g_pCursor->m_pAttachedItem->m_pItem->sIndex;
++}
++
++// NPC shop, cargo and chat (stage 5 slice 3, read-only). The harness buys,
++// sells, stores and chats with real mouse and keyboard input; these only
++// locate cells and read what the client shows. Nothing here sends a packet.
++extern "C" WYD_EXPORT int wyd_field_shop_visible() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pShopPanel && f->m_pShopPanel->IsVisible() ? 1 : 0;
++}
++
++extern "C" WYD_EXPORT unsigned int wyd_field_shop_merchant() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pGridShop ? f->m_pGridShop->m_dwMerchantID : 0;
++}
++
++// Shop cell (x 0..4, y 0..7 of the visible grid): item index and center.
++extern "C" WYD_EXPORT int wyd_field_shop_cell_item(int x, int y) {
++  TMFieldScene* f = WydField();
++  if (!f || !f->m_pGridShop) return -1;
++  SGridControlItem* it = f->m_pGridShop->GetItem(x, y);
++  return it && it->m_pItem ? it->m_pItem->sIndex : 0;
++}
++
++extern "C" WYD_EXPORT int wyd_field_shop_cell_screen(int x, int y, int which) {
++  TMFieldScene* f = WydField();
++  return f ? WydCellCenter(f->m_pGridShop, x, y, which) : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_shop_grid_size(int which) {
++  TMFieldScene* f = WydField();
++  if (!f || !f->m_pGridShop) return -1;
++  return which == 0 ? f->m_pGridShop->m_nColumnGridCount : f->m_pGridShop->m_nRowGridCount;
++}
++
++extern "C" WYD_EXPORT int wyd_field_cargo_visible() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pCargoPanel && f->m_pCargoPanel->IsVisible() ? 1 : 0;
++}
++
++// Account cargo gold as the client holds it (0x0339 and the deposit/withdraw
++// echoes), and the visible cargo page (0..2, control 67328+page) or -1.
++extern "C" WYD_EXPORT int wyd_field_cargo_coin() {
++  return g_pObjectManager ? g_pObjectManager->m_nCargoCoin : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_cargo_page() {
++  TMFieldScene* f = WydField();
++  if (!f) return -1;
++  for (int i = 0; i < 3; ++i)
++    if (f->m_pCargoGridList[i] && f->m_pCargoGridList[i]->IsVisible()) return i;
++  return -1;
++}
++
++// Cargo slot as the client holds it (0..127) and a cell center on a page.
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_cargo_item(int slot) {
++  if (!g_pObjectManager || slot < 0 || slot >= MAX_CARGO) return -1;
++  return g_pObjectManager->m_stItemCargo[slot].sIndex;
++}
++
++extern "C" WYD_EXPORT int wyd_field_cargo_cell_screen(int page, int x, int y, int which) {
++  TMFieldScene* f = WydField();
++  if (!f || page < 0 || page >= 3) return -1;
++  return WydCellCenter(f->m_pCargoGridList[page], x, y, which);
++}
++
++// Chat window: number of lines and line k counted from the newest (0).
++extern "C" WYD_EXPORT int wyd_field_chat_count() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pChatList ? f->m_pChatList->m_nNumItem : -1;
++}
++
++extern "C" WYD_EXPORT const char* wyd_field_chat_line(int k) {
++  TMFieldScene* f = WydField();
++  if (!f || !f->m_pChatList || k < 0 || k >= f->m_pChatList->m_nNumItem) return "";
++  SListBoxItem* it = f->m_pChatList->m_pItemList[f->m_pChatList->m_nNumItem - 1 - k];
++  return it && it->GetText() ? it->GetText() : "";
++}
++
++// Gold buttons of the inventory/cargo windows and the amount box OK
++// (B_MONEY 65563, B_CARGO_MONEY 65688, B_IG_OK 65886): center as drawn, or -1.
++extern "C" WYD_EXPORT int wyd_field_button_screen(unsigned int id, int which) {
++  TMFieldScene* f = WydField();
++  if (!f || (id != 65563u && id != 65688u && id != 65886u && id != 641u && id != 475139u &&
++                id != 643u && id != 617u && (id < 67076u || id > 67079u))) return -1;
++  auto* b = static_cast<SPanel*>(f->m_pControlContainer->FindControl(id));
++  if (!b || !b->IsVisible() || b->m_GCPanel.nWidth <= 0 || b->m_GCPanel.nHeight <= 0) return -1;
++  return static_cast<int>(which == 0 ? b->m_GCPanel.nPosX + b->m_GCPanel.nWidth / 2
++                                     : b->m_GCPanel.nPosY + b->m_GCPanel.nHeight / 2);
++}
++
++extern "C" WYD_EXPORT int wyd_field_gold_input_visible() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pInputGoldPanel && f->m_pInputGoldPanel->IsVisible() ? 1 : 0;
++}
++
++// The client's catalog price of an item (ItemList nPrice). The harness uses it
++// only to choose what to try; the server charges from its own table.
++extern "C" WYD_EXPORT int wyd_item_price(int index) {
++  return index > 0 && index < MAX_ITEMLIST ? g_pItemList[index].nPrice : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_field_chat_editing() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pEditChatPanel && f->m_pEditChatPanel->IsVisible() ? 1 : 0;
++}
++
++extern "C" int wyd_start_client() {
++  wchar_t empty_cmdline[] = L"";
++  return wWinMain(reinterpret_cast<HINSTANCE>(1), nullptr, empty_cmdline, 1);
++}
++
++// Party probes: snapshots and the rendered row center, never input shortcuts.
++extern "C" WYD_EXPORT int wyd_field_party_count() {
++  auto* f = WydField();
++  return f && f->m_pPartyList ? f->m_pPartyList->m_nNumItem : 0;
++}
++extern "C" WYD_EXPORT int wyd_field_party_value(int row, int field) {
++  auto* f = WydField();
++  if (!f || !f->m_pPartyList || row < 0 || row >= f->m_pPartyList->m_nNumItem) return -1;
++  auto* p = static_cast<SListBoxPartyItem*>(f->m_pPartyList->m_pItemList[row]);
++  if (!p) return -1;
++  switch (field) {
++    case 0: return p->m_dwCharID;
++    case 1: return p->m_nState; // 1 invite, 2 leader, 0 member
++    case 2: return p->m_nLevel;
++    case 3: return p->m_nClass;
++    case 4: return static_cast<int>(p->m_GCText.nPosX + 25);
++    case 5: return static_cast<int>(p->m_GCText.nPosY + 7);
++  }
++  return -1;
++}
++extern "C" WYD_EXPORT int wyd_field_party_member(unsigned int id) {
++  auto* p = g_pObjectManager ? static_cast<TMHuman*>(g_pObjectManager->GetHumanByID(id)) : nullptr;
++  return p ? p->m_bParty : -1;
++}
++extern "C" WYD_EXPORT int wyd_field_party_menu_target() {
++  auto* f = WydField();
++  return f && f->m_pPGTPanel && f->m_pPGTPanel->IsVisible() ? f->m_dwOpID : 0;
++}
++
++// Trade probes: snapshots of the original trade window, never input shortcuts.
++// Fields: 0 visible, 1 opponent, 2 my check (617), 3 opponent check (601),
++// 4 my money, 5 opponent money as drawn (603).
++extern "C" WYD_EXPORT int wyd_field_trade_value(int field) {
++  auto* f = WydField();
++  if (!f || !f->m_pTradePanel || !g_pObjectManager) return -1;
++  auto* c = f->m_pControlContainer;
++  switch (field) {
++    case 0: return f->m_pTradePanel->IsVisible() ? 1 : 0;
++    case 1: return static_cast<int>(g_pObjectManager->m_stTrade.OpponentID);
++    case 2: { auto* b = static_cast<SButton*>(c->FindControl(617u)); return b ? b->m_bSelected : -1; }
++    case 3: { auto* b = static_cast<SButton*>(c->FindControl(601u)); return b ? b->m_bSelected : -1; }
++    case 4: return g_pObjectManager->m_stTrade.TradeMoney;
++    case 5: { auto* t = static_cast<SText*>(c->FindControl(603u)); return t && t->GetText() ? std::atoi(t->GetText()) : -1; }
++  }
++  return -1;
++}
++// side 0: my offer grid (8448+k), 1: opponent grid (8192+k): item index or 0.
++// side 2: carry slot recorded for my offer k (-1 when empty).
++extern "C" WYD_EXPORT int wyd_field_trade_item(int side, int k) {
++  auto* f = WydField();
++  if (!f || !g_pObjectManager || k < 0 || k >= 15) return -1;
++  if (side == 2) return g_pObjectManager->m_stTrade.CarryPos[k];
++  if (side != 0 && side != 1) return -1;
++  auto* g = static_cast<SGridControl*>(f->m_pControlContainer->FindControl((side ? 8192u : 8448u) + k));
++  if (!g) return -1;
++  auto* it = g->GetItem(0, 0);
++  return it && it->m_pItem ? it->m_pItem->sIndex : 0;
++}
++
++// Character deletion through the original controls: 4615 opens box 4615, the
++// harness confirms it with wyd_debug_scene_msgbox_ok, which opens the password
++// panel. The password is typed into the original field and cleared after 65886.
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_open_delete(int slot) {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || slot < 0 || slot >= 4 || g_AccountLock != 1) return 0;
++  if (!scene->m_pHuman[slot] || !g_pObjectManager->m_stSelCharData.MobName[slot][0]) return 0;
++  g_pObjectManager->m_cCharacterSlot = static_cast<char>(slot);
++  scene->OnControlEvent(4615, 0);
++  return scene->m_pMessageBox && scene->m_pMessageBox->IsVisible() && scene->m_pMessageBox->m_dwMessage == 4615 ? 1 : 0;
++}
++extern "C" WYD_EXPORT int wyd_selchar_delete_panel_visible() {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  return scene && scene->m_pInputPWPanel && scene->m_pInputPWPanel->IsVisible() ? 1 : 0;
++}
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_delete(const char* password) {
++  TMSelectCharScene* scene = WydSelectCharScene();
++  if (!scene || !password || !scene->m_pPWEdit || !scene->m_pInputPWPanel || !scene->m_pInputPWPanel->IsVisible()) return 0;
++  char buf[16] = {0};
++  std::snprintf(buf, sizeof(buf), "%s", password);
++  scene->m_pPWEdit->SetText(buf);
++  std::memset(buf, 0, sizeof(buf));
++  const int r = scene->OnControlEvent(65886, 0);
++  std::memset(scene->m_pPWEdit->m_strText, 0, sizeof(scene->m_pPWEdit->m_strText));
++  return r;
++}
++
++// ---- Settings panel: sound effects and music levels (etapa 7) ----
++// Levels use the Config.bin scale (0..100; 0 = off). Before boot they are kept
++// for NewApp::Initialize; after boot they go to the live managers with the
++// original curves: effects 25 * n - 2500, music 30 * n - 3000 (hundredths of dB).
++static int g_wydAudioPendingLevel[2] = {-1, -1};
++
++extern "C" int wyd_audio_pending_level(int which) {
++  return which == 0 || which == 1 ? g_wydAudioPendingLevel[which] : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_audio_set_levels(int sound, int music) {
++  sound = sound < 0 ? 0 : (sound > 100 ? 100 : sound);
++  music = music < 0 ? 0 : (music > 100 ? 100 : music);
++  g_wydAudioPendingLevel[0] = sound;
++  g_wydAudioPendingLevel[1] = music;
++  if (!g_pApp) return 0;
++  g_pApp->m_nSound = sound;
++  g_pApp->m_nMusic = music;
++  if (g_pApp->m_pSoundManager)
++    g_pApp->m_pSoundManager->SetSoundVolume(sound > 0 ? 25 * sound - 2500 : -10000);
++  if (g_pApp->m_pBGMManager)
++    g_pApp->m_pBGMManager->SetVolume(0, music > 0 ? 30 * music - 3000 : -10000);
++  return 1;
++}
++
++// 0 effects, 1 music: the level in use (the pending one before boot), or -1.
++extern "C" WYD_EXPORT int wyd_audio_get_level(int which) {
++  if (which != 0 && which != 1) return -1;
++  if (!g_pApp) return g_wydAudioPendingLevel[which];
++  return which == 0 ? g_pApp->m_nSound : g_pApp->m_nMusic;
++}
