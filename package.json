@@ -19,6 +19,7 @@
     "settings:ui": "node tools/verify_settings_ui.mjs",
     "loading:ui": "node tools/verify_loading_ui.mjs",
     "auto:server": "node tools/verify_auto_server.mjs",
+    "auto:login": "node tools/verify_auto_login.mjs",
     "measure": "python tools/build_local_scene.py --page-only && node tools/measure_scene.mjs"
   }
 }

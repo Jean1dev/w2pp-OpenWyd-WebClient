@@ -268,6 +268,20 @@ function describe(info) {
   return `${info.stateName}`;
 }
 
+// Login automático (ADR 017): o gateway entrega uma única vez a conta e o
+// código de uso único emitido pelo portal. Qualquer falha deixa o login manual,
+// como antes. Nada disso vai para o console, a URL ou o armazenamento.
+async function fetchPortalLogin() {
+  try {
+    const response = await fetch("auth/game-login", { method: "POST", cache: "no-store", credentials: "same-origin" });
+    if (response.status !== 200) return null;
+    const login = await response.json();
+    return typeof login?.account === "string" && typeof login?.code === "string" ? login : null;
+  } catch {
+    return null;
+  }
+}
+
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     const s = document.createElement("script");
@@ -326,6 +340,9 @@ async function start() {
         // Com um único servidor, a lista é pulada e o painel de login abre direto
         // (patch 0025). -1: não se aplica; null: runtime sem a exportação.
         let autoServer = true;
+        // Login automático: só depois do primeiro salto da lista, uma vez por página.
+        let portalLogin = null;
+        let loginTries = 0;
         const frame = () => {
           try {
             if (Module._wyd_tick_client() < 0) throw new Error("Falha no tick");
@@ -335,6 +352,24 @@ async function start() {
                 const result = call("_wyd_selectserver_auto");
                 if (result === 1) clientEvidence.autoServer = (clientEvidence.autoServer ?? 0) + 1;
                 if (result === null || result === -1) autoServer = false;
+                if (result === 1 && clientEvidence.autoLogin === undefined) {
+                  clientEvidence.autoLogin = "pending";
+                  fetchPortalLogin().then(login => {
+                    portalLogin = login;
+                    if (!login) clientEvidence.autoLogin = "none";
+                  });
+                }
+              }
+              if (portalLogin) {
+                // 0: o painel ainda não está pronto; tenta de novo por alguns segundos.
+                const result = typeof Module._wyd_selectserver_login === "function"
+                  ? Module.ccall("wyd_selectserver_login", "number", ["string", "string"],
+                    [portalLogin.account, portalLogin.code])
+                  : -1;
+                if (result !== 0 || ++loginTries >= 20) {
+                  clientEvidence.autoLogin = result === 1 ? "sent" : "failed";
+                  portalLogin = null;
+                }
               }
               clientEvidence.probe = probe();
               identityEl.textContent = describe(clientEvidence.probe);

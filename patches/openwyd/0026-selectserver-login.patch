@@ -1,0 +1,59 @@
+Etapa 7 (ADR 017): wyd_selectserver_login logs in with the portal's one-time
+code. It fills the original login panel and presses Login (B_LOGIN_OK), only
+when the panel is already open and ready; nothing is forced and the code is
+scrubbed after the send. The player can still log in by hand.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -560,6 +560,50 @@
+   return select_server->m_cLogin == 1 ? 1 : -1;
+ }
+ 
++// Etapa 7 (ADR 017): logs in with the portal's one-time code. It fills the
++// original login panel and presses Login, the path a player takes with Enter
++// on the password, so B_LOGIN_OK validates, connects and sends 0x020D itself.
++// Unlike the harness helper it forces nothing: the panel must already be open
++// and ready. The code is scrubbed here and the patched B_LOGIN_OK clears the
++// password edit after the send. Returns 1 when the login was sent, 0 when the
++// panel is not ready yet, and -1 when it cannot be used (bad input, refused
++// by the panel or the connection failed); the player then logs in by hand.
++extern "C" WYD_EXPORT int wyd_selectserver_login(const char* account, const char* code) {
++  if (!account || !code) return -1;
++  const size_t account_len = std::strlen(account);
++  const size_t code_len = std::strlen(code);
++  // The 7662 panel accepts 4..12 for the name; the password field is 12 bytes
++  // with its terminator.
++  if (account_len < 4 || account_len > 12 || code_len < 4 || code_len > 11) return -1;
++
++  if (!g_pObjectManager || !g_pTimerManager) return 0;
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELECT_SERVER) return 0;
++  auto* select_server = static_cast<TMSelectServerScene*>(scene);
++  if (!select_server->m_pEditID || !select_server->m_pEditPW || !select_server->m_pLoginPanel ||
++      !select_server->m_pLoginBtns[0]) {
++    return -1;
++  }
++  if (select_server->m_cLogin != 1 || !select_server->m_pLoginPanel->IsVisible() ||
++      !select_server->m_pLoginBtns[0]->m_bEnable) {
++    return 0;
++  }
++  if (select_server->m_pMessageBox && select_server->m_pMessageBox->IsVisible()) return 0;
++  const unsigned int sent_before = select_server->LastSendMsgTime;
++  if (sent_before + 1500 > g_pTimerManager->GetServerTime()) return 0;
++
++  char account_buf[16] = {0};
++  char code_buf[16] = {0};
++  std::memcpy(account_buf, account, account_len);
++  std::memcpy(code_buf, code, code_len);
++  select_server->m_pEditID->SetText(account_buf);
++  select_server->m_pEditPW->SetText(code_buf);
++  select_server->OnControlEvent(B_LOGIN_OK, 0);
++  volatile char* scrub = code_buf;
++  for (size_t i = 0; i < sizeof(code_buf); ++i) scrub[i] = 0;
++  return select_server->LastSendMsgTime != sent_before ? 1 : -1;
++}
++
+ // Types the PIN on the shuffled keypad (buttons 66437..66446 show keybuf[])
+ // and presses the verify button (66433). The digits are not kept.
+ extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_pin(const char* pin) {

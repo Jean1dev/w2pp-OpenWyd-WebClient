@@ -75,6 +75,12 @@ const fakeRuntime = scenario => `
     _wyd_key_event: () => 1,
     // Patch 0025: 0 enquanto não está pronto, 1 abriu o login, -1 não se aplica.
     _wyd_selectserver_auto: () => { fake.autoCalls = (fake.autoCalls ?? 0) + 1; return window.fakeAuto ?? 0; },
+    // Patch 0026: o login do portal chega por ccall com as strings.
+    _wyd_selectserver_login: () => 1,
+    ccall: (name, ret, types, args) => {
+      (fake.ccalls = fake.ccalls ?? []).push([name, ...args]);
+      return window.fakeLoginResult ?? 1;
+    },
   });
   if (${JSON.stringify(scenario)} === 'abort') { setTimeout(() => Module.onAbort('x'), 300); return; }
   for (const fn of Module.preRun || []) await fn();
@@ -83,12 +89,20 @@ const fakeRuntime = scenario => `
 `;
 
 let scenario = 'cold';
+let loginFetches = 0;
 const server = createServer(async (req, res) => {
   const path = new URL(req.url, 'http://x').pathname;
   const send = (type, body, status = 200) => { res.writeHead(status, { 'content-type': type }); res.end(body); };
   if (path === '/config.json') {
     if (scenario === 'config401') return send('text/plain', 'unauthorized', 401);
     return send('application/json', JSON.stringify({ channel: 'fake', wsUrl: 'ws://127.0.0.1:1/x', clientVersion: 7662 }));
+  }
+  // Handoff do gateway (ADR 017): só POST; o cenário frio tem um login pendente.
+  if (path === '/auth/game-login') {
+    if (req.method !== 'POST') return send('text/plain', '', 405);
+    loginFetches++;
+    if (scenario === 'cold') return send('application/json', JSON.stringify({ account: 'alice', code: 'abcdefgh29' }));
+    res.writeHead(204); return res.end();
   }
   if (path === '/openwyd_assets.js') return send('text/javascript', scenario === 'abort' ? 'window.fake = { snapshots: [], mouse: [] };' : fakePackage(scenario));
   if (path === '/runtime.js') return send('text/javascript', fakeRuntime(scenario));
@@ -163,6 +177,12 @@ try {
         check('auto: chamada enquanto não está pronto', (await calls()) > c0, `${c0} → ${await calls()}`);
         await page.evaluate(() => { window.fakeAuto = 1; });
         check('auto: login aberto registrado', await until(page, () => clientEvidence.autoServer >= 1));
+        // Login automático: busca o handoff uma vez e entrega ao runtime.
+        check('login: enviado ao runtime', await until(page, () => clientEvidence.autoLogin === 'sent'));
+        const ccalls = await page.evaluate(() => fake.ccalls ?? []);
+        check('login: conta e código do handoff', ccalls.length === 1 &&
+          JSON.stringify(ccalls[0]) === JSON.stringify(['wyd_selectserver_login', 'alice', 'abcdefgh29']), JSON.stringify(ccalls.map(c => c[0])));
+        check('login: nada no clientEvidence', !JSON.stringify(await page.evaluate(() => window.clientEvidence)).includes('abcdefgh29'));
         await page.evaluate(() => { window.fakeAuto = -1; });
         await new Promise(r => setTimeout(r, 600));
         const c1 = await calls();
@@ -181,6 +201,13 @@ try {
         check('warm: etapa de cache', snap.stage === 'Abrindo os dados guardados no navegador…', snap.stage);
         check('warm: sem nota de download', snap.note === null);
         check('warm: some após o primeiro quadro', await until(page, () => document.getElementById('loader').hidden));
+        // Sem login pendente (204): fica no login manual e não chama o runtime.
+        const before = loginFetches;
+        await page.evaluate(() => { window.fakeAuto = 1; });
+        check('login: sem handoff fica manual', await until(page, () => clientEvidence.autoLogin === 'none'));
+        await new Promise(r => setTimeout(r, 600));
+        check('login: handoff pedido uma vez', loginFetches - before === 1 &&
+          (await page.evaluate(() => (fake.ccalls ?? []).length)) === 0, `${loginFetches - before} pedidos`);
         await page.context().close();
       }
 
