@@ -932,8 +932,9 @@ class Session {
   // The chat box as a player uses it: Enter opens it, the text is typed,
   // Enter sends (TMFieldScene OnKeyDown / OnCharEvent). After a "=" line the
   // box reopens with the "=" prefix, so `clear` erases what is already there.
-  async say(text, { clear = false } = {}) {
-    await this.closePanels();
+  // `keepPanels` leaves windows open (the party window holds "Sair do Grupo").
+  async say(text, { clear = false, keepPanels = false } = {}) {
+    if (!keepPanels) await this.closePanels();
     await this.page.focus('#canvas');
     await this.page.keyboard.press('Enter');
     await this.until('chat box', () => Module._wyd_field_chat_editing() === 1, 10000);
@@ -2898,7 +2899,7 @@ async function main() {
       }, [self, other, n0]);
       const line = async (from, to, fromName, toName, text) => {
         const n0 = await to.eval(() => Module._wyd_field_chat_count());
-        const sent = await from.say(text, { clear: true });
+        const sent = await from.say(text, { clear: true, keepPanels: true });
         const [heard, gotNotice] = await Promise.all([inChat(to, text.slice(1)), notice(from)]);
         return { ...sent, heard, notice: gotNotice, senderShown: await shown(to, toName, fromName, n0) };
       };
@@ -2915,7 +2916,7 @@ async function main() {
         let via = 'button';
         try { await b.uiButton(65678); await b.frames(3); } catch { via = 'typed'; }
         const res = via === 'button' ? { sent: (await b.outCount()) > out0, lastSent: '0x' + (await b.lastSent()).toString(16) }
-          : await b.say('partychat', { clear: true });
+          : await b.say('partychat', { clear: true, keepPanels: true });
         return { ...res, via, confirmed: await inChat(b, `Party Chatting : ${state}`) };
       };
       res.toggleOff = await toggle('Off');

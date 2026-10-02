@@ -1,7 +1,7 @@
 From 32e5114aba4ac6e559d9fed69dc5101ea7c89ad3 Mon Sep 17 00:00:00 2001
 From: Jeanluca <jeanlucafp@gmail.com>
 Date: Thu, 1 Oct 2026 22:15:01 -0300
-Subject: [PATCH] fix: start characters at level 0 like the legacy BaseMob
+Subject: [PATCH 1/2] fix: start characters at level 0 like the legacy BaseMob
  templates
 
 New characters were seeded at level 1, but the legacy copies g_pBaseSet,
@@ -338,6 +338,30 @@ index 51769c8a..0d8391e5 100644
  	}
  
  	// Equip the sword (right hand): weapon damage is separate, so e.Damage is
+-- 
+2.54.0.windows.1
+
+
+From 9483ff9477e5190ef730d4dfce0186a80eee496b Mon Sep 17 00:00:00 2001
+From: Jeanluca <jeanlucafp@gmail.com>
+Date: Fri, 2 Oct 2026 07:55:08 -0300
+Subject: [PATCH 2/2] style(tmserver): drop the blank line left at the end of
+ login.go
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ tmserver/internal/handler/login.go | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/tmserver/internal/handler/login.go b/tmserver/internal/handler/login.go
+index fc86ab23..4cfed427 100644
+--- a/tmserver/internal/handler/login.go
++++ b/tmserver/internal/handler/login.go
+@@ -157,4 +157,3 @@ func (d *Dispatcher) selCharsFrom(chars []world.CharSummary) []protocol.SelChar
+ 	}
+ 	return out
+ }
+-
 -- 
 2.54.0.windows.1
 

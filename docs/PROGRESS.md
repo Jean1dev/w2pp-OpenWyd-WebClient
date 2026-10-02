@@ -8,7 +8,7 @@ Atualização: 01/10/2026 (noite). O cliente web, via gateway próprio, faz no t
 | 2 Build e cena | Validada (01/10: build limpo, importador com testes sintéticos e cena Field/Select Server em Chromium e Firefox; Field é fixture offline; Safari não testado) | [Cena real no navegador](evidence/02-build/README.md), [reprodução de 01/10](evidence/02-build/2026-10-01-reproduction.md) |
 | 3 Protocolo | Validada (01/10: vetores, streaming adversarial, login real e DeleteCharacter com recusa `0x011B` no Railway `2e532afa`; login real no tm-server do operador, não numa stack local) | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; chat de grupo bloqueado pelo servidor até o PR #364; em 02/10, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco; falta o reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, e buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco; falta o reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
 | 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
@@ -18,8 +18,7 @@ Atualização: 01/10/2026 (noite). O cliente web, via gateway próprio, faz no t
 1. Etapa 5:
    - fatia A (01/10): venda, ouro no banco entre sessões, teleporte pago e casos de troca confirmados. A execução 4 de `tradeedge` (01/10, 21:04) rodou todos os passos: aviso "Nao ha espaco no inventario." confirmado online e B limpo. Só a regra final reprovou, porque B começou cheio de sobra; regra corrigida e JSON reavaliado offline;
    - PRs #361, #362 e #363 implantados (`052cd5fe`). Ouro dos mobs e dano após o login foram confirmados em execução;
-   - operador: revisar, integrar e implantar o PR [#364](https://github.com/Jean1dev/w2pp-OpenWYD/pull/364) (chat de grupo). Depois, rodar `login,enter,second,partychat`. As correções do harness dessa fase (caixa de chat com prefixo e saída do grupo) ainda não foram validadas online;
-   - operador: decidir o PR [#365](https://github.com/Jean1dev/w2pp-OpenWYD/pull/365) (nível 0 na criação, +1 de defesa por nível e migração `0025` em dados vivos). Depois do deploy, conferir "Nv 1" nas duas telas com um personagem novo;
+   - PRs #364 e #365 implantados (`bc7b3923`); chat de grupo e nível confirmados em execução em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-partychat-level-deployed.md)). Em produção real, rodar migrações de personagem com jogadores deslogados;
    - fatia 5: persistência após reinício controlado do servidor. O usuário autorizou o reinício via Railway CLI quando a fatia entrar;
    - buff e cura aprovados em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-buff-cure.md)). Em aberto: o modelo da BM volta ao humano no relogin com o afeto ainda ativo (hipótese: snapshot de login sem o override visual); cura em outro jogador.
 
@@ -31,8 +30,6 @@ Atualização: 01/10/2026 (noite). O cliente web, via gateway próprio, faz no t
 4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6.
 5. Servidor, entregas separadas (não feitas):
    - itens no chão: `0x026E`, CNF de 28 bytes, decay e dono ([ADR 007](decisions/007-inventory-dialect.md));
-   - chat de grupo: PR #364, aberto;
-   - nível inicial e defesa por nível: PR #365, aberto;
    - aviso na recusa do teleporte pago (o original avisa, o Go fica em silêncio);
    - sussurro: gravar o nome de quem envia e reproduzir a reescrita legada; enviar aviso nas recusas de compra, venda, banco e teleporte; confirmar o layout de 57 bytes do `0x0339` ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
 6. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
@@ -685,3 +682,16 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - Cura, execuções 1 e 2: a regeneração encheu o HP antes do lançamento. Na execução 2, sem custo de MP visível, causa não determinada.
 - **Em aberto:** modelo humano no relogin com o afeto ativo (hipótese); cura em outro jogador; reinício controlado.
 - **Próximo passo:** merge e deploy dos #364/#365; investigar o modelo da BM no relogin; fatia 5.
+
+### 02/10/2026 — PRs #364 e #365 implantados: chat de grupo e nível
+
+- **Servidor:** o usuário integrou o #364 e depois o #365. A CI do #365 reprovava no `gofmt` (linha em branco no fim de `login.go`), corrigido no commit `9483ff94`; todos os jobs ficaram verdes. Deploy `bc7b3923` às 11:01 UTC. `patches/server/0004-level-zero-seed.patch` regenerado com os dois commits (SHA-256 `e47bb333…`).
+- **Confirmado em execução:**
+  - `login,enter,second,partychat` aprovado na execução 3;
+  - o nível aparece igual na seleção e no HUD (6/6), e a defesa sobe 1 (37→38).
+- **Falhas registradas:**
+  - execução 1 interrompida pelo deploy do #365;
+  - execução 2 com todo o chat certo, mas sem sair do grupo, porque o `say` fechava a janela do grupo com Esc. Corrigido com `keepPanels` em `tools/verify_world.mjs`.
+- **Migração:** a `0025` foi aplicada, mas o TK de B, online durante o deploy, foi salvo de volta no nível 1. O mesmo `UPDATE` foi reaplicado no banco de testes (1 linha). Em produção real, migrar com os jogadores deslogados.
+- **Verificação:** `world:checks` 35/0; evidências sem valores do `.env`.
+- **Próximo passo:** modelo da BM no relogin, cura em outro jogador e fatia 5 (reinício controlado).

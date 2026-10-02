@@ -1,6 +1,6 @@
 # ADR 013: chat de grupo e nível inicial no servidor (etapa 5)
 
-Data: 01/10/2026. Estado: as duas correções do servidor estão **confirmadas em teste** e abertas nos PRs [#364](https://github.com/Jean1dev/w2pp-OpenWYD/pull/364) (chat de grupo) e [#365](https://github.com/Jean1dev/w2pp-OpenWYD/pull/365) (nível), **sem merge nem deploy**. A lacuna do chat de grupo está **confirmada em execução** no Railway `052cd5fe`.
+Data: 01/10/2026. Estado: as duas correções do servidor estão **confirmadas em teste** e abertas nos PRs [#364](https://github.com/Jean1dev/w2pp-OpenWYD/pull/364) (chat de grupo) e [#365](https://github.com/Jean1dev/w2pp-OpenWYD/pull/365) (nível). A lacuna do chat de grupo está **confirmada em execução** no Railway `052cd5fe`. **Revisão de 02/10/2026:** os dois foram integrados e implantados (`bc7b3923`). Chat de grupo e nível estão **confirmados em execução** ([evidência](../evidence/05-gameplay/2026-10-02-partychat-level-deployed.md)). O #365 recebeu um commit de formatação (`9483ff94`), porque o `gofmt` da CI reprovou a linha em branco deixada no fim de `login.go`.
 
 ## Contexto
 
