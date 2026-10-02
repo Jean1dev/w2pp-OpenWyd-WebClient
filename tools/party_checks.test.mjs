@@ -84,4 +84,3 @@ test('restart keeps what both clients held, including unsaved gold, carry and ca
   validateOptions({ ...opt, phases: 'login,enter,second,restart' });
   assert.throws(() => validateOptions({ ...opt, phases: 'login,enter,restart' }));
 });
-
