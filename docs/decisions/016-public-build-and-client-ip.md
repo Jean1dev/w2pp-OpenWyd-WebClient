@@ -6,7 +6,7 @@ Data: 02/10/2026. Estado: **implantado e confirmado em execução** (PR [#20](ht
 - o `.wasm` publicado (`tmproject_startup.1790967849521866044.wasm`), baixado do domínio com sessão e passado pelo `check_public_exports.py`, tem 946 exports, 0 `wyd_debug_*` e todas as funções usadas por `client.js`/`settings.js`;
 - `/local-scene.html` com sessão → 404.
 
-**Pendente:** jogar no navegador com o build público (login, seleção, Field, configurações).
+**Confirmado pelo operador (02/10/2026):** login pelo portal até o jogo no navegador com o build público, sem problemas. Isso também confirma que o `PLAY_TICKET_SECRET` do Vercel é igual ao do Railway ([ADR 015](015-portal-account-gate.md)).
 
 ## Contexto
 
