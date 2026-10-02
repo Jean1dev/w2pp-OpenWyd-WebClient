@@ -10,7 +10,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
 | 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco, fatia 5 (reinício controlado) e cura em outro jogador aprovadas; o checklist não tem mais item pendente que dependa só do cliente) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
-| 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente; 02/10: painel de música, efeitos e resolução compilado e testado com runtime falso, áudio real ainda não verificado; tela de carregamento com progresso real, cache e erros testada com runtime falso, pacote real ainda não verificado; seleção automática do servidor quando todos os canais têm o mesmo destino (patch 0025), aprovada com runtime real contra o tm-server do Railway) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md), [painel de configurações](evidence/07-web/2026-10-02-settings.md), [tela de carregamento](evidence/07-web/2026-10-02-loading-screen.md), [seleção automática do servidor](evidence/07-web/2026-10-02-auto-server.md) |
+| 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente; 02/10: painel de música, efeitos e resolução compilado e testado com runtime falso, áudio real ainda não verificado; tela de carregamento com progresso real, cache e erros testada com runtime falso, pacote real ainda não verificado; seleção automática do servidor quando todos os canais têm o mesmo destino (patch 0025), aprovada com runtime real contra o tm-server do Railway; login automático pela conta do portal (ADR 017) aprovado de ponta a ponta na stack local, deploy pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md), [painel de configurações](evidence/07-web/2026-10-02-settings.md), [tela de carregamento](evidence/07-web/2026-10-02-loading-screen.md), [seleção automática do servidor](evidence/07-web/2026-10-02-auto-server.md), [login automático](evidence/07-web/2026-10-02-auto-login.md) |
 | 8 Entrega | Em andamento (02/10: gate por conta do portal no lugar do Basic Auth, implantado e confirmado no domínio público; falta o login real pelo portal) | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md), [gate do portal](evidence/08-entrega/2026-10-02-portal-gate.md) |
 
 ## Próxima ação
@@ -893,3 +893,18 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - `loading:ui` 42/42; `settings:ui` 36/36; `test_public_exports` 4/4.
 - **Não executado:** relogin com conta real, Firefox com runtime real e build `--public` local.
 - **Próximo passo:** PR, CI verde e deploy; conferir pelo portal.
+
+### 02/10/2026 — login automático pela conta do portal (ADR 017)
+
+- **Pedido do usuário:** pular conta e senha para quem já entrou no portal (item 2). Plano aprovado: código de uso único, teste de ponta a ponta numa stack local com Docker e issue separada sobre o webserver exposto (Jean1dev/w2pp-OpenWYD#369).
+- **Entregas:**
+  - servidor `Jean1dev/play-code` (`84272fc9`): `internal/playcode`, migração 0026, `IssuePlayCode` com asserção HMAC e `dbserver AccountLogin`;
+  - portal `Jean1dev/play-code` (`0d75da2`): `/jogar` com código no ticket;
+  - este repositório: handoff no gateway, patch 0026, `web/client.js`, `tools/verify_auto_login.mjs`, ADR 017 e a [evidência](evidence/07-web/2026-10-02-auto-login.md).
+- **Resultados:**
+  - unitários e integração verdes (as falhas de `npctemplate` já existiam no Windows);
+  - `loading:ui` 52/52;
+  - `auto:server` contra o Railway 8/8;
+  - **`auto:login` 9/9 na stack local**: login automático até a seleção de personagem, handoff de uso único, nada vazado e, sem segredo, login manual.
+- **Observado:** a primeira execução de ponta a ponta deu `DeadlineExceeded` no dbserver. A hipótese é a ordem de boot do compose somada à CPU disputada; a execução seguinte passou, e os detalhes estão na evidência.
+- **Próximo passo:** PRs nos três repositórios; deploy na ordem servidor, portal, cliente web, com `W2PP_PLAY_CODE_SECRET`/`PLAY_CODE_SECRET`.

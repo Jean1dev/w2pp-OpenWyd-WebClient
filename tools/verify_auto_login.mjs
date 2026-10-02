@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes, randomInt } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, link, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { chromium } from 'playwright';
@@ -49,6 +49,23 @@ for (const p of [join(SITE, 'client.html'), join(SITE, 'openwyd_assets.data'), G
   assert.ok(existsSync(p), `${p} não encontrado`);
 }
 await mkdir(OUT, { recursive: true });
+
+// Como no deploy (assemble_site --index client.html), "/" é a página do jogo:
+// o gateway redireciona para lá depois do ticket. O site local mantém a cena
+// offline em index.html para os outros testes, então este usa uma cópia feita
+// de hardlinks (sem duplicar o pacote de ~300 MB).
+const E2E_SITE = join(OUT, 'site');
+async function linkTree(from, to) {
+  await mkdir(to, { recursive: true });
+  for (const entry of await readdir(from, { withFileTypes: true })) {
+    const src = join(from, entry.name), dst = join(to, entry.name);
+    if (entry.isDirectory()) await linkTree(src, dst);
+    else if (entry.name !== 'index.html') await link(src, dst);
+  }
+}
+await rm(E2E_SITE, { recursive: true, force: true });
+await linkTree(SITE, E2E_SITE);
+await copyFile(join(SITE, 'client.html'), join(E2E_SITE, 'index.html'));
 
 function freePort() {
   return new Promise((res, rej) => {
@@ -83,7 +100,7 @@ async function startGateway() {
   });
   const cfgPath = join(OUT, 'gateway.json');
   await writeFile(cfgPath, JSON.stringify({
-    listen: `127.0.0.1:${gwPort}`, allowInsecure: true, allowedOrigins: [gwOrigin], staticDir: SITE,
+    listen: `127.0.0.1:${gwPort}`, allowInsecure: true, allowedOrigins: [gwOrigin], staticDir: E2E_SITE,
     defaultChannel: 'local',
     channels: [{ name: 'local', target: tmTarget, publicWsUrl: `ws://127.0.0.1:${gwPort}/ws/local`, clientVersion }],
     limits: { maxConns: 4, maxConnsPerIP: 4 },
@@ -156,7 +173,14 @@ async function enterGame(browser, label, signup) {
   assert.ok(r.ok(), `${route}: HTTP ${r.status()}`);
   await page.goto(`${portalOrigin}/jogar`);
   await page.waitForURL(u => u.origin === gwOrigin, { timeout: 30000 });
-  await until(page, `${label}: runtime`, () => window.clientEvidence?.frames > 0, 240000);
+  try {
+    await until(page, `${label}: runtime`, () => window.clientEvidence?.frames > 0, 240000);
+  } catch (e) {
+    const why = await page.evaluate(() => ({ url: location.href, stage: document.getElementById('loader-stage')?.textContent,
+      errors: window.clientEvidence?.errors })).catch(err => String(err));
+    await page.screenshot({ path: join(OUT, `${label}-stuck.png`) }).catch(() => {});
+    throw new Error(`${e.message}: ${JSON.stringify(why)}; page errors: ${pageErrors.join('; ')}`);
+  }
   await until(page, `${label}: lista pulada`, () => (window.clientEvidence.autoServer ?? 0) >= 1, 120000);
   return { context, page, pageErrors, seen };
 }

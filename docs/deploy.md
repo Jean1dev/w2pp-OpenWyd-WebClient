@@ -49,6 +49,13 @@ Gate por conta do portal ([ADR 015](decisions/015-portal-account-gate.md)), alte
 
 Ao ativar o gate, remova `WYD_BASIC_AUTH_*`; com as duas credenciais o gateway recusa iniciar. No portal, defina também `WEBCLIENT_URL` com o domínio deste serviço.
 
+Login automático pela conta do portal ([ADR 017](decisions/017-portal-auto-login.md)): o gateway não precisa de variável nova. Ativação, nesta ordem:
+1. servidor (`w2pp-OpenWYD`) com a migração 0026 e `W2PP_PLAY_CODE_SECRET` (≥ 32 bytes aleatórios) no `api-server`;
+2. `PLAY_CODE_SECRET` com o mesmo valor no Vercel;
+3. este serviço com o patch 0026.
+
+Sem o segredo em qualquer lado, o jogo pede a senha como antes.
+
 Limites e IP do cliente ([ADR 016](decisions/016-public-build-and-client-ip.md)): `WYD_MAX_CONNS_PER_IP=4` e `WYD_FORWARDED_FOR=first`, registradas em 02/10. O Railway põe o cliente na primeira entrada do `X-Forwarded-For`; o padrão `last` registrava o IP da borda.
 
 Opcionais: `WYD_CHANNEL`, `WYD_MAX_CONNS` e `WYD_MAX_CONNS_PER_IP`. `WYD_ALLOW_PUBLIC=true` é o único jeito de subir sem senha; não use enquanto a licença dos assets não estiver resolvida. Com dados faltando ou inválidos, o gateway recusa iniciar e lista o problema, sem nunca incluir segredos na mensagem.

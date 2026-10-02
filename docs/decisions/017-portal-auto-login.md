@@ -1,6 +1,6 @@
 # ADR 017: login automático no jogo pela conta do portal
 
-Data: 02/10/2026. Estado: **implementado em três entregas, aguardando teste de ponta a ponta na stack local e deploy**. Revê o item "fora do escopo" da [ADR 015](015-portal-account-gate.md#consequências-e-limites).
+Data: 02/10/2026. Estado: **implementado em três entregas e aprovado de ponta a ponta na stack local ([evidência](../evidence/07-web/2026-10-02-auto-login.md)); deploy pendente**. Revê o item "fora do escopo" da [ADR 015](015-portal-account-gate.md#consequências-e-limites).
 
 ## Contexto
 
