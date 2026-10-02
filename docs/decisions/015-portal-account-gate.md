@@ -51,7 +51,7 @@ gateway: valida o ticket ── Set-Cookie wyd_play ── 303 /
 
 ## Consequências e limites
 
-- O jogo continua pedindo conta, senha e PIN na tela do cliente. A sessão do portal só libera o acesso à página. O login automático exigiria mudar o protocolo ou o servidor e fica fora do escopo.
+- O jogo continua pedindo conta, senha e PIN na tela do cliente. A sessão do portal só libera o acesso à página. O login automático exigiria mudar o protocolo ou o servidor e fica fora do escopo. **Revisto pela [ADR 017](017-portal-auto-login.md):** código de uso único emitido pelo servidor, sem mudar o protocolo; o PIN continua.
 - Uma conta bloqueada depois do login mantém o cookie do gateway por até 12 h. O tm-server continua sendo a autoridade sobre o login no jogo.
 - *Login CSRF:* um terceiro poderia postar o próprio ticket e abrir o cliente na sessão de gateway dele. Isso não dá acesso a nada além da página e dos assets, e a conta do jogo continua sendo digitada pelo jogador.
 - O cache de `jti` vive em memória: um reinício do gateway esquece os tickets usados, mas eles expiram em segundos.
