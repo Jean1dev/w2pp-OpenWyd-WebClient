@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkParty, checkPartyChat, checkPartyEvidence } from './party_checks.mjs';
+import { checkGuildChat, checkParty, checkPartyChat, checkPartyEvidence } from './party_checks.mjs';
 import { validateOptions } from './world_checks.mjs';
 
 test('party rejects stale, duplicate, optimistic and incorrectly led membership', () => {
@@ -100,4 +100,23 @@ test('cure on another player needs the server heal on B, seen by both pages', as
   const opt = { target: 'localhost:8281', 'client-version': '12000' };
   validateOptions({ ...opt, class: '1', phases: 'login,healother' });
   assert.throws(() => validateOptions({ ...opt, class: '2', phases: 'login,healother' }));
+});
+
+test('guild chat needs both directions, the -- line, Color 3 and the toggle', () => {
+  const line = { sent: true, lastSent: '0x334', heard: true, senderShown: 'sender', prefixShown: false, notice: false };
+  const ok = { memberSays: line, otherSays: line, allySays: line, toggleOff: { confirmed: true },
+    silenced: { sent: true, heard: false }, toggleOn: { confirmed: true }, restored: { ...line } };
+  checkGuildChat(ok);
+  const bad = [{ memberSays: { ...line, heard: false } }, { otherSays: { ...line, senderShown: 'none' } },
+    { allySays: { ...line, prefixShown: true } }, { memberSays: { ...line, notice: true } },
+    { otherSays: { ...line, lastSent: '0x333' } }, { toggleOff: { confirmed: false } },
+    { silenced: { sent: true, heard: true } }, { toggleOn: undefined }, { restored: { ...line, heard: false } }];
+  for (const x of bad) assert.throws(() => checkGuildChat({ ...ok, ...x }), JSON.stringify(x));
+});
+
+test('guild chat runs only with login,enter,second', () => {
+  const opt = { target: 'localhost:8281', 'client-version': '12000', class: '0' };
+  validateOptions({ ...opt, phases: 'login,enter,second,guildchat' });
+  for (const phases of ['login,enter,guildchat', 'login,enter,second,guildchat,partychat'])
+    assert.throws(() => validateOptions({ ...opt, phases }));
 });

@@ -15,7 +15,7 @@ export function redactEvidence(value, secrets) {
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
   'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea',
-  'equip', 'potion', 'loot', 'shop', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent'];
+  'equip', 'potion', 'loot', 'shop', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -48,6 +48,7 @@ export function validateOptions(opt) {
     ['paidteleport', ['enter', 'login', 'paidteleport']],
     ['chat', ['chat', 'enter', 'login', 'second']], ['party', ['enter', 'login', 'party', 'second']],
     ['partychat', ['enter', 'login', 'partychat', 'second']],
+    ['guildchat', ['enter', 'guildchat', 'login', 'second']],
     ['restart', ['enter', 'login', 'restart', 'second']],
     ['trade', ['enter', 'login', 'second', 'trade']], ['tradeedge', ['enter', 'login', 'second', 'tradeedge']],
     ['delete', ['delete']]]) {

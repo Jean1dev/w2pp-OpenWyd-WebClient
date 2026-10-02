@@ -38,7 +38,7 @@ import { freemem, totalmem } from 'node:os';
 import { parseArgs, promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { areaPair, checkAreaAttempt } from './area_checks.mjs';
-import { checkParty, checkPartyChat, checkPartyEvidence } from './party_checks.mjs';
+import { checkGuildChat, checkParty, checkPartyChat, checkPartyEvidence } from './party_checks.mjs';
 import { fsTraceInit, packageIndex, openedByDir } from './fs_trace.mjs';
 import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
@@ -1005,7 +1005,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'partychat', 'trade', 'paidteleport'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'partychat', 'guildchat', 'trade', 'paidteleport'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -3114,6 +3114,64 @@ async function main() {
       await a.healthy();
       await b.healthy();
       checkPartyChat(res);
+      return res;
+    });
+
+    // Guild chat (stage 5): "-text" goes out as 0x0334 with an empty MobName and
+    // Color 3 (TMFieldScene InsertInChatList); the server routes it to the guild
+    // and stamps Color 3 (_MSG_MessageWhisper.cpp "Chat Guild"). Without Color 3
+    // the runtime files a "-" line in the whisper memo, not in the chat list, so
+    // a chat line without the prefix proves the guild path. "--text" also goes
+    // to the allied guild. A and B must already share a guild (set up outside).
+    await step('guildchat', async () => {
+      const res = {}; r.guildchat = res;
+      const tag = `gc${Date.now() % 100000}`;
+      // 0x0101 is the "not in a guild" panel; 0x0102 a line taken as a whisper.
+      const notice = s => s.until('notice', () => [0x101, 0x102].includes(window.clientProbe().socket.lastRecvOpcode), 4000)
+        .then(() => true, () => false);
+      const newLines = (s, n0) => s.eval(n0 => {
+        const lines = [];
+        for (let k = 0; k < Module._wyd_field_chat_count() - n0; k++) lines.push(Module.UTF8ToString(Module._wyd_field_chat_line(k)));
+        return lines;
+      }, n0);
+      // Names and lines stay out of the evidence; only what was shown is kept.
+      const line = async (from, to, fromName, toName, text) => {
+        const body = text.replace(/^-+/, '');
+        const n0 = await to.eval(() => Module._wyd_field_chat_count());
+        const sent = await from.say(text, { clear: true, keepPanels: true });
+        const [heard, gotNotice] = await Promise.all([inChat(to, body), notice(from)]);
+        const lines = (await newLines(to, n0)).filter(l => l.includes(body));
+        return { ...sent, heard, notice: gotNotice,
+          senderShown: lines.some(l => l.includes(fromName)) ? 'sender' : lines.some(l => l.includes(toName)) ? 'receiver' : 'none',
+          prefixShown: lines.some(l => l.includes(`> -${body}`) || l.includes(`> --${body}`)) };
+      };
+      res.memberSays = await line(a, b, A.char, B.char, `-${tag} guilda`);
+      await b.shot('guildchat-heard');
+      res.otherSays = await line(b, a, B.char, A.char, `-${tag} resposta`);
+      res.allySays = await line(a, b, A.char, B.char, `--${tag} alianca`);
+      // The original toggle is B_CHAT_GUILD (65680, OnControlEvent sends
+      // "guildchat"). The server answers with a message panel whose exact text
+      // the runtime matches to flip the guild button (TMScene.cpp:1660-1669).
+      const toggle = async state => {
+        const out0 = await b.outCount();
+        let via = 'button';
+        try { await b.uiButton(65680); await b.frames(3); } catch { via = 'typed'; }
+        const res = via === 'button' ? { sent: (await b.outCount()) > out0, lastSent: '0x' + (await b.lastSent()).toString(16) }
+          : await b.say('guildchat', { clear: true, keepPanels: true });
+        const want = `Guild Chatting : ${state}`;
+        const confirmed = await b.until(`panel "${want}"`, w => Module._wyd_scene_message_visible() === 1 &&
+          Module.UTF8ToString(Module._wyd_scene_message_text()) === w, 10000, want).then(() => true, () => false);
+        return { ...res, via, confirmed };
+      };
+      res.toggleOff = await toggle('Off');
+      res.silenced = await line(a, b, A.char, B.char, `-${tag} silencio`);
+      res.toggleOn = await toggle('On');
+      res.restored = await line(a, b, A.char, B.char, `-${tag} de volta`);
+      console.log(`    A->B ${res.memberSays.heard}, B->A ${res.otherSays.heard}, -- ${res.allySays.heard}, ` +
+        `off ${res.toggleOff.confirmed}/${res.silenced.heard}, on ${res.toggleOn.confirmed}/${res.restored.heard}`);
+      await a.healthy();
+      await b.healthy();
+      checkGuildChat(res);
       return res;
     });
 

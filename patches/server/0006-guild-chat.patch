@@ -1,0 +1,359 @@
+From 2b714b6cb5e4ac7bd4566af22e3601948c750d69 Mon Sep 17 00:00:00 2001
+From: Jeanluca <jeanlucafp@gmail.com>
+Date: Fri, 2 Oct 2026 13:25:48 -0300
+Subject: [PATCH] fix(tmserver): route "-" guild chat to the guild like the
+ legacy server
+
+The client sends guild chat as MSG_MessageWhisper with an empty MobName,
+the text prefixed by "-" ("--" for the alliance) and Color 3
+(TMFieldScene InsertInChatList). messageWhisper took it as a whisper to an
+empty name and answered "not connected", so guild chat never reached
+anyone.
+
+Port the "Chat Guild" region of _MSG_MessageWhisper.cpp:1426-1468:
+MobName becomes the speaker's name and Color becomes 3; every other
+in-play member of the speaker's guild receives the line unless it turned
+guildchat off; "--" also reaches the guild the speaker's guild is allied
+to; a player without a guild gets _NN_Only_Guild_Member_Can. Color is
+written at String[128], where the 7662 client reads it (the legacy
+writes String[96] for its own 100-byte whisper struct). Port the
+"guildchat" toggle of _MSG_MessageChat.cpp:140-150 with its message
+panel, whose exact text the client matches to flip its guild button.
+The chat_guild log line stays unmodeled; the text is never logged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ tmserver/internal/handler/chat.go            |  74 ++++++++
+ tmserver/internal/handler/guild_chat_test.go | 185 +++++++++++++++++++
+ tmserver/internal/handler/handler_test.go    |   4 +-
+ tmserver/internal/world/session.go           |   1 +
+ 4 files changed, 263 insertions(+), 1 deletion(-)
+ create mode 100644 tmserver/internal/handler/guild_chat_test.go
+
+diff --git a/tmserver/internal/handler/chat.go b/tmserver/internal/handler/chat.go
+index 1b1ce247..d8e3b6d5 100644
+--- a/tmserver/internal/handler/chat.go
++++ b/tmserver/internal/handler/chat.go
+@@ -33,6 +33,17 @@ func (d *Dispatcher) messageChat(w *world.World, s *world.Session, _ protocol.He
+ 		} else {
+ 			d.sendChatText(w, s, "Party Chatting : On")
+ 		}
++	case "guildchat":
++		// _MSG_MessageChat.cpp:140-150: toggles whether this player receives the
++		// guild channel and confirms with SendClientMessage (a message panel). The
++		// client matches these exact texts to flip its guild button
++		// (TMScene.cpp:1660-1669).
++		s.GuildChat = !s.GuildChat
++		if s.GuildChat {
++			w.Send(s, protocol.MsgMessagePanel, protocol.EncodeMessagePanelBody("Guild Chatting : Off"))
++		} else {
++			w.Send(s, protocol.MsgMessagePanel, protocol.EncodeMessagePanelBody("Guild Chatting : On"))
++		}
+ 	case "guildon":
+ 		s.GuildDisable = false
+ 	case "guildoff":
+@@ -61,6 +72,10 @@ func (d *Dispatcher) messageWhisper(w *world.World, s *world.Session, _ protocol
+ 		return
+ 	}
+ 	name := cstr(body.MobName[:])
++	if name == "" && len(body.String) > 0 && body.String[0] == '-' {
++		d.guildChat(w, s, body)
++		return
++	}
+ 	if name == "" && len(body.String) > 0 && body.String[0] == '=' {
+ 		d.partyChat(w, s, body)
+ 		return
+@@ -126,6 +141,65 @@ func (d *Dispatcher) partyChat(w *world.World, s *world.Session, body protocol.M
+ 	}
+ }
+ 
++// guildChatColor is the Color the legacy stamps on a guild line
++// (m->String[MESSAGE_LENGTH] = 3); the client only shows a "-" line as guild chat
++// when Color == 3 (TMFieldScene.cpp:17885).
++const guildChatColor = 3
++
++// whisperColorOffset is where the 7662 client keeps MSG_MessageWhisper.Color
++// inside the body String: MobName[16] + String[128] + short Color (frame offset
++// 156). The legacy TMSrv writes String[MESSAGE_LENGTH] = String[96] because its
++// own whisper struct has a 100-byte String; the Windows client this server
++// targets reads offset 128.
++const whisperColorOffset = 128
++
++// onlyGuildMemberCan is Language.txt _NN_Only_Guild_Member_Can (104), kept in the
++// table's Windows-1252 bytes like the rest of the legacy string table.
++const onlyGuildMemberCan = "S\xf3 poder\xe1 usar o Chat Guildas se pertence a alguma."
++
++// guildChat routes a "-text" line (MobName empty) to the speaker's guild, as the
++// "Chat Guild" region of _MSG_MessageWhisper.cpp:1426-1468: MobName becomes the
++// speaker's name and Color becomes 3. Every other in-play member of the guild
++// receives it, unless it turned guildchat off. A "--text" line also reaches the
++// members of the guild the speaker's guild is allied to (g_pGuildAlly[guild]).
++// A player outside any guild gets _NN_Only_Guild_Member_Can.
++//
++// Not reproduced: the chat_guild log line — the text is never logged.
++func (d *Dispatcher) guildChat(w *world.World, s *world.Session, body protocol.MsgWhisperBody) {
++	e := w.Entity(s.Conn)
++	if e == nil {
++		return
++	}
++	guild := e.Guild
++	if guild == 0 {
++		w.Send(s, protocol.MsgMessagePanel, protocol.EncodeMessagePanelBody(onlyGuildMemberCan))
++		return
++	}
++	body.MobName = [16]byte{}
++	copy(body.MobName[:len(body.MobName)-1], e.Name)
++	// A short line is padded up to Color, which is a little-endian short.
++	if len(body.String) < whisperColorOffset+2 {
++		body.String = append(body.String, make([]byte, whisperColorOffset+2-len(body.String))...)
++	}
++	body.String[whisperColorOffset] = guildChatColor
++	body.String[whisperColorOffset+1] = 0
++	out := body.Encode()
++	ally := uint16(0)
++	if len(body.String) > 1 && body.String[1] == '-' {
++		ally = d.guildAllies[guild]
++	}
++	h := protocol.Header{Type: protocol.MsgMessageWhisper, ID: uint16(s.Conn)}
++	w.ForEachPlaying(s.Conn, func(ms *world.Session, me *world.Entity) {
++		if me.Guild != guild && (ally == 0 || me.Guild != ally) {
++			return
++		}
++		if ms.GuildChat {
++			return
++		}
++		w.SendTo(ms, h, out)
++	})
++}
++
+ // teleportCmds maps a chat slash command to its destination tile. The client sends
+ // "/armia" as a whisper whose target name is "armia", so the command keyword IS the
+ // whisper name (_MSG_MessageWhisper.cpp). Coordinates are the peacetime ones; the
+diff --git a/tmserver/internal/handler/guild_chat_test.go b/tmserver/internal/handler/guild_chat_test.go
+new file mode 100644
+index 00000000..34288825
+--- /dev/null
++++ b/tmserver/internal/handler/guild_chat_test.go
+@@ -0,0 +1,185 @@
++package handler
++
++import (
++	"net"
++	"strings"
++	"testing"
++
++	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/protocol"
++	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/world"
++)
++
++// guildChatDB puts "tester" (Hero, conn 1) and "tradeb" (HeroB, conn 2) in guild 5
++// and "third" (HeroC, conn 3) in guild 6. With ally set, guild 5 is allied to 6.
++func guildChatDB(ally bool) *fakeDB {
++	db := newDB()
++	mk := func(name string, guild uint16) world.CharacterState {
++		return world.CharacterState{Slot: 0, Name: name, X: 5, Y: 5, HP: 1000, MaxHP: 1000, Level: 50, Clan: 1, GuildID: guild}
++	}
++	db.accounts["third"] = &fakeAccount{id: 13, pass: "secret", chars: []world.CharSummary{{Slot: 0, Name: "HeroC", Class: 1, Level: 50}}}
++	db.loads = map[int64]world.CharacterState{7: mk("Hero", 5), 11: mk("HeroB", 5), 13: mk("HeroC", 6)}
++	if ally {
++		db.guildRelations = []world.GuildRelation{{GuildID: 5, TargetGuildID: 6, Kind: world.GuildRelationAlly}}
++	}
++	return db
++}
++
++func guildChatWorld(t *testing.T, db *fakeDB) (a, b, c net.Conn, stop func()) {
++	t.Helper()
++	addr, stop, _ := startServerClock(t, db)
++	a = enterWorldAs(t, addr, "tester")
++	b = enterWorldAs(t, addr, "tradeb")
++	c = enterWorldAs(t, addr, "third")
++	drainRaw(t, a)
++	drainRaw(t, b)
++	drainRaw(t, c)
++	return a, b, c, stop
++}
++
++// expectGuildLine reads a guild line: an MSG_MessageWhisper from the speaker's
++// conn with MobName rewritten to the speaker, the text kept with its '-' prefix
++// and Color 3 at the 7662 offset (the client shows it as guild chat only then).
++func expectGuildLine(t *testing.T, c net.Conn, fromConn uint16, fromName, text string) {
++	t.Helper()
++	h, p, ok := readMaybeHeader(t, c)
++	if !ok || h.Type != protocol.MsgMessageWhisper {
++		t.Fatalf("got %#x ok=%v, want the guild line", h.Type, ok)
++	}
++	var body protocol.MsgWhisperBody
++	if err := body.Decode(p); err != nil {
++		t.Fatal(err)
++	}
++	if h.ID != fromConn || cstr(body.MobName[:]) != fromName || !strings.HasPrefix(string(body.String), text+"\x00") {
++		t.Fatalf("guild line = ID %d %q %q, want ID %d %q %q", h.ID, cstr(body.MobName[:]), body.String, fromConn, fromName, text)
++	}
++	if len(body.String) < whisperColorOffset+2 || body.String[whisperColorOffset] != 3 || body.String[whisperColorOffset+1] != 0 {
++		t.Fatalf("guild line Color bytes = %v, want [3 0] at %d", body.String[min(len(body.String), whisperColorOffset):], whisperColorOffset)
++	}
++}
++
++func expectPanel(t *testing.T, c net.Conn, text string) {
++	t.Helper()
++	ty, p, ok := readMaybe(t, c)
++	if !ok || ty != protocol.MsgMessagePanel {
++		t.Fatalf("got %#x ok=%v, want MessagePanel %q", ty, ok, text)
++	}
++	if got := cstr(p); got != text {
++		t.Fatalf("panel = %q, want %q", got, text)
++	}
++}
++
++// TestGuildChatReachesGuild: a "-" line reaches the other guild member only —
++// not the speaker and not the allied guild (_MSG_MessageWhisper.cpp:1426-1468).
++func TestGuildChatReachesGuild(t *testing.T) {
++	a, b, c, stop := guildChatWorld(t, guildChatDB(true))
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	whisperFrame(t, a, "", "-ola guilda")
++	expectGuildLine(t, b, 1, "Hero", "-ola guilda")
++	expectNothing(t, a, "speaker")
++	expectNothing(t, c, "allied guild on a single -")
++
++	whisperFrame(t, b, "", "-oi")
++	expectGuildLine(t, a, 2, "HeroB", "-oi")
++	expectNothing(t, c, "allied guild on a single -")
++}
++
++// TestGuildChatAlly: a "--" line also reaches the allied guild.
++func TestGuildChatAlly(t *testing.T) {
++	a, b, c, stop := guildChatWorld(t, guildChatDB(true))
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	whisperFrame(t, a, "", "--aliados")
++	expectGuildLine(t, b, 1, "Hero", "--aliados")
++	expectGuildLine(t, c, 1, "Hero", "--aliados")
++	expectNothing(t, a, "speaker")
++}
++
++// TestGuildChatAllyIsDirected: g_pGuildAlly is per guild; guild 6 has no ally,
++// so its "--" line reaches nobody in guild 5.
++func TestGuildChatAllyIsDirected(t *testing.T) {
++	a, b, c, stop := guildChatWorld(t, guildChatDB(true))
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	whisperFrame(t, c, "", "--ninguem")
++	expectNothing(t, a, "guild 5 on guild 6's --")
++	expectNothing(t, b, "guild 5 on guild 6's --")
++	expectNothing(t, c, "speaker")
++}
++
++// TestGuildChatWithoutAllyStaysInGuild: without an alliance "--" is guild-only.
++func TestGuildChatWithoutAllyStaysInGuild(t *testing.T) {
++	a, b, c, stop := guildChatWorld(t, guildChatDB(false))
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	whisperFrame(t, a, "", "--so guilda")
++	expectGuildLine(t, b, 1, "Hero", "--so guilda")
++	expectNothing(t, c, "other guild without an alliance")
++}
++
++// TestGuildChatOutsideGuild: a player without a guild gets
++// _NN_Only_Guild_Member_Can and nobody receives the line.
++func TestGuildChatOutsideGuild(t *testing.T) {
++	db := guildChatDB(false)
++	st := db.loads[13]
++	st.GuildID = 0
++	db.loads[13] = st
++	a, b, c, stop := guildChatWorld(t, db)
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	whisperFrame(t, c, "", "-sem guilda")
++	expectPanel(t, c, onlyGuildMemberCan)
++	expectNothing(t, a, "guild member")
++	expectNothing(t, b, "guild member")
++}
++
++// TestGuildChatToggle: "guildchat" stops the guild channel for that player and
++// confirms with the legacy panel text (_MSG_MessageChat.cpp:140-150); a second
++// toggle turns it back on.
++func TestGuildChatToggle(t *testing.T) {
++	a, b, c, stop := guildChatWorld(t, guildChatDB(false))
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	chatFrame(t, b, "guildchat")
++	expectPanel(t, b, "Guild Chatting : Off")
++	whisperFrame(t, a, "", "-voce nao ouve")
++	expectNothing(t, b, "member with guildchat off")
++
++	chatFrame(t, b, "guildchat")
++	expectPanel(t, b, "Guild Chatting : On")
++	whisperFrame(t, a, "", "-agora ouve")
++	expectGuildLine(t, b, 1, "Hero", "-agora ouve")
++}
++
++// TestGuildChatShortLineGetsColor: a body that stops before Color is padded so
++// the client still sees Color 3.
++func TestGuildChatShortLineGetsColor(t *testing.T) {
++	a, b, c, stop := guildChatWorld(t, guildChatDB(false))
++	defer stop()
++	defer a.Close()
++	defer b.Close()
++	defer c.Close()
++
++	var body protocol.MsgWhisperBody
++	body.String = []byte("-x\x00")
++	send(t, a, protocol.MsgMessageWhisper, body.Encode())
++	expectGuildLine(t, b, 1, "Hero", "-x")
++}
+diff --git a/tmserver/internal/handler/handler_test.go b/tmserver/internal/handler/handler_test.go
+index ca2ebcc6..8b98adc8 100644
+--- a/tmserver/internal/handler/handler_test.go
++++ b/tmserver/internal/handler/handler_test.go
+@@ -66,6 +66,8 @@ type fakeDB struct {
+ 	promoted      []uint8
+ 	promoteCosts  []int32
+ 	transfers     int
++
++	guildRelations []world.GuildRelation // ListGuildRelations result
+ }
+ 
+ // duelResult captures one RecordDuelResult call for assertions.
+@@ -168,7 +170,7 @@ func (f *fakeDB) SetGuildRelation(context.Context, uint16, uint16, world.GuildRe
+ func (f *fakeDB) ListGuilds(context.Context) ([]world.GuildRecord, error) { return nil, nil }
+ 
+ func (f *fakeDB) ListGuildRelations(context.Context) ([]world.GuildRelation, error) {
+-	return nil, nil
++	return f.guildRelations, nil
+ }
+ 
+ func (f *fakeDB) LoadGuildZones(context.Context) ([]world.GuildZone, error) { return nil, nil }
+diff --git a/tmserver/internal/world/session.go b/tmserver/internal/world/session.go
+index 1edbdcbf..6dae0308 100644
+--- a/tmserver/internal/world/session.go
++++ b/tmserver/internal/world/session.go
+@@ -65,6 +65,7 @@ type Session struct {
+ 	CrackError        int             // anti-cheat violation count (CUser.NumError)
+ 	Whisper           bool            // true blocks incoming whispers
+ 	PartyChat         bool            // true blocks the party channel (partychat)
++	GuildChat         bool            // true blocks the guild channel (guildchat)
+ 	GuildDisable      bool            // hide guild tag (guildon/guildoff)
+ 	TradeMode         int             // non-zero while in auto-trade (blocks attacks)
+ 	Trade             TradeState      // P2P direct-trade state (lote2-trade-autotrade.md)
+-- 
+2.54.0.windows.1
+
