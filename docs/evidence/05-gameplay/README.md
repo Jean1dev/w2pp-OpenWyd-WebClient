@@ -47,7 +47,7 @@ Ambiente: Railway `tm-server` (commit do servidor `98286fdf…`, `ClientVersion=
 | Grupo | aprovado | recusa, aceite, clique repetido, saída, expulsão, desconexão de membro e de líder, e relogin com inventário preservado; execução 6 no Railway ([fatia 4](2026-09-30-party.md)) |
 | Troca | **confirmado em execução** | recusa, oferta encaminhada, reset das confirmações por mudança de ouro, troca de item e ouro, relogin, cancelamento (`0x0384`) e troca de volta; servidor `2e532afa` com o PR #358 ([fatia 4, troca](2026-10-01-trade.md)) |
 | Troca: bolsa cheia e desconexão no meio | **confirmado em execução** | o servidor desfaz a troca sem mover nada (aviso 31); a desconexão de A fecha a janela de B sem mudança; limpeza da fase incompleta por prazo ([fatia A](2026-10-01-slice-a.md#casos-de-troca-loginentersecondtradeedge)) |
-| Persistência após reinício | pendente | fatia 5 |
+| Persistência após reinício controlado (fatia 5) | **confirmado em execução** (servidor `9d9af882`) | com A e B online, compra e depósito só na memória; `railway restart`; o desligamento salva as sessões (`sessions_saved=2`) e, após o relogin, ouro, bolsa, banco, nível, Exp e skills de A e B ficam idênticos ([evidência](2026-10-02-restart.md)) |
 
 ## Execuções de 29/09/2026 (cenário `login,enter,second,attack`)
 

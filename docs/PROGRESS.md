@@ -8,7 +8,7 @@ Atualização: 01/10/2026 (noite). O cliente web, via gateway próprio, faz no t
 | 2 Build e cena | Validada (01/10: build limpo, importador com testes sintéticos e cena Field/Select Server em Chromium e Firefox; Field é fixture offline; Safari não testado) | [Cena real no navegador](evidence/02-build/README.md), [reprodução de 01/10](evidence/02-build/2026-10-01-reproduction.md) |
 | 3 Protocolo | Validada (01/10: vetores, streaming adversarial, login real e DeleteCharacter com recusa `0x011B` no Railway `2e532afa`; login real no tm-server do operador, não numa stack local) | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, e buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco; falta o reinício) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco, e fatia 5 (reinício controlado) aprovada; falta a cura em outro jogador) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
 | 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
@@ -19,7 +19,7 @@ Atualização: 01/10/2026 (noite). O cliente web, via gateway próprio, faz no t
    - fatia A (01/10): venda, ouro no banco entre sessões, teleporte pago e casos de troca confirmados. A execução 4 de `tradeedge` (01/10, 21:04) rodou todos os passos: aviso "Nao ha espaco no inventario." confirmado online e B limpo. Só a regra final reprovou, porque B começou cheio de sobra; regra corrigida e JSON reavaliado offline;
    - PRs #361, #362 e #363 implantados (`052cd5fe`). Ouro dos mobs e dano após o login foram confirmados em execução;
    - PRs #364 e #365 implantados (`bc7b3923`); chat de grupo e nível confirmados em execução em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-partychat-level-deployed.md)). Em produção real, rodar migrações de personagem com jogadores deslogados;
-   - fatia 5: persistência após reinício controlado do servidor. O usuário autorizou o reinício via Railway CLI quando a fatia entrar;
+   - fatia 5 aprovada em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-restart.md));
    - buff e cura aprovados em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-buff-cure.md)). O modelo da BM voltava a humano no relogin; corrigido pelo PR [#366](https://github.com/Jean1dev/w2pp-OpenWYD/pull/366) e confirmado em execução em `9d9af882`. Em aberto: cura em outro jogador.
 
    Rodar os cenários online em processos separados. Antes de abrir A e B, confirmar ≥ 2 GB livres: órfãos `tail`/`grep`, Docker e Chrome em segundo plano custaram ~1,3 GB nesta sessão ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
@@ -713,3 +713,23 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - **no relogin, A continua lobo (modelo 26)**.
 
   O "126 → 95" registrado antes incluía um tick de regeneração.
+
+### 02/10/2026 — fatia 5: reinício controlado
+
+- **Pedido do usuário:** fazer a fatia 5 com o reinício.
+- **Confirmado em fonte:** o tm-server salva no logout ou desconexão e no desligamento (`world.go` `shutdown`: personagens em jogo, depois os bancos); não há salvamento periódico.
+- **Arquivos:**
+  - `tools/verify_world.mjs`: fase `restart`. A compra e deposita com A e B online, sinaliza `.cache/restart-ready.json`, espera `.cache/restart-done.json`, reloga com novas tentativas e compara;
+  - `tools/world_checks.mjs`: `checkRestart` e regra da fase;
+  - `tools/party_checks.test.mjs`;
+  - evidência e checklist.
+- **Confirmado em execução (Railway `9d9af882`):**
+  - `railway restart -s tm-server -y` às 13:06:18; `sessions_saved=2`;
+  - o banco de dados mostrou a compra e o depósito só depois do reinício;
+  - A e B relogaram com tudo idêntico;
+  - `world:checks` 36/0.
+- **Falhas registradas:**
+  - primeira chamada com `ARMIA_EAST` antes de definido;
+  - segunda tentativa sem detectar a queda (causa não determinada; servidor reiniciado às 12:37:55) e DSN vazia na CLI;
+  - a CLI de restart só sai pelo timeout.
+- **Próximo passo:** cura em outro jogador; etapa 4 (relogin do cliente Windows); etapas 6–8.

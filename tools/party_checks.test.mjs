@@ -68,3 +68,20 @@ test('buff and cure need a server MP cost, the visible effect and the skill afte
     { class: '2', skill: '5', phases: 'login,learn' }])
     assert.throws(() => validateOptions({ ...opt, ...bad }), JSON.stringify(bad));
 });
+
+test('restart keeps what both clients held, including unsaved gold, carry and cargo', async () => {
+  const { checkRestart } = await import('./world_checks.mjs');
+  const side = { coin: 900, level: 6, exp: '4566', learned: 0, equip: [1, 2], carry: [{ index: 401 }, { index: 1774 }] };
+  const ok = { buy: { gained: 1, price: 100, coinBefore: 1053, coinAfter: 953 }, deposit: { amount: 53, cargoBefore: 0 },
+    droppedAt: { a: 't', b: 't' }, before: { a: side, b: side, cargo: { coin: 53, items: [0, 7] } },
+    after: { a: side, b: side, cargo: { coin: 53, items: [0, 7] } } };
+  checkRestart(ok);
+  const bad = [{ after: { ...ok.after, a: { ...side, coin: 1053 } } }, { after: { ...ok.after, b: { ...side, exp: '0' } } },
+    { after: { ...ok.after, a: { ...side, carry: [{ index: 401 }] } } }, { after: { ...ok.after, cargo: { coin: 0, items: [0, 7] } } },
+    { droppedAt: { a: 't' } }, { buy: { gained: 0, price: 100, coinBefore: 1053, coinAfter: 1053 } }];
+  for (const x of bad) assert.throws(() => checkRestart({ ...ok, ...x }), JSON.stringify(Object.keys(x)));
+  const opt = { target: 'localhost:8281', 'client-version': '12000', class: '0' };
+  validateOptions({ ...opt, phases: 'login,enter,second,restart' });
+  assert.throws(() => validateOptions({ ...opt, phases: 'login,enter,restart' }));
+});
+

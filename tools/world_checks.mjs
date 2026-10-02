@@ -15,7 +15,7 @@ export function redactEvidence(value, secrets) {
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
   'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'buff', 'castarea',
-  'equip', 'potion', 'loot', 'shop', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'trade', 'tradeedge', 'delete', 'concurrent'];
+  'equip', 'potion', 'loot', 'shop', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -48,6 +48,7 @@ export function validateOptions(opt) {
     ['paidteleport', ['enter', 'login', 'paidteleport']],
     ['chat', ['chat', 'enter', 'login', 'second']], ['party', ['enter', 'login', 'party', 'second']],
     ['partychat', ['enter', 'login', 'partychat', 'second']],
+    ['restart', ['enter', 'login', 'restart', 'second']],
     ['trade', ['enter', 'login', 'second', 'trade']], ['tradeedge', ['enter', 'login', 'second', 'tradeedge']],
     ['delete', ['delete']]]) {
     if (phases.has(p)) assert.deepEqual([...phases].sort(), only, `${p} runs only with ${only.join(',')}`);
@@ -442,4 +443,22 @@ export function checkBuff(r, plan) {
     assert(echoB && echoB.targets[0].damage === echoA.targets[0].damage && echoB.hp === echoA.hp,
       'B did not receive the same heal answer');
   }
+}
+
+// Slice 5, controlled restart: what both clients held right before the
+// server stopped (A's purchase and cargo deposit lived only in its memory)
+// comes back unchanged after the restart, through a fresh login.
+export function checkRestart(r) {
+  assert(r.buy?.gained === 1 && r.buy.coinAfter === r.buy.coinBefore - r.buy.price, 'purchase before the restart not applied');
+  assert(r.droppedAt?.a && r.droppedAt?.b, 'the restart did not drop both sessions');
+  for (const who of ['a', 'b']) {
+    const [x, y] = [r.before[who], r.after[who]];
+    for (const k of ['coin', 'level', 'exp', 'learned'])
+      assert.deepEqual(y[k], x[k], `${who}.${k} changed across the restart`);
+    assert.deepEqual(y.equip, x.equip, `${who}.equip changed across the restart`);
+    assert.deepEqual(y.carry, x.carry, `${who}.carry changed across the restart`);
+  }
+  assert.equal(r.after.cargo.coin, r.before.cargo.coin, 'cargo gold changed across the restart');
+  assert.deepEqual(r.after.cargo.items, r.before.cargo.items, 'cargo items changed across the restart');
+  assert(r.before.cargo.coin >= r.deposit.cargoBefore + r.deposit.amount, 'deposit not in the cargo before the restart');
 }
