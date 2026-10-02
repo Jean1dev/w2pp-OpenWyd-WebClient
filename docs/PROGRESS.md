@@ -10,7 +10,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
 | 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco, fatia 5 (reinício controlado) e cura em outro jogador aprovadas; o checklist não tem mais item pendente que dependa só do cliente) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
-| 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente; 02/10: painel de música, efeitos e resolução compilado e testado com runtime falso, áudio real ainda não verificado; tela de carregamento com progresso real, cache e erros testada com runtime falso, pacote real ainda não verificado) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md), [painel de configurações](evidence/07-web/2026-10-02-settings.md), [tela de carregamento](evidence/07-web/2026-10-02-loading-screen.md) |
+| 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente; 02/10: painel de música, efeitos e resolução compilado e testado com runtime falso, áudio real ainda não verificado; tela de carregamento com progresso real, cache e erros testada com runtime falso, pacote real ainda não verificado; seleção automática do servidor quando todos os canais têm o mesmo destino (patch 0025), aprovada com runtime real contra o tm-server do Railway) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md), [painel de configurações](evidence/07-web/2026-10-02-settings.md), [tela de carregamento](evidence/07-web/2026-10-02-loading-screen.md), [seleção automática do servidor](evidence/07-web/2026-10-02-auto-server.md) |
 | 8 Entrega | Em andamento (02/10: gate por conta do portal no lugar do Basic Auth, implantado e confirmado no domínio público; falta o login real pelo portal) | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md), [gate do portal](evidence/08-entrega/2026-10-02-portal-gate.md) |
 
 ## Próxima ação
@@ -877,3 +877,19 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - `npm run settings:ui`: 36/36 (regressão).
 - **Não executado:** `assets:cache`, `--real` e Railway. Este worktree não tem emsdk nem dataset.
 - **Próximo passo:** validar com o pacote real e rede lenta; depois do deploy, o operador confere no domínio público.
+
+### 02/10/2026 — seleção automática do servidor (etapa 7)
+
+- **Pedido do usuário:** o jogador entra pelo portal; o `serverlist.bin` tem vários grupos, mas todos apontam para o mesmo destino, então o jogo deve pular a lista. O teste deve usar o tm-server via CLI do Railway. Pular conta e senha exige mudar o servidor e não foi feito.
+- **Arquivos:**
+  - `patches/openwyd/0025-selectserver-auto.patch` (`wyd_selectserver_auto`: destino único; aciona grupo, canal e OK originais);
+  - `web/client.js`;
+  - `tools/verify_auto_server.mjs` (`npm run auto:server`), `tools/verify_loading_ui.mjs`;
+  - a [evidência](evidence/07-web/2026-10-02-auto-server.md).
+- **Toolchain local montada:** emsdk 6.0.0 (`d223ae7`), Go 1.25.13 com hash conferido e assets importados de `Client-aws`.
+- **Comandos e resultados:**
+  - runtime linkado com 0 indefinidos;
+  - `auto:server` **8/8 com o runtime real** contra `reseau.proxy.rlwy.net:56950` (destino lido com a CLI do Railway): 3 canais e 1 destino; login aberto sem clique; `0x020D` digitado pelo teclado; o tm-server respondeu `0x0102` "Conta inexistente.";
+  - `loading:ui` 42/42; `settings:ui` 36/36; `test_public_exports` 4/4.
+- **Não executado:** relogin com conta real, Firefox com runtime real e build `--public` local.
+- **Próximo passo:** PR, CI verde e deploy; conferir pelo portal.

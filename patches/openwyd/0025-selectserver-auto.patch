@@ -1,0 +1,64 @@
+Etapa 7: wyd_selectserver_auto lets the page skip the server selection when
+every channel of every group in the server list points to the same address.
+It drives the original controls in the order a player clicks them (first
+group, first channel, OK); nothing is typed or sent, and the player still
+logs in on the original panel.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -512,6 +512,54 @@
+ // 0 locked, 1 unlocked, 2 verify sent, 3..5 PIN change steps.
+ extern "C" WYD_EXPORT int wyd_selchar_account_lock() { return g_AccountLock; }
+ 
++// Etapa 7: when every channel of every group points to the same address the
++// list offers no real choice, so the page skips it. Entry [group][0] is the
++// status URL; channels start at 1. Returns 1 when the login panel opened, 0
++// when not ready yet (other scene, opening animation, panel hidden, message
++// box, or the player went back to the list), and -1 when it does not apply
++// (no channel, different addresses, or the original OK refused the channel).
++static int WydServerListSingleAddress() {
++  const char* first = nullptr;
++  for (int group = 0; group < MAX_SERVERGROUP; ++group) {
++    for (int channel = 1; channel < MAX_SERVERNUMBER; ++channel) {
++      const char* address = g_pServerList[group][channel];
++      if (!address[0]) continue;
++      if (!first) first = address;
++      else if (std::strncmp(first, address, sizeof g_pServerList[0][0]) != 0) return 0;
++    }
++  }
++  return first ? 1 : 0;
++}
++
++// It drives the original controls in the order a player clicks them (first
++// group, first channel, OK), so B_SERVER_SEL_OK picks the address and shows
++// the login panel itself. Nothing is typed or sent.
++extern "C" WYD_EXPORT int wyd_selectserver_auto() {
++  if (!g_pObjectManager) return 0;
++  TMScene* scene = g_pObjectManager->GetCurrentScene();
++  if (!scene || scene->GetSceneType() != ESCENE_TYPE::ESCENE_SELECT_SERVER) return 0;
++
++  auto* select_server = static_cast<TMSelectServerScene*>(scene);
++  if (!select_server->m_pNServerSelect || !select_server->m_pNServerGroupList ||
++      !select_server->m_pNServerList) {
++    return -1;
++  }
++  if (select_server->m_cLogin != 0 || select_server->m_bGameGradePlay ||
++      !select_server->m_pNServerSelect->IsVisible()) {
++    return 0;
++  }
++  if (select_server->m_pMessageBox && select_server->m_pMessageBox->IsVisible()) return 0;
++  if (!WydServerListSingleAddress() || select_server->m_pNServerGroupList->m_nNumItem < 1) return -1;
++
++  select_server->m_pNServerGroupList->SetSelectedIndex(0);
++  select_server->OnControlEvent(L_SELECT_SERVERG, 0);
++  if (select_server->m_pNServerList->m_nNumItem < 1) return -1;
++
++  select_server->m_pNServerList->SetSelectedIndex(0);
++  select_server->OnControlEvent(B_SERVER_SEL_OK, 0);
++  return select_server->m_cLogin == 1 ? 1 : -1;
++}
++
+ // Types the PIN on the shuffled keypad (buttons 66437..66446 show keybuf[])
+ // and presses the verify button (66433). The digits are not kept.
+ extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_pin(const char* pin) {
