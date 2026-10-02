@@ -27,7 +27,8 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
 2. Etapa 4 — fechar (os cenários de duas sessões passaram em 01/10, [evidência](evidence/04-login-mundo/2026-10-01-two-sessions.md)):
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
    - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
-3. Etapa 8 — gate por conta do portal implantado ([ADR 015](decisions/015-portal-account-gate.md)). Falta verificar no navegador: login ou cadastro no portal → `/jogar` → jogo, duas sessões e relogin. Depois, `wyd_debug_*` atrás de flag e `WYD_MAX_CONNS_PER_IP`.
+3. Etapa 8 — gate por conta do portal implantado ([ADR 015](decisions/015-portal-account-gate.md)). Falta verificar no navegador: login ou cadastro no portal → `/jogar` → jogo, duas sessões e relogin.
+   Build público sem `wyd_debug_*` e IP do cliente pela primeira entrada do `X-Forwarded-For` ([ADR 016](decisions/016-public-build-and-client-ip.md)): confirmar o build real na CI ou no Railway e, depois do deploy, o IP no log com um `X-Forwarded-For` forjado.
    Também: confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
 4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6.
 5. Etapa 7 — painel de configurações: com o dataset, verificar no Railway música e efeitos ao vivo, mudo na troca de zona, persistência no relogin e as resoluções 1024×768/1280×1024 ([roteiro](evidence/07-web/2026-10-02-settings.md#próximo-passo)).
@@ -838,3 +839,24 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - merge do gateway [#19](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/pull/19);
   - `WYD_BASIC_AUTH_*` removidas do Railway; deploy `3504ab4c` em SUCCESS.
   O domínio público responde como esperado ([evidência](evidence/08-entrega/2026-10-02-portal-gate.md#produção-02102026)). Falta o login real pelo portal.
+
+### 02/10/2026 — build público sem `wyd_debug_*` e IP do cliente
+
+- **Pedido do usuário:** aplicar as recomendações de antes de abrir: `wyd_debug_*` atrás de flag e `WYD_MAX_CONNS_PER_IP`.
+- **Confirmado em fonte:**
+  - as `wyd_debug_*` chegam ao WASM pela lista `EXPORTED_FUNCTIONS` do link e por `KEEPALIVE`;
+  - `client.js` e `settings.js` não usam nenhuma; só `local-scene.js` usa `wyd_debug_camera_*`.
+- **Confirmado em execução:** o gateway registrava um IP de borda e não o IP do cliente, porque a última entrada do `X-Forwarded-For` é um salto do Railway.
+- **Arquivos:**
+  - `patches/openwyd/0024-public-build-exports.patch`;
+  - `tools/check_public_exports.py`, `tools/test_public_exports.py`, `tools/assemble_site.py`;
+  - `Dockerfile`, `.github/workflows/ci.yml`;
+  - gateway: `config`, `env`, `relay`, `portalauth` e testes;
+  - ADR 016 e `deploy.md`.
+- **Comandos e resultados:**
+  - patches 0001–0024 aplicados num checkout limpo;
+  - testes do verificador: 4/4;
+  - `assemble_site --public` com link falso: o build limpo passa, sem a cena offline; o build com `wyd_debug_selchar_pin` falha;
+  - gateway: `go vet` e `go test ./...` passam.
+- **Railway:** `WYD_FORWARDED_FOR=first` e `WYD_MAX_CONNS_PER_IP=4` registradas com `--skip-deploys`.
+- **Não executado:** build real da imagem (sem Docker ou emsdk locais), que fica com a CI e o Railway.

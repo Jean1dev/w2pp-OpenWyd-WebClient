@@ -144,7 +144,7 @@ func (g *Gateway) handleWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return
 	}
-	ip := remoteIP(r, g.cfg.TLSTerminatedByProxy)
+	ip := remoteIP(r, forwardedFor(g.cfg))
 	if !g.acquire(ip) {
 		g.log.Warn("connection limit", "channel", ch.Name, "ip", ip)
 		http.Error(w, "too many connections", http.StatusServiceUnavailable)
@@ -361,13 +361,27 @@ func (g *Gateway) release(ip string) {
 // then the peer is always that proxy, and the rightmost X-Forwarded-For entry
 // is the one the proxy appended (a client can only prepend forged entries).
 // Without that declaration the per-IP limit degrades to per-proxy, which is safe.
-func remoteIP(r *http.Request, behindProxy bool) string {
-	if behindProxy {
-		if xff := r.Header.Values("X-Forwarded-For"); len(xff) > 0 {
-			parts := strings.Split(xff[len(xff)-1], ",")
-			if ip := net.ParseIP(strings.TrimSpace(parts[len(parts)-1])); ip != nil {
-				return ip.String()
-			}
+// forwardedFor is the X-Forwarded-For entry trusted as the client: "" (the
+// header is ignored), "last" or "first".
+func forwardedFor(cfg *config.Config) string {
+	switch {
+	case !cfg.TLSTerminatedByProxy:
+		return ""
+	case cfg.ForwardedFor == "":
+		return "last"
+	}
+	return cfg.ForwardedFor
+}
+
+func remoteIP(r *http.Request, xff string) string {
+	if values := r.Header.Values("X-Forwarded-For"); xff != "" && len(values) > 0 {
+		parts := strings.Split(strings.Join(values, ","), ",")
+		entry := parts[len(parts)-1]
+		if xff == "first" {
+			entry = parts[0]
+		}
+		if ip := net.ParseIP(strings.TrimSpace(entry)); ip != nil {
+			return ip.String()
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

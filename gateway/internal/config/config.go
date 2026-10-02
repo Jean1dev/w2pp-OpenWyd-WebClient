@@ -76,6 +76,10 @@ type Config struct {
 	// HTTPS/WSS and forwards plain HTTP to Listen. The public side must then be
 	// wss:// and https:// only; nothing is served insecurely to the browser.
 	TLSTerminatedByProxy bool `json:"tlsTerminatedByProxy"`
+	// ForwardedFor picks the client entry of X-Forwarded-For behind that proxy:
+	// "last" (default) for proxies that append the peer, "first" for edges
+	// that replace the client-supplied header (Railway, ADR 015).
+	ForwardedFor string `json:"forwardedFor"`
 	// AllowedOrigins are exact scheme://host[:port] browser origins.
 	AllowedOrigins []string `json:"allowedOrigins"`
 	// StaticDir optionally serves the built client from the same origin.
@@ -186,6 +190,14 @@ func (c *Config) Validate() error {
 	}
 	if c.TLSTerminatedByProxy && c.AllowInsecure {
 		errs = append(errs, errors.New("tlsTerminatedByProxy and allowInsecure are exclusive"))
+	}
+	switch c.ForwardedFor {
+	case "", "last", "first":
+		if c.ForwardedFor != "" && !c.TLSTerminatedByProxy {
+			errs = append(errs, errors.New("forwardedFor requires tlsTerminatedByProxy"))
+		}
+	default:
+		errs = append(errs, errors.New(`forwardedFor must be "last" or "first"`))
 	}
 	if c.TLSTerminatedByProxy {
 		for _, o := range c.AllowedOrigins {

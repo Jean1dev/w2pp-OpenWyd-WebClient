@@ -105,6 +105,16 @@ func TestFromEnvPortalGate(t *testing.T) {
 	}
 }
 
+func TestFromEnvForwardedFor(t *testing.T) {
+	c, err := FromEnv(env(map[string]string{EnvForwardedFor: "first"}))
+	if err != nil || c.ForwardedFor != "first" {
+		t.Fatalf("first refused: %v", err)
+	}
+	if _, err := FromEnv(env(map[string]string{EnvForwardedFor: "middle"})); err == nil {
+		t.Fatal("invalid position accepted")
+	}
+}
+
 func TestTLSProxyValidation(t *testing.T) {
 	c := valid()
 	c.AllowInsecure = false
