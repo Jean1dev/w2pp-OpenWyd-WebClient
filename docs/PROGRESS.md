@@ -10,7 +10,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
 | 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco, fatia 5 (reinício controlado) e cura em outro jogador aprovadas; o checklist não tem mais item pendente que dependa só do cliente) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
-| 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md) |
+| 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente; 02/10: painel de música, efeitos e resolução compilado e testado com runtime falso, áudio real ainda não verificado) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md), [painel de configurações](evidence/07-web/2026-10-02-settings.md) |
 | 8 Entrega | Em andamento | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md) |
 
 ## Próxima ação
@@ -29,7 +29,8 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
 3. Etapa 8 — confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
 4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6.
-5. Servidor, entregas separadas (não feitas):
+5. Etapa 7 — painel de configurações: com o dataset, verificar no Railway música e efeitos ao vivo, mudo na troca de zona, persistência no relogin e as resoluções 1024×768/1280×1024 ([roteiro](evidence/07-web/2026-10-02-settings.md#próximo-passo)).
+6. Servidor, entregas separadas (não feitas):
    - itens no chão: `0x026E`, CNF de 28 bytes, decay e dono ([ADR 007](decisions/007-inventory-dialect.md));
    - aviso na recusa do teleporte pago (o original avisa, o Go fica em silêncio);
    - sussurro: gravar o nome de quem envia e reproduzir a reescrita legada; enviar aviso nas recusas de compra, venda, banco e teleporte; confirmar o layout de 57 bytes do `0x0339` ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
@@ -783,3 +784,29 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Achado:** kefra, refino, nightmare, convite de guilda e o relógio `!!` usam o mesmo `w.Send` para o painel e devem estar invisíveis no 7662. Não foi verificado em execução.
 - **Arquivos:** evidência, JSON e log sanitizado da execução 1; ADR 014; checklist; patch 0007; este progresso.
 - **Próximo passo:** merge e deploy do #368; repetir `login,enter,second,guildchat`.
+
+### 02/10/2026 — painel de configurações (música, efeitos e resolução)
+
+- **Pedido do usuário:** painel de configurações com som, música ambiente e resolução, como no wyd.vektar.tech. Escolhas do usuário: recarregar com confirmação ao trocar a resolução e "ampliar mantendo proporção"; sem tela cheia.
+- **Referência:** o Valthera foi só observado (HTML/JS público, sem login, nada copiado), conforme `docs/SOURCES.md`.
+- **Confirmado em fonte:**
+  - o `Config.bin` (som, música e resolução) só é lido no boot;
+  - os managers de áudio só existem com nível > 0;
+  - a troca de zona recria o BGM a partir de `m_nMusic`;
+  - no WASM, a resolução é o tamanho do canvas.
+  Detalhes na [evidência](evidence/07-web/2026-10-02-settings.md).
+- **Arquivos:**
+  - `patches/openwyd/0023-audio-levels.patch` (exports `wyd_audio_set_levels`/`wyd_audio_get_level`; managers sempre criados no WASM; nível 0 = mudo);
+  - `web/settings.js`, `web/settings.css`;
+  - `web/client.{html,js}`, `web/local-scene.{html,js}`;
+  - `tools/verify_settings_ui.mjs`, `package.json` (`settings:ui`).
+- **Comandos e resultados:**
+  - `python tools/fetch_pinned.py upstream` e `apply_openwyd_patches.py` a partir do reset: 0001–0023 aplicados;
+  - `docker build --target wasm`: exit 0, com os exports presentes no `runtime.js`;
+  - runtime real sem dataset: resolução 1024×768 e níveis da página aplicados no `NewApp`; o boot para em `BASE_InitializeBaseDef`, sem assets;
+  - `npm run settings:ui`: 36/36 em Chromium e Firefox, três vezes.
+- **Não executado:**
+  - áudio real, Field e servidor, porque esta máquina não tem dataset, emsdk ou Go locais;
+  - nenhum deploy;
+  - o teste de UI usa runtime falso e não é evidência de gameplay.
+- **Próximo passo:** roteiro online da [evidência](evidence/07-web/2026-10-02-settings.md#próximo-passo).

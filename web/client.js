@@ -73,7 +73,8 @@ function probe() {
     },
     textInputActive: call("_wyd_text_input_active"),
     webgl2: call("_wyd_d3d9_is_webgl2"),
-    glErrorTotal: call("_wyd_d3d9_gl_error_total")
+    glErrorTotal: call("_wyd_d3d9_gl_error_total"),
+    settings: WydSettings.snapshot()
   };
 }
 window.clientProbe = probe;
@@ -176,6 +177,8 @@ async function start() {
     throw new Error("config.json inválido");
   }
   clientEvidence.config = { channel: cfg.channel, wsUrl: cfg.wsUrl, clientVersion: cfg.clientVersion };
+  // O runtime lê a resolução do tamanho do canvas no boot.
+  WydSettings.applyBeforeBoot(canvas);
 
   window.Module = {
     canvas,
@@ -195,8 +198,10 @@ async function start() {
         call("_wyd_net_set_client_version", cfg.clientVersion | 0);
         call("_wyd_renderer_set_backend", 0);
         call("_wyd_set_field_mode", 1);
+        WydSettings.beforeBoot({ call, inField: () => call("_wyd_field_has_my_human") === 1 });
         if (Module._wyd_boot_client(1) !== 1) throw new Error("Falha ao inicializar o cliente");
         Module._wyd_set_game_state(SELECTSERVER_STATE);
+        WydSettings.afterBoot();
         call("_wyd_d3d9_set_debug_flags", 0);
         wireInput();
         canvas.focus();

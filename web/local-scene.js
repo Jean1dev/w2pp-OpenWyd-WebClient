@@ -82,7 +82,8 @@ function probe() {
     assetOpenFailures: call("_wyd_d3d9_asset_file_open_fail"),
     assetOpenFailureSamples: samples(),
     glErrorTotal: call("_wyd_d3d9_gl_error_total"),
-    glErrorLast: call("_wyd_d3d9_gl_error_last")
+    glErrorLast: call("_wyd_d3d9_gl_error_last"),
+    settings: WydSettings.snapshot()
   };
 }
 window.sceneProbe = probe;
@@ -144,6 +145,9 @@ function describe(info) {
     `em ${info.humanX},${info.humanY} (${origin})`;
 }
 
+// O runtime lê a resolução do tamanho do canvas no boot.
+WydSettings.applyBeforeBoot(canvas);
+
 window.Module = {
   canvas,
   // Endpoint deliberadamente inutilizável na cena offline; a CSP também proíbe WS.
@@ -161,9 +165,11 @@ window.Module = {
       // field real antes do boot, cena e contadores logo depois.
       call("_wyd_renderer_set_backend", 0);
       call("_wyd_set_field_mode", 1);
+      WydSettings.beforeBoot({ call, inField: () => call("_wyd_field_has_my_human") === 1 });
       sceneEvidence.boot = Module._wyd_boot_client(1);
       if (sceneEvidence.boot !== 1) throw new Error("Falha ao inicializar a cena");
       Module._wyd_set_game_state(requestedState);
+      WydSettings.afterBoot();
       call("_wyd_d3d9_set_debug_flags", 0);
       call("_wyd_d3d9_reset_debug_counters");
       wireInput();

@@ -47,6 +47,8 @@ No checkout do servidor, ler conforme a tarefa:
 
 Essas URLs são mutáveis. Observações de funcionalidades não validam corretude ou autoria. Não importar conteúdo delas.
 
+Observado em 02/10/2026, sem login: `startup_harness.html` e `openwyd-ui.js` mostram o painel "Exibição". Nele há resolução 640×480–1600×1200, ajuste de tamanho e sliders de música e efeitos que chamam `_wyd_audio_set_volumes`, um export que não existe no upstream fixado. Isso serviu só como referência funcional para o nosso painel ([evidência](evidence/07-web/2026-10-02-settings.md)); nenhum código, texto ou estilo foi importado.
+
 ## Fontes para decisões de plataforma
 
 Consultar documentação oficial atual somente quando escolher ou alterar a respectiva capacidade:
