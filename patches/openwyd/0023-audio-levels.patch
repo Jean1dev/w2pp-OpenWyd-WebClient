@@ -1,0 +1,137 @@
+Sound effects and music levels for the page's settings panel. On the web
+both managers always exist and level 0 is mute (-10000), so a level can be
+raised from 0 without a reload. wyd_audio_set_levels keeps the levels for
+NewApp::Initialize before boot (they win over Config.bin) and applies them to
+the live managers after boot with the original curves. Windows build unchanged
+apart from a null check after a failed CSoundManager::Initialize.
+
+diff --git a/Projects/TMProject/DirShow.cpp b/Projects/TMProject/DirShow.cpp
+index 46fcf33..d7db66f 100644
+--- a/Projects/TMProject/DirShow.cpp
++++ b/Projects/TMProject/DirShow.cpp
+@@ -278,6 +278,10 @@ DS_SOUND_MANAGER::DS_SOUND_MANAGER(int channel_num, int lBGMVolume)
+ 	m_lBGMVolume = lBGMVolume;
+ 
+ #if defined(__EMSCRIPTEN__)
++	// Callers pass 30 * level - 3000; level 0 means music off. The web always
++	// keeps a BGM manager (NewApp::InitDevice), so off must be silent, not -30 dB.
++	if (m_lBGMVolume <= -3000)
++		m_lBGMVolume = -10000;
+ 	channels = nullptr;
+ 	init_flag = channel_num >= 1;
+ 	return;
+diff --git a/Projects/TMProject/NewApp.cpp b/Projects/TMProject/NewApp.cpp
+index c77e829..c89e3e9 100644
+--- a/Projects/TMProject/NewApp.cpp
++++ b/Projects/TMProject/NewApp.cpp
+@@ -25,6 +25,7 @@ extern "C" void wyd_wasm_clear_deferred_state_request();
+ extern "C" unsigned int wyd_d3d9_get_debug_flags();
+ extern "C" int wyd_d3d9_optimized_begin_world();
+ extern "C" void wyd_d3d9_optimized_end_world_begin_ui();
++extern "C" int wyd_audio_pending_level(int which);
+ #endif
+ #include <WinInet.h>
+ #include "TMSkinMesh.h"
+@@ -304,6 +305,14 @@ HRESULT NewApp::Initialize(HINSTANCE hInstance, int nFull)
+ 
+ 	m_nSound = Config.Config[2];
+ 	m_nMusic = Config.Config[3];
++#if defined(__EMSCRIPTEN__)
++	// The page's settings panel takes the place of the external Config.bin
++	// editor: levels it set before boot win over the packaged file.
++	if (wyd_audio_pending_level(0) >= 0)
++		m_nSound = wyd_audio_pending_level(0);
++	if (wyd_audio_pending_level(1) >= 0)
++		m_nMusic = wyd_audio_pending_level(1);
++#endif
+ 	nBright = Config.Config[5];
+ 	nCursor = Config.Config[6];
+ 
+@@ -575,7 +584,17 @@ HRESULT NewApp::InitDevice()
+ 	}
+ 	WasmInitLog("[newapp:init-device] render initialize ok");
+ 
+-	if (m_nSound > 0)
++#if defined(__EMSCRIPTEN__)
++	// On the web both managers always exist, so the settings panel can raise a
++	// level from 0 without a reload. Level 0 is applied as mute (-10000).
++	const bool bSoundSetup = true;
++	const bool bMusicSetup = true;
++#else
++	const bool bSoundSetup = m_nSound > 0;
++	const bool bMusicSetup = m_nMusic > 0;
++#endif
++
++	if (bSoundSetup)
+ 	{
+ 		WasmInitLog("[newapp:init-device] sound setup");
+ 		InitMusicList();
+@@ -593,12 +612,17 @@ HRESULT NewApp::InitDevice()
+ 			nVolume = 0;
+ 		if (nVolume < -2500)
+ 			nVolume = -2500;
++		if (m_nSound <= 0)
++			nVolume = -10000;
+ 
+-		m_pSoundManager->SetSoundVolume(nVolume);
+-		m_pSoundManager->LoadSoundData();
++		if (m_pSoundManager)
++		{
++			m_pSoundManager->SetSoundVolume(nVolume);
++			m_pSoundManager->LoadSoundData();
++		}
+ 	}
+ 
+-	if (m_nMusic > 0)
++	if (bMusicSetup)
+ 	{
+ 		WasmInitLog("[newapp:init-device] bgm setup");
+ 		m_pBGMManager = new DS_SOUND_MANAGER(1, 30 * m_nMusic - 3000);
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+index b78c70c..9a137cf 100644
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -5,6 +5,7 @@
+ #include "CFrame.h"
+ #include "CMesh.h"
+ #include "DirShow.h"
++#include "dsutil.h"
+ #include "MeshManager.h"
+ #include "NewApp.h"
+ #include "ObjectManager.h"
+@@ -1206,3 +1207,35 @@ extern "C" WYD_EXPORT int wyd_debug_selchar_delete(const char* password) {
+   std::memset(scene->m_pPWEdit->m_strText, 0, sizeof(scene->m_pPWEdit->m_strText));
+   return r;
+ }
++
++// ---- Settings panel: sound effects and music levels (etapa 7) ----
++// Levels use the Config.bin scale (0..100; 0 = off). Before boot they are kept
++// for NewApp::Initialize; after boot they go to the live managers with the
++// original curves: effects 25 * n - 2500, music 30 * n - 3000 (hundredths of dB).
++static int g_wydAudioPendingLevel[2] = {-1, -1};
++
++extern "C" int wyd_audio_pending_level(int which) {
++  return which == 0 || which == 1 ? g_wydAudioPendingLevel[which] : -1;
++}
++
++extern "C" WYD_EXPORT int wyd_audio_set_levels(int sound, int music) {
++  sound = sound < 0 ? 0 : (sound > 100 ? 100 : sound);
++  music = music < 0 ? 0 : (music > 100 ? 100 : music);
++  g_wydAudioPendingLevel[0] = sound;
++  g_wydAudioPendingLevel[1] = music;
++  if (!g_pApp) return 0;
++  g_pApp->m_nSound = sound;
++  g_pApp->m_nMusic = music;
++  if (g_pApp->m_pSoundManager)
++    g_pApp->m_pSoundManager->SetSoundVolume(sound > 0 ? 25 * sound - 2500 : -10000);
++  if (g_pApp->m_pBGMManager)
++    g_pApp->m_pBGMManager->SetVolume(0, music > 0 ? 30 * music - 3000 : -10000);
++  return 1;
++}
++
++// 0 effects, 1 music: the level in use (the pending one before boot), or -1.
++extern "C" WYD_EXPORT int wyd_audio_get_level(int which) {
++  if (which != 0 && which != 1) return -1;
++  if (!g_pApp) return g_wydAudioPendingLevel[which];
++  return which == 0 ? g_pApp->m_nSound : g_pApp->m_nMusic;
++}
