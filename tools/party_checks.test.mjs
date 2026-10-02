@@ -101,4 +101,3 @@ test('cure on another player needs the server heal on B, seen by both pages', as
   validateOptions({ ...opt, class: '1', phases: 'login,healother' });
   assert.throws(() => validateOptions({ ...opt, class: '2', phases: 'login,healother' }));
 });
-
