@@ -1,0 +1,202 @@
+Published build without the test-harness entry points (ADR 003, ADR 016).
+The wyd_debug_* functions of wyd_client_entry.cpp are no longer KEEPALIVE
+(WYD_DEBUG_EXPORT): EMSCRIPTEN_KEEPALIVE marks the export at compile time and
+-sEXPORT_KEEPALIVE=0 does not remove it. The link exports them by name, so the
+default (harness) build is unchanged, and --public drops every _wyd_debug_*
+name from EXPORTED_FUNCTIONS (UI automation, fake time, camera, item probes).
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+index 9a137cf..41bfa6a 100644
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -497,6 +497,10 @@ extern "C" int wyd_public_demo_unlock_select_character() {
+ #else
+ #define WYD_EXPORT
+ #endif
++// Test-harness entry points are not KEEPALIVE: the link exports them by name
++// (link_tmproject_wasm_startup.py), and the published build (--public) leaves
++// them out, since KEEPALIVE cannot be undone at link time.
++#define WYD_DEBUG_EXPORT
+ 
+ static TMSelectCharScene* WydSelectCharScene() {
+   if (!g_pObjectManager) return nullptr;
+@@ -510,7 +514,7 @@ extern "C" WYD_EXPORT int wyd_selchar_account_lock() { return g_AccountLock; }
+ 
+ // Types the PIN on the shuffled keypad (buttons 66437..66446 show keybuf[])
+ // and presses the verify button (66433). The digits are not kept.
+-extern "C" WYD_EXPORT int wyd_debug_selchar_pin(const char* pin) {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_pin(const char* pin) {
+   TMSelectCharScene* scene = WydSelectCharScene();
+   if (!scene || !pin || g_AccountLock != 0) return 0;
+   const size_t len = std::strlen(pin);
+@@ -531,7 +535,7 @@ extern "C" WYD_EXPORT int wyd_debug_selchar_pin(const char* pin) {
+ // Opens the creation view as the "Criar" button does: control 4613 runs
+ // VisibleSelectCreate(0) (CreCamAction). 5673 is "Voltar": in the selection
+ // view it asks to return to server selection.
+-extern "C" WYD_EXPORT int wyd_debug_selchar_open_create() {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_open_create() {
+   TMSelectCharScene* scene = WydSelectCharScene();
+   if (!scene || g_AccountLock != 1) return 0;
+   return scene->OnControlEvent(4613, 0);
+@@ -539,7 +543,7 @@ extern "C" WYD_EXPORT int wyd_debug_selchar_open_create() {
+ 
+ // Picks the class sample, types the name into edit 4626 and presses create
+ // (1545). The server's CNFNewCharacter/NewCharacterFail decides the outcome.
+-extern "C" WYD_EXPORT int wyd_debug_selchar_create(const char* name, int class_index) {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_create(const char* name, int class_index) {
+   TMSelectCharScene* scene = WydSelectCharScene();
+   if (!scene || !name || class_index < 0 || class_index >= 4 || g_AccountLock != 1) return 0;
+   if (!scene->m_pSampleHuman[class_index]) return 0;
+@@ -554,7 +558,7 @@ extern "C" WYD_EXPORT int wyd_debug_selchar_create(const char* name, int class_i
+ }
+ 
+ // Selects the slot and presses "enter" (4612): the scene sends CharacterLogin.
+-extern "C" WYD_EXPORT int wyd_debug_selchar_enter(int slot) {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_enter(int slot) {
+   TMSelectCharScene* scene = WydSelectCharScene();
+   if (!scene || slot < 0 || slot >= 4 || g_AccountLock != 1) return 0;
+   if (!scene->m_pHuman[slot] || !g_pObjectManager->m_stSelCharData.MobName[slot][0]) return 0;
+@@ -610,7 +614,7 @@ extern "C" WYD_EXPORT unsigned int wyd_scene_msgbox_message() {
+   return scene->m_pMessageBox->m_dwMessage;
+ }
+ 
+-extern "C" WYD_EXPORT int wyd_debug_scene_msgbox_ok() {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_scene_msgbox_ok() {
+   TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
+   if (!scene || !scene->m_pMessageBox || !scene->m_pMessageBox->IsVisible()) return 0;
+   // SMessageBox::OnControlEvent on OK: hide, then notify the scene with the
+@@ -621,7 +625,7 @@ extern "C" WYD_EXPORT int wyd_debug_scene_msgbox_ok() {
+ 
+ // Texture diagnostics (read-only): the size the renderer sees for a UI
+ // texture (which = 0 width, 1 height), and item table fields used by icons.
+-extern "C" WYD_EXPORT int wyd_debug_ui_texture_size(int index, int which) {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_ui_texture_size(int index, int which) {
+   if (!g_pTextureManager) return -1;
+   IDirect3DTexture9* tex = g_pTextureManager->GetUITexture(index, 2000);
+   if (!tex) return -2;
+@@ -630,7 +634,7 @@ extern "C" WYD_EXPORT int wyd_debug_ui_texture_size(int index, int which) {
+   return which == 0 ? static_cast<int>(desc.Width) : static_cast<int>(desc.Height);
+ }
+ 
+-extern "C" WYD_EXPORT int wyd_debug_item_field(int item, int field) {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_item_field(int item, int field) {
+   if (item < 0 || item >= MAX_ITEMLIST) return -99999;
+   const STRUCT_ITEMLIST& it = g_pItemList[item];
+   switch (field) {
+@@ -656,7 +660,7 @@ static CMesh* WydNthMesh(CFrame* frame, int* n) {
+   return nullptr;
+ }
+ 
+-extern "C" WYD_EXPORT const char* wyd_debug_myhuman_mesh_texture(int index) {
++extern "C" WYD_DEBUG_EXPORT const char* wyd_debug_myhuman_mesh_texture(int index) {
+   static char out[300];
+   out[0] = 0;
+   TMScene* scene = g_pObjectManager ? g_pObjectManager->GetCurrentScene() : nullptr;
+@@ -671,7 +675,7 @@ extern "C" WYD_EXPORT const char* wyd_debug_myhuman_mesh_texture(int index) {
+   return out;
+ }
+ 
+-extern "C" WYD_EXPORT int wyd_debug_my_item(int place, int slot) {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_my_item(int place, int slot) {
+   if (!g_pObjectManager) return -1;
+   if (place == 0 && slot >= 0 && slot < 18) return g_pObjectManager->m_stMobData.Equip[slot].sIndex;
+   if (place == 1 && slot >= 0 && slot < 64) return g_pObjectManager->m_stMobData.Carry[slot].sIndex;
+@@ -990,7 +994,7 @@ extern "C" WYD_EXPORT int wyd_field_equip_cell_screen(int slot, int which) {
+ 
+ // Effect pair k (0..2) of an own slot: which 0 = effect, 1 = value. Effect 61
+ // (EF_AMOUNT) carries the stack size. place 0 equip (0..17), 1 carry (0..63).
+-extern "C" WYD_EXPORT int wyd_debug_my_item_ef(int place, int slot, int k, int which) {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_my_item_ef(int place, int slot, int k, int which) {
+   if (!g_pObjectManager || k < 0 || k >= 3) return -1;
+   const STRUCT_ITEM* it = nullptr;
+   if (place == 0 && slot >= 0 && slot < 18) it = &g_pObjectManager->m_stMobData.Equip[slot];
+@@ -1065,7 +1069,7 @@ extern "C" WYD_EXPORT int wyd_field_cargo_page() {
+ }
+ 
+ // Cargo slot as the client holds it (0..127) and a cell center on a page.
+-extern "C" WYD_EXPORT int wyd_debug_cargo_item(int slot) {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_cargo_item(int slot) {
+   if (!g_pObjectManager || slot < 0 || slot >= MAX_CARGO) return -1;
+   return g_pObjectManager->m_stItemCargo[slot].sIndex;
+ }
+@@ -1184,7 +1188,7 @@ extern "C" WYD_EXPORT int wyd_field_trade_item(int side, int k) {
+ // Character deletion through the original controls: 4615 opens box 4615, the
+ // harness confirms it with wyd_debug_scene_msgbox_ok, which opens the password
+ // panel. The password is typed into the original field and cleared after 65886.
+-extern "C" WYD_EXPORT int wyd_debug_selchar_open_delete(int slot) {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_open_delete(int slot) {
+   TMSelectCharScene* scene = WydSelectCharScene();
+   if (!scene || slot < 0 || slot >= 4 || g_AccountLock != 1) return 0;
+   if (!scene->m_pHuman[slot] || !g_pObjectManager->m_stSelCharData.MobName[slot][0]) return 0;
+@@ -1196,7 +1200,7 @@ extern "C" WYD_EXPORT int wyd_selchar_delete_panel_visible() {
+   TMSelectCharScene* scene = WydSelectCharScene();
+   return scene && scene->m_pInputPWPanel && scene->m_pInputPWPanel->IsVisible() ? 1 : 0;
+ }
+-extern "C" WYD_EXPORT int wyd_debug_selchar_delete(const char* password) {
++extern "C" WYD_DEBUG_EXPORT int wyd_debug_selchar_delete(const char* password) {
+   TMSelectCharScene* scene = WydSelectCharScene();
+   if (!scene || !password || !scene->m_pPWEdit || !scene->m_pInputPWPanel || !scene->m_pInputPWPanel->IsVisible()) return 0;
+   char buf[16] = {0};
+diff --git a/webclient/client-wasm/tools/link_tmproject_wasm_startup.py b/webclient/client-wasm/tools/link_tmproject_wasm_startup.py
+index 0308f9f..5c233cc 100755
+--- a/webclient/client-wasm/tools/link_tmproject_wasm_startup.py
++++ b/webclient/client-wasm/tools/link_tmproject_wasm_startup.py
+@@ -651,6 +651,32 @@ def capture_startup_link_contract(
+     return payload
+ 
+ 
++DEBUG_EXPORT_PREFIX = "_wyd_debug_"
++_DEBUG_EXPORT = re.compile(r"\bWYD_DEBUG_EXPORT\b[^;{(]*?\b(wyd_debug_[A-Za-z0-9_]+)\s*\(")
++
++
++def debug_exports(repo_root: Path) -> list[str]:
++    """Harness entry points of wyd_client_entry.cpp, exported by name."""
++    text = (repo_root / "webclient/client-wasm/compat/src/wyd_client_entry.cpp").read_text(
++        encoding="utf-8", errors="replace"
++    )
++    return [f"_{name}" for name in _DEBUG_EXPORT.findall(text)]
++
++
++def drop_debug_exports(link_cmd: list[str]) -> None:
++    """Published build: no _wyd_debug_* name (UI automation, fake time, camera
++    and item probes used by the test harness) stays in EXPORTED_FUNCTIONS."""
++    for index, arg in enumerate(link_cmd):
++        if arg.startswith("-sEXPORTED_FUNCTIONS=["):
++            names = re.findall(r"'([^']+)'", arg)
++            kept = [name for name in names if not name.startswith(DEBUG_EXPORT_PREFIX)]
++            link_cmd[index] = "-sEXPORTED_FUNCTIONS=[" + ",".join(repr(name) for name in kept) + "]"
++            print(f"[startup-link] public exports: {len(kept)} kept, "
++                  f"{len(names) - len(kept)} {DEBUG_EXPORT_PREFIX}* removed")
++            return
++    raise RuntimeError("public build: -sEXPORTED_FUNCTIONS not found")
++
++
+ def write_response_file(path: Path, args: list[str]) -> None:
+     """Write arguments in the format consumed by Emscripten response files.
+ 
+@@ -798,6 +824,11 @@ def main() -> int:
+         action="store_true",
+         help="Force all objects to rebuild (still leaves assets external).",
+     )
++    parser.add_argument(
++        "--public",
++        action="store_true",
++        help="Published build: export no _wyd_debug_* automation/probe entry point.",
++    )
+     parser.add_argument(
+         "--link-opt-level",
+         choices=sorted(VALID_OPT_LEVELS),
+@@ -1678,10 +1709,13 @@ def main() -> int:
+         "_wyd_d3d9_set_detailed_telemetry",
+         "_wyd_d3d9_get_detailed_telemetry",
+     ]
++    extra_exports.extend(debug_exports(repo_root))
+     for index, arg in enumerate(link_cmd):
+         if arg.startswith("-sEXPORTED_FUNCTIONS=["):
+             link_cmd[index] = arg[:-1] + "," + ",".join(repr(name) for name in extra_exports) + "]"
+             break
++    if args.public:
++        drop_debug_exports(link_cmd)
+ 
+     link_rsp_path = link_dir / "startup-link.rsp.utf-8"
+     write_response_file(link_rsp_path, link_cmd[1:])

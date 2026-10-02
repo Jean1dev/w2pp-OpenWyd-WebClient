@@ -223,7 +223,7 @@ func TestPortalCookieSecureBehindTLS(t *testing.T) {
 	cfg := &config.Config{TLSTerminatedByProxy: true,
 		PortalAuth: &config.PortalAuth{URL: "https://portal.example", TicketSecret: testTicketSecret}}
 	cfg.Defaults()
-	if g := newPortalGate(cfg, http.NotFoundHandler(), slog.Default()); !g.secure || !g.proxy {
+	if g := newPortalGate(cfg, http.NotFoundHandler(), slog.Default()); !g.secure || g.xff != "last" {
 		t.Fatal("session cookie would not be Secure behind the TLS proxy")
 	}
 }

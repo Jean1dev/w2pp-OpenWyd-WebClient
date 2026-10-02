@@ -96,14 +96,26 @@ func TestRemoteIPBehindProxy(t *testing.T) {
 	r, _ := http.NewRequest(http.MethodGet, "/ws/local", nil)
 	r.RemoteAddr = "10.0.0.7:5555"
 	r.Header.Add("X-Forwarded-For", "6.6.6.6, 203.0.113.9")
-	if got := remoteIP(r, false); got != "10.0.0.7" {
+	if got := remoteIP(r, ""); got != "10.0.0.7" {
 		t.Fatalf("without proxy declaration: %s", got)
 	}
-	if got := remoteIP(r, true); got != "203.0.113.9" {
+	if got := remoteIP(r, "last"); got != "203.0.113.9" {
 		t.Fatalf("behind proxy: %s", got)
 	}
+	// Railway: the edge replaces the client's header, so the client is first
+	// and the later entries are edge hops.
+	r.Header.Set("X-Forwarded-For", "198.51.100.4, 151.101.2.1")
+	if got := remoteIP(r, "first"); got != "198.51.100.4" {
+		t.Fatalf("first entry: %s", got)
+	}
+	r.Header.Del("X-Forwarded-For")
+	r.Header.Add("X-Forwarded-For", "198.51.100.4")
+	r.Header.Add("X-Forwarded-For", "151.101.2.1")
+	if remoteIP(r, "first") != "198.51.100.4" || remoteIP(r, "last") != "151.101.2.1" {
+		t.Fatal("repeated headers must read as one list")
+	}
 	r.Header.Set("X-Forwarded-For", "not-an-ip")
-	if got := remoteIP(r, true); got != "10.0.0.7" {
+	if got := remoteIP(r, "first"); got != "10.0.0.7" {
 		t.Fatalf("invalid header must fall back to the peer: %s", got)
 	}
 }

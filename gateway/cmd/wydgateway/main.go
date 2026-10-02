@@ -56,7 +56,7 @@ func run(load func() (*config.Config, error), log *slog.Logger) error {
 		channels = append(channels, ch.Name)
 	}
 	log.Info("gateway listening", "addr", cfg.Listen, "tls", cfg.TLSCert != "",
-		"tlsProxy", cfg.TLSTerminatedByProxy, "channels", channels, "static", cfg.StaticDir != "",
+		"tlsProxy", cfg.TLSTerminatedByProxy, "forwardedFor", cfg.ForwardedFor, "channels", channels, "static", cfg.StaticDir != "",
 		"assets", assetSource(cfg), "auth", authMode(cfg))
 
 	errc := make(chan error, 1)

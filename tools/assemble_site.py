@@ -17,7 +17,12 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LINK = ROOT / "external/OpenWyd/webclient/client-wasm/build/link"
 
 
-def assemble(site: Path, link_dir: Path = DEFAULT_LINK, index: str = "local-scene.html") -> Path:
+# The offline test scene drives wyd_debug_* probes, absent from a public runtime.
+PRIVATE_PAGES = ("local-scene.",)
+
+
+def assemble(site: Path, link_dir: Path = DEFAULT_LINK, index: str = "local-scene.html",
+             public: bool = False) -> Path:
     """Returns the published .wasm path inside site."""
     bootstrap = (link_dir / "tmproject_startup.js").read_text(encoding="utf-8")
     match = re.search(r"tmproject_startup\.\d+\.js", bootstrap)
@@ -30,6 +35,8 @@ def assemble(site: Path, link_dir: Path = DEFAULT_LINK, index: str = "local-scen
     # the offline scene locally (npm run scene), the connected client
     # (client.html) in a deployment. Both share the same runtime and dataset.
     for path in (ROOT / "web").glob("*.*"):
+        if public and path.name.startswith(PRIVATE_PAGES):
+            continue
         shutil.copyfile(path, site / path.name)
     if not (site / index).is_file() or not index.endswith(".html"):
         raise ValueError(f"unknown index page {index!r}")
@@ -44,8 +51,15 @@ def main() -> None:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--link-dir", type=Path, default=DEFAULT_LINK)
     ap.add_argument("--index", default="local-scene.html", help="page served at / (e.g. client.html)")
+    ap.add_argument("--public", action="store_true",
+                    help="published site: no offline scene, runtime linked with --public (checked)")
     args = ap.parse_args()
-    wasm = assemble(args.out, args.link_dir, args.index)
+    wasm = assemble(args.out, args.link_dir, args.index, args.public)
+    if args.public:
+        from check_public_exports import check
+        errors = check(args.out)
+        if errors:
+            raise SystemExit("public export check failed:\n" + "\n".join(errors))
     print(json.dumps({"site": str(args.out), "wasm": wasm.name}))
 
 

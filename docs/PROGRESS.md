@@ -11,7 +11,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco, fatia 5 (reinício controlado) e cura em outro jogador aprovadas; o checklist não tem mais item pendente que dependa só do cliente) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
 | 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente; 02/10: painel de música, efeitos e resolução compilado e testado com runtime falso, áudio real ainda não verificado) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md), [painel de configurações](evidence/07-web/2026-10-02-settings.md) |
-| 8 Entrega | Em andamento (02/10: gate por conta do portal no lugar do Basic Auth, testado localmente, sem deploy) | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md), [gate do portal](evidence/08-entrega/2026-10-02-portal-gate.md) |
+| 8 Entrega | Em andamento (02/10: gate por conta do portal no lugar do Basic Auth, implantado e confirmado no domínio público; falta o login real pelo portal) | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md), [gate do portal](evidence/08-entrega/2026-10-02-portal-gate.md) |
 
 ## Próxima ação
 
@@ -27,7 +27,8 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
 2. Etapa 4 — fechar (os cenários de duas sessões passaram em 01/10, [evidência](evidence/04-login-mundo/2026-10-01-two-sessions.md)):
    - o operador executa o roteiro Windows × web com `node tools/tcp_relay.mjs --target reseau.proxy.rlwy.net:56950` ativo, porque o `serverlist.bin` do `Client-aws` aponta para `127.0.0.1:8281` ([roteiro](evidence/04-login-mundo/README.md#3-roteiro-manual-para-o-cliente-windows-7662-pendente));
    - registrar a comparação visual Windows × web das cenas de seleção/criação e do Field.
-3. Etapa 8 — gate por conta do portal ([ADR 015](decisions/015-portal-account-gate.md)): PR do portal (`wyd-plataforma`, branch `Jean1dev/jogar-no-navegador`), `wyd_debug_*` atrás de flag, troca das variáveis no Railway/Vercel e verificação no domínio público.
+3. Etapa 8 — gate por conta do portal implantado ([ADR 015](decisions/015-portal-account-gate.md)). Falta verificar no navegador: login ou cadastro no portal → `/jogar` → jogo, duas sessões e relogin.
+   Build público sem `wyd_debug_*` e IP do cliente pela primeira entrada do `X-Forwarded-For` ([ADR 016](decisions/016-public-build-and-client-ip.md)): confirmar o build real na CI ou no Railway e, depois do deploy, o IP no log com um `X-Forwarded-For` forjado.
    Também: confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
 4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6.
 5. Etapa 7 — painel de configurações: com o dataset, verificar no Railway música e efeitos ao vivo, mudo na troca de zona, persistência no relogin e as resoluções 1024×768/1280×1024 ([roteiro](evidence/07-web/2026-10-02-settings.md#próximo-passo)).
@@ -833,3 +834,30 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   O `WYD_BASIC_AUTH_*` deve ser removido junto com o deploy desta versão.
 - **Não executado:** deploy, login real no portal (sem `web-api` local), navegador real e duas sessões.
 - **Próximo passo:** PRs, depois a troca descrita na ADR 015 e a verificação no domínio público.
+- **Implantação (mesmo dia, a pedido do usuário):**
+  - merge do portal [#34](https://github.com/Jean1dev/wyd-plataforma/pull/34), com produção do Vercel confirmada;
+  - merge do gateway [#19](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/pull/19);
+  - `WYD_BASIC_AUTH_*` removidas do Railway; deploy `3504ab4c` em SUCCESS.
+  O domínio público responde como esperado ([evidência](evidence/08-entrega/2026-10-02-portal-gate.md#produção-02102026)). Falta o login real pelo portal.
+
+### 02/10/2026 — build público sem `wyd_debug_*` e IP do cliente
+
+- **Pedido do usuário:** aplicar as recomendações de antes de abrir: `wyd_debug_*` atrás de flag e `WYD_MAX_CONNS_PER_IP`.
+- **Confirmado em fonte:**
+  - as `wyd_debug_*` chegam ao WASM pela lista `EXPORTED_FUNCTIONS` do link e por `KEEPALIVE`;
+  - `client.js` e `settings.js` não usam nenhuma; só `local-scene.js` usa `wyd_debug_camera_*`.
+- **Confirmado em execução:** o gateway registrava um IP de borda e não o IP do cliente, porque a última entrada do `X-Forwarded-For` é um salto do Railway.
+- **Arquivos:**
+  - `patches/openwyd/0024-public-build-exports.patch`;
+  - `tools/check_public_exports.py`, `tools/test_public_exports.py`, `tools/assemble_site.py`;
+  - `Dockerfile`, `.github/workflows/ci.yml`;
+  - gateway: `config`, `env`, `relay`, `portalauth` e testes;
+  - ADR 016 e `deploy.md`.
+- **Comandos e resultados:**
+  - patches 0001–0024 aplicados num checkout limpo;
+  - testes do verificador: 4/4;
+  - `assemble_site --public` com link falso: o build limpo passa, sem a cena offline; o build com `wyd_debug_selchar_pin` falha;
+  - gateway: `go vet` e `go test ./...` passam.
+- **Railway:** `WYD_FORWARDED_FOR=first` e `WYD_MAX_CONNS_PER_IP=4` registradas com `--skip-deploys`.
+- **CI do PR #20:** a 1ª versão (`-sEXPORT_KEEPALIVE=0`) foi barrada pelo verificador, com 13 `wyd_debug_*` `KEEPALIVE` ainda exportadas. Corrigido no próprio código: `WYD_DEBUG_EXPORT` sem `KEEPALIVE`, exportação pelo nome e `--public` filtrando a lista.
+- **Não executado:** build real da imagem (sem Docker ou emsdk locais), que fica com a CI e o Railway.

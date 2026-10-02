@@ -31,6 +31,7 @@ const (
 	EnvAuthPassword  = "WYD_BASIC_AUTH_PASSWORD"  //
 	EnvPortalURL     = "WYD_PORTAL_URL"           // portal account gate (exclusive with Basic)
 	EnvPortalSecret  = "WYD_PORTAL_TICKET_SECRET" // HMAC key shared with the portal
+	EnvForwardedFor  = "WYD_FORWARDED_FOR"        // "first" or "last" X-Forwarded-For entry (default last)
 	EnvAllowPublic   = "WYD_ALLOW_PUBLIC"         // "true" to run without a credential
 	EnvMaxConns      = "WYD_MAX_CONNS"            // optional limits
 	EnvMaxConnsPerIP = "WYD_MAX_CONNS_PER_IP"
@@ -66,6 +67,7 @@ func FromEnv(getenv func(string) string) (*Config, error) {
 	c := &Config{
 		Listen:               "0.0.0.0:" + port,
 		TLSTerminatedByProxy: true,
+		ForwardedFor:         strings.TrimSpace(getenv(EnvForwardedFor)),
 		AllowedOrigins:       []string{origin},
 		StaticDir:            strings.TrimSpace(getenv(EnvStaticDir)),
 		AssetDir:             strings.TrimSpace(getenv(EnvAssetDir)),

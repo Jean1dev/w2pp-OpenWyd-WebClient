@@ -19,7 +19,7 @@ Um único serviço, `wydgateway -env`, na imagem do `Dockerfile` da raiz:
 | Rota | Conteúdo | Origem |
 |---|---|---|
 | `/healthz` | `ok` (sem autenticação, para o healthcheck) | gateway |
-| `/` (= `client.html`, cliente conectado), `/local-scene.html` (cena offline de teste), `runtime.js`, `tmproject_startup.<id>.wasm` | páginas e runtime | imagem (`/srv/site`), compilados do upstream no SHA do lock + `patches/openwyd` |
+| `/` (= `client.html`, cliente conectado), `runtime.js`, `tmproject_startup.<id>.wasm` | páginas e runtime | imagem (`/srv/site`), compilados do upstream no SHA do lock + `patches/openwyd`. Build público: sem `wyd_debug_*` e sem a cena offline `/local-scene.html` ([ADR 016](decisions/016-public-build-and-client-ip.md)) |
 | `openwyd_assets.data/.js`, `music/*`, `manifest.json` | dados do jogo do operador | bucket privado: o gateway assina um `GET` (SigV4) por requisição e repassa em streaming, com `Range`/206/304. O navegador nunca vê o bucket nem as credenciais |
 | `/config.json` | canal, `wss://…/ws/<canal>`, `clientVersion` | gateway; o destino TCP não aparece |
 | `/ws/<canal>` | relé binário WebSocket ↔ TCP do tm-server | gateway; destino só por variável |
@@ -43,11 +43,13 @@ Todas as rotas, exceto `/healthz`, exigem a credencial Basic, inclusive a abertu
 | `WYD_ASSET_S3_ACCESS_KEY_ID`, `WYD_ASSET_S3_SECRET_ACCESS_KEY` | secretas | definidas por stdin a partir da CLI; se forem rotacionadas (`--reset`), redefina-as |
 | `WYD_ASSET_S3_PREFIX`, `WYD_ASSET_MANIFEST` | `assets-f4c03289374bd614`, `f4c03289374bd614` | versão ativa dos assets |
 
-Gate por conta do portal ([ADR 015](decisions/015-portal-account-gate.md)), alternativa exclusiva ao Basic. As variáveis foram **registradas** no Railway e no Vercel em 02/10, mas o gate só passa a valer com o deploy desta versão e a remoção de `WYD_BASIC_AUTH_*`:
+Gate por conta do portal ([ADR 015](decisions/015-portal-account-gate.md)), alternativa exclusiva ao Basic. **Ativo em produção desde 02/10** (deploy `82f3850`); `WYD_BASIC_AUTH_*` foram removidas:
 - `WYD_PORTAL_URL`: origem do portal, por exemplo `https://wyd-ten.vercel.app`;
 - `WYD_PORTAL_TICKET_SECRET`: ≥ 32 caracteres, o mesmo valor de `PLAY_TICKET_SECRET` no Vercel.
 
 Ao ativar o gate, remova `WYD_BASIC_AUTH_*`; com as duas credenciais o gateway recusa iniciar. No portal, defina também `WEBCLIENT_URL` com o domínio deste serviço.
+
+Limites e IP do cliente ([ADR 016](decisions/016-public-build-and-client-ip.md)): `WYD_MAX_CONNS_PER_IP=4` e `WYD_FORWARDED_FOR=first`, registradas em 02/10. O Railway põe o cliente na primeira entrada do `X-Forwarded-For`; o padrão `last` registrava o IP da borda.
 
 Opcionais: `WYD_CHANNEL`, `WYD_MAX_CONNS` e `WYD_MAX_CONNS_PER_IP`. `WYD_ALLOW_PUBLIC=true` é o único jeito de subir sem senha; não use enquanto a licença dos assets não estiver resolvida. Com dados faltando ou inválidos, o gateway recusa iniciar e lista o problema, sem nunca incluir segredos na mensagem.
 

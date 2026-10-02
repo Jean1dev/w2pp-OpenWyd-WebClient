@@ -64,3 +64,21 @@ Executar a troca descrita na ADR 015 e repetir no domínio público:
 - duas sessões e relogin no jogo;
 - cookie expirado voltando ao portal;
 - DevTools, para confirmar o ticket fora da URL e do histórico e o cookie `Secure`.
+
+## Produção (02/10/2026)
+
+O portal [#34](https://github.com/Jean1dev/wyd-plataforma/pull/34) foi mergeado (`329f5aa`), e a produção do Vercel passou a responder `/jogar` → 303 `/?next=/jogar`. Em seguida, o gateway [#19](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/pull/19) foi mergeado (`82f3850`) e `WYD_BASIC_AUTH_USER/PASSWORD` foram removidas. O deploy `3504ab4c` terminou em SUCCESS, com o log `auth="portal"`.
+
+| Verificação em `w2pp-openwyd-webclient-production.up.railway.app` | Resultado |
+|---|---|
+| `/healthz` | 200 |
+| `/` e `/client.html` sem cookie | 302 → `https://wyd-ten.vercel.app/jogar`, sem `WWW-Authenticate` |
+| `runtime.js`, `config.json`, `openwyd_assets.js`, upgrade de `/ws/server` sem cookie | 401 |
+| `POST /auth/portal` com ticket falso | 401; log `reason="bad signature"` |
+| `POST /auth/portal` com ticket assinado com o segredo do `.env` (= Railway) | 303 `/`; `Set-Cookie: wyd_play=…; Max-Age=43200; HttpOnly; Secure; SameSite=Lax` |
+| `client.html` e `config.json` com o cookie | 200, 200 (`wss://…/ws/server`, `clientVersion` 12000) |
+| reenvio do mesmo ticket | 401 |
+
+**Ainda não verificado:**
+- o login real no portal levando ao jogo, que prova que o `PLAY_TICKET_SECRET` do Vercel é igual ao do Railway;
+- o jogo no navegador com duas sessões e relogin.

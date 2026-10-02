@@ -50,7 +50,7 @@ type portalGate struct {
 	login  string
 	ttl    time.Duration
 	secure bool
-	proxy  bool
+	xff    string
 	next   http.Handler
 	log    *slog.Logger
 	now    func() time.Time
@@ -67,7 +67,7 @@ func newPortalGate(cfg *config.Config, next http.Handler, log *slog.Logger) *por
 		ttl:   a.SessionTTL.Std(),
 		// Plain HTTP only in local development; browsers drop Secure cookies there.
 		secure: !cfg.AllowInsecure,
-		proxy:  cfg.TLSTerminatedByProxy,
+		xff:    forwardedFor(cfg),
 		next:   next,
 		log:    log,
 		now:    time.Now,
@@ -113,7 +113,7 @@ func (p *portalGate) handleTicket(w http.ResponseWriter, r *http.Request) {
 	sub, err := p.redeem(r.PostForm.Get("ticket"))
 	if err != nil {
 		// The reason is safe to log; the ticket itself never is.
-		p.log.Warn("portal ticket rejected", "reason", err.Error(), "remote", remoteIP(r, p.proxy))
+		p.log.Warn("portal ticket rejected", "reason", err.Error(), "remote", remoteIP(r, p.xff))
 		http.Error(w, "invalid or expired ticket; open the game again from the portal", http.StatusUnauthorized)
 		return
 	}
