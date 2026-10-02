@@ -26,17 +26,19 @@ const (
 	EnvS3URLStyle    = "WYD_ASSET_S3_URL_STYLE"
 	EnvS3KeyID       = "WYD_ASSET_S3_ACCESS_KEY_ID"
 	EnvS3Secret      = "WYD_ASSET_S3_SECRET_ACCESS_KEY"
-	EnvManifest      = "WYD_ASSET_MANIFEST"      // optional asset manifest version label
-	EnvAuthUser      = "WYD_BASIC_AUTH_USER"     // private deployment credential
-	EnvAuthPassword  = "WYD_BASIC_AUTH_PASSWORD" //
-	EnvAllowPublic   = "WYD_ALLOW_PUBLIC"        // "true" to run without a credential
-	EnvMaxConns      = "WYD_MAX_CONNS"           // optional limits
+	EnvManifest      = "WYD_ASSET_MANIFEST"       // optional asset manifest version label
+	EnvAuthUser      = "WYD_BASIC_AUTH_USER"      // private deployment credential
+	EnvAuthPassword  = "WYD_BASIC_AUTH_PASSWORD"  //
+	EnvPortalURL     = "WYD_PORTAL_URL"           // portal account gate (exclusive with Basic)
+	EnvPortalSecret  = "WYD_PORTAL_TICKET_SECRET" // HMAC key shared with the portal
+	EnvAllowPublic   = "WYD_ALLOW_PUBLIC"         // "true" to run without a credential
+	EnvMaxConns      = "WYD_MAX_CONNS"            // optional limits
 	EnvMaxConnsPerIP = "WYD_MAX_CONNS_PER_IP"
 )
 
 // FromEnv builds a configuration for a TLS-terminating platform. It requires a
-// credential unless WYD_ALLOW_PUBLIC=true is set explicitly, because the page
-// serves the operator's game data. getenv is os.Getenv in production.
+// credential (Basic or the portal gate) unless WYD_ALLOW_PUBLIC=true is set
+// explicitly, because the page serves the operator's game data. getenv is os.Getenv in production.
 func FromEnv(getenv func(string) string) (*Config, error) {
 	var errs []error
 	need := func(k string) string {
@@ -85,12 +87,17 @@ func FromEnv(getenv func(string) string) (*Config, error) {
 		c.AssetDir = ""
 	}
 	user, pass := getenv(EnvAuthUser), getenv(EnvAuthPassword)
-	switch {
-	case user != "" || pass != "":
+	if user != "" || pass != "" {
 		c.BasicAuth = &BasicAuth{User: user, Password: pass}
-	case getenv(EnvAllowPublic) != "true":
-		errs = append(errs, fmt.Errorf("set %s/%s, or %s=true for a public deployment",
-			EnvAuthUser, EnvAuthPassword, EnvAllowPublic))
+	}
+	portal, secret := strings.TrimSuffix(strings.TrimSpace(getenv(EnvPortalURL)), "/"), getenv(EnvPortalSecret)
+	if portal != "" || secret != "" {
+		// Both credentials at once are rejected by Validate.
+		c.PortalAuth = &PortalAuth{URL: portal, TicketSecret: secret}
+	}
+	if c.BasicAuth == nil && c.PortalAuth == nil && getenv(EnvAllowPublic) != "true" {
+		errs = append(errs, fmt.Errorf("set %s/%s, %s/%s, or %s=true for a public deployment",
+			EnvAuthUser, EnvAuthPassword, EnvPortalURL, EnvPortalSecret, EnvAllowPublic))
 	}
 	for key, dst := range map[string]*int{EnvMaxConns: &c.Limits.MaxConns, EnvMaxConnsPerIP: &c.Limits.MaxConnsPerIP} {
 		if v := getenv(key); v != "" {
