@@ -21,10 +21,11 @@ import (
 
 	"github.com/coder/websocket"
 
+	"github.com/Jean1dev/w2pp-OpenWyd-WebClient/gateway/internal/chat"
 	"github.com/Jean1dev/w2pp-OpenWyd-WebClient/gateway/internal/config"
 )
 
-// Gateway is the HTTP handler exposing /ws/{channel} and /config.json.
+// Gateway is the HTTP handler exposing /ws/{channel}, /chat/ws and /config.json.
 type Gateway struct {
 	cfg     *config.Config
 	log     *slog.Logger
@@ -34,9 +35,9 @@ type Gateway struct {
 	mux     *http.ServeMux
 	handler http.Handler
 
-	mu     sync.Mutex
-	total  int
-	perIP  map[string]int
+	relays limiter
+	chats  limiter
+	chat   *chat.Hub
 	nextID atomic.Uint64
 	active sync.WaitGroup
 	live   atomic.Int64
@@ -49,7 +50,8 @@ func New(baseCtx context.Context, cfg *config.Config, log *slog.Logger) *Gateway
 		log:     log,
 		baseCtx: baseCtx,
 		origins: make(map[string]bool, len(cfg.AllowedOrigins)),
-		perIP:   map[string]int{},
+		relays:  newLimiter(cfg.Limits.MaxConns, cfg.Limits.MaxConnsPerIP),
+		chats:   newLimiter(cfg.Chat.MaxClients, cfg.Chat.MaxPerIP),
 		mux:     http.NewServeMux(),
 	}
 	d := &net.Dialer{Timeout: cfg.Limits.DialTimeout.Std(), KeepAlive: 30 * time.Second}
@@ -59,6 +61,15 @@ func New(baseCtx context.Context, cfg *config.Config, log *slog.Logger) *Gateway
 	}
 	g.mux.HandleFunc("GET /ws/{channel}", g.handleWS)
 	g.mux.HandleFunc("GET /config.json", g.handleConfig)
+	if cfg.Chat.On() {
+		g.chat = chat.NewHub(log)
+		g.active.Add(1)
+		go func() {
+			defer g.active.Done()
+			g.chat.Run(baseCtx)
+		}()
+		g.mux.HandleFunc("GET /chat/ws", g.handleChat)
+	}
 	if cfg.StaticDir != "" {
 		var assets http.Handler
 		switch {
@@ -102,6 +113,8 @@ type browserConfig struct {
 	WSURL                string `json:"wsUrl"`
 	ClientVersion        int    `json:"clientVersion"`
 	AssetManifestVersion string `json:"assetManifestVersion,omitempty"`
+	// Chat tells the page whether /chat/ws exists (ADR 018).
+	Chat bool `json:"chat"`
 }
 
 // handleConfig tells the page which endpoint and protocol version to use. The
@@ -123,6 +136,7 @@ func (g *Gateway) handleConfig(w http.ResponseWriter, r *http.Request) {
 		WSURL:                ch.PublicWSURL,
 		ClientVersion:        ch.ClientVersion,
 		AssetManifestVersion: g.cfg.AssetManifestVersion,
+		Chat:                 g.chat != nil,
 	})
 }
 
@@ -145,12 +159,12 @@ func (g *Gateway) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ip := remoteIP(r, forwardedFor(g.cfg))
-	if !g.acquire(ip) {
+	if !g.relays.acquire(ip) {
 		g.log.Warn("connection limit", "channel", ch.Name, "ip", ip)
 		http.Error(w, "too many connections", http.StatusServiceUnavailable)
 		return
 	}
-	defer g.release(ip)
+	defer g.relays.release(ip)
 	// Count the relay before the upgrade hijacks the connection: from then on
 	// http.Server.Shutdown no longer waits for this handler, so a later Add
 	// could race Wait and let shutdown return while a relay is starting.
@@ -181,6 +195,49 @@ func (g *Gateway) handleWS(w http.ResponseWriter, r *http.Request) {
 	g.live.Add(1)
 	defer g.live.Add(-1)
 	g.run(ch, ip, ws, tcp)
+}
+
+// handleChat joins the page chat (ADR 018). The nick is the portal account's
+// login name from the session; without one the connection is read-only.
+func (g *Gateway) handleChat(w http.ResponseWriter, r *http.Request) {
+	if r.URL.RawQuery != "" {
+		http.Error(w, "query parameters are not accepted", http.StatusBadRequest)
+		return
+	}
+	if !g.origins[trimSlash(r.Header.Get("Origin"))] {
+		g.log.Warn("chat origin rejected", "origin", r.Header.Get("Origin"))
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
+	}
+	ip := remoteIP(r, forwardedFor(g.cfg))
+	if !g.chats.acquire(ip) {
+		g.log.Warn("chat connection limit", "ip", ip)
+		http.Error(w, "too many connections", http.StatusServiceUnavailable)
+		return
+	}
+	defer g.chats.release(ip)
+	// Counted before the upgrade hijacks the connection, as in handleWS.
+	g.active.Add(1)
+	defer g.active.Done()
+	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true, // Origin checked above against the exact allowlist.
+		CompressionMode:    websocket.CompressionDisabled,
+	})
+	if err != nil {
+		g.log.Warn("chat websocket accept failed", "err", err)
+		return
+	}
+	nick := ""
+	if id, ok := identityFrom(r.Context()); ok {
+		nick = id.Name
+	}
+	id := g.nextID.Add(1)
+	start := time.Now()
+	// Neither the nick nor any text is logged; only counts and the reason.
+	g.log.Info("chat open", "conn", id, "ip", ip, "canSend", nick != "")
+	sent, reason := g.chat.Serve(context.Background(), ws, nick)
+	g.log.Info("chat closed", "conn", id, "reason", reason, "sent", sent,
+		"duration", time.Since(start).Round(time.Millisecond))
 }
 
 // run pumps both directions until either side ends, then closes both.
@@ -336,23 +393,35 @@ func idleCheckInterval(idle time.Duration) time.Duration {
 	return iv
 }
 
-func (g *Gateway) acquire(ip string) bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.total >= g.cfg.Limits.MaxConns || g.perIP[ip] >= g.cfg.Limits.MaxConnsPerIP {
+// limiter bounds connections in total and per client IP.
+type limiter struct {
+	mu            sync.Mutex
+	max, maxPerIP int
+	total         int
+	perIP         map[string]int
+}
+
+func newLimiter(max, maxPerIP int) limiter {
+	return limiter{max: max, maxPerIP: maxPerIP, perIP: map[string]int{}}
+}
+
+func (l *limiter) acquire(ip string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.total >= l.max || l.perIP[ip] >= l.maxPerIP {
 		return false
 	}
-	g.total++
-	g.perIP[ip]++
+	l.total++
+	l.perIP[ip]++
 	return true
 }
 
-func (g *Gateway) release(ip string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.total--
-	if g.perIP[ip]--; g.perIP[ip] <= 0 {
-		delete(g.perIP, ip)
+func (l *limiter) release(ip string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.total--
+	if l.perIP[ip]--; l.perIP[ip] <= 0 {
+		delete(l.perIP, ip)
 	}
 }
 

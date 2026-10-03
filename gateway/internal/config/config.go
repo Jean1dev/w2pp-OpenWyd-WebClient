@@ -101,7 +101,21 @@ type Config struct {
 	DefaultChannel       string      `json:"defaultChannel"`
 	Channels             []Channel   `json:"channels"`
 	Limits               Limits      `json:"limits"`
+	Chat                 Chat        `json:"chat"`
 }
+
+// Chat configures the page's global text chat (ADR 018). Messages live only in
+// memory while they are delivered; nothing is stored or logged.
+type Chat struct {
+	// Enabled defaults to true; false removes /chat/ws.
+	Enabled *bool `json:"enabled"`
+	// MaxClients and MaxPerIP bound chat connections separately from game relays.
+	MaxClients int `json:"maxClients"`
+	MaxPerIP   int `json:"maxPerIP"`
+}
+
+// On reports whether the chat is enabled.
+func (c Chat) On() bool { return c.Enabled == nil || *c.Enabled }
 
 // BasicAuth is a single operator-issued credential for a private deployment.
 type BasicAuth struct {
@@ -166,6 +180,12 @@ func (c *Config) Defaults() {
 	}
 	if l.WriteTimeout == 0 {
 		l.WriteTimeout = Duration(15 * time.Second)
+	}
+	if c.Chat.MaxClients == 0 {
+		c.Chat.MaxClients = 256
+	}
+	if c.Chat.MaxPerIP == 0 {
+		c.Chat.MaxPerIP = 4
 	}
 	if c.PortalAuth != nil && c.PortalAuth.SessionTTL == 0 {
 		c.PortalAuth.SessionTTL = Duration(12 * time.Hour)
@@ -309,6 +329,9 @@ func (c *Config) Validate() error {
 	}
 	if l.IdleTimeout <= 0 || l.DialTimeout <= 0 || l.WriteTimeout <= 0 {
 		errs = append(errs, errors.New("limits: timeouts must be positive"))
+	}
+	if ch := c.Chat; ch.MaxClients <= 0 || ch.MaxPerIP <= 0 || ch.MaxPerIP > ch.MaxClients {
+		errs = append(errs, errors.New("chat: need 0 < maxPerIP <= maxClients"))
 	}
 	return errors.Join(errs...)
 }

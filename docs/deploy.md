@@ -23,6 +23,7 @@ Um único serviço, `wydgateway -env`, na imagem do `Dockerfile` da raiz:
 | `openwyd_assets.data/.js`, `music/*`, `manifest.json` | dados do jogo do operador | bucket privado: o gateway assina um `GET` (SigV4) por requisição e repassa em streaming, com `Range`/206/304. O navegador nunca vê o bucket nem as credenciais |
 | `/config.json` | canal, `wss://…/ws/<canal>`, `clientVersion` | gateway; o destino TCP não aparece |
 | `/ws/<canal>` | relé binário WebSocket ↔ TCP do tm-server | gateway; destino só por variável |
+| `/chat/ws` | chat global da página, só em memória ([ADR 018](decisions/018-web-chat.md)) | gateway; nick vindo da sessão do portal |
 
 Todas as rotas, exceto `/healthz`, exigem a credencial Basic, inclusive a abertura do WebSocket e os assets. Com o gate por conta do portal ([ADR 015](decisions/015-portal-account-gate.md)), a credencial Basic é substituída pelo cookie `wyd_play`, emitido em `POST /auth/portal`. Sem cookie, a navegação vai para `<portal>/jogar` e o resto recebe 401. Arquivos da imagem têm precedência, então o bucket não consegue sombrear `runtime.js`.
 
@@ -58,7 +59,7 @@ Sem o segredo em qualquer lado, o jogo pede a senha como antes.
 
 Limites e IP do cliente ([ADR 016](decisions/016-public-build-and-client-ip.md)): `WYD_MAX_CONNS_PER_IP=4` e `WYD_FORWARDED_FOR=first`, registradas em 02/10. O Railway põe o cliente na primeira entrada do `X-Forwarded-For`; o padrão `last` registrava o IP da borda.
 
-Opcionais: `WYD_CHANNEL`, `WYD_MAX_CONNS` e `WYD_MAX_CONNS_PER_IP`. `WYD_ALLOW_PUBLIC=true` é o único jeito de subir sem senha; não use enquanto a licença dos assets não estiver resolvida. Com dados faltando ou inválidos, o gateway recusa iniciar e lista o problema, sem nunca incluir segredos na mensagem.
+Opcionais: `WYD_CHANNEL`, `WYD_MAX_CONNS`, `WYD_MAX_CONNS_PER_IP` e `WYD_CHAT_ENABLED` (`false` desliga o chat da página; o padrão é ligado). `WYD_ALLOW_PUBLIC=true` é o único jeito de subir sem senha; não use enquanto a licença dos assets não estiver resolvida. Com dados faltando ou inválidos, o gateway recusa iniciar e lista o problema, sem nunca incluir segredos na mensagem.
 
 ## Atualizar os assets
 

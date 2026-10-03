@@ -72,7 +72,9 @@ window.WydSettings = (() => {
       canvas.style.height = "";
       return;
     }
-    const availW = document.documentElement.clientWidth - 2 * GUTTER;
+    // Dentro de .wyd-stage, a largura é a que sobra ao lado do chat.
+    const stage = canvas.closest(".wyd-stage");
+    const availW = stage ? stage.clientWidth : document.documentElement.clientWidth - 2 * GUTTER;
     const top = canvas.getBoundingClientRect().top + window.scrollY;
     const availH = window.innerHeight - top - GUTTER;
     const scale = Math.max(0.1, Math.min(availW / canvas.width, availH / canvas.height));

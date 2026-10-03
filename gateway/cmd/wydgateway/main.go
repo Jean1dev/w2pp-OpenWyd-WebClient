@@ -57,7 +57,7 @@ func run(load func() (*config.Config, error), log *slog.Logger) error {
 	}
 	log.Info("gateway listening", "addr", cfg.Listen, "tls", cfg.TLSCert != "",
 		"tlsProxy", cfg.TLSTerminatedByProxy, "forwardedFor", cfg.ForwardedFor, "channels", channels, "static", cfg.StaticDir != "",
-		"assets", assetSource(cfg), "auth", authMode(cfg))
+		"assets", assetSource(cfg), "auth", authMode(cfg), "chat", cfg.Chat.On())
 
 	errc := make(chan error, 1)
 	go func() {

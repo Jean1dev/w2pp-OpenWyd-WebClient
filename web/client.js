@@ -302,6 +302,9 @@ async function start() {
     throw new Error("config.json inválido");
   }
   clientEvidence.config = { channel: cfg.channel, wsUrl: cfg.wsUrl, clientVersion: cfg.clientVersion };
+  // O chat não depende do runtime: conecta enquanto o jogo ainda baixa.
+  clientEvidence.chat = WydChat.evidence;
+  WydChat.start(cfg.chat);
   // O runtime lê a resolução do tamanho do canvas no boot.
   WydSettings.applyBeforeBoot(canvas);
 

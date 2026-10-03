@@ -1,0 +1,46 @@
+/* Chat global ao lado do canvas (web/chat.js, ADR 018). Visual próprio, nas
+   cores da tela de carregamento; sem imagens nem fontes externas. */
+.wyd-play { display: flex; gap: 16px; align-items: stretch; justify-content: center; }
+.wyd-stage { flex: 0 1 auto; min-width: 0; }
+/* Com "ampliar", o canvas ocupa a largura que sobra ao lado do chat. */
+.wyd-stage:has(canvas.wyd-fit) { flex: 1 1 0; }
+
+.wyd-chat {
+  --gold: #e2bf68; --gold-deep: #8f6f2c; --text: #efe6d2; --muted: #a8a08e;
+  flex: 0 0 300px; display: flex; flex-direction: column; min-height: 360px; box-sizing: border-box;
+  /* A altura acompanha o canvas; as mensagens não esticam a linha. */
+  contain: size;
+  border: 1px solid #3a3426; border-radius: 4px; background: #17171a; color: var(--text);
+  text-align: left; font: 14px/1.4 system-ui, sans-serif;
+}
+.wyd-chat[hidden] { display: none; }
+
+.wyd-chat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding: 8px 12px; border-bottom: 1px solid #3a3426; background: linear-gradient(#211d14, #19170f); }
+.wyd-chat-head h2 { margin: 0; font: 600 15px Georgia, "Times New Roman", serif; letter-spacing: .12em; color: var(--gold); }
+.wyd-chat-status { font-size: 12px; color: var(--muted); }
+.wyd-chat[data-state="closed"] .wyd-chat-status { color: #f2a48e; }
+
+.wyd-chat-log { flex: 1 1 0; min-height: 0; margin: 0; padding: 8px 12px; overflow-y: auto; list-style: none;
+  overflow-wrap: anywhere; }
+.wyd-chat-log li { margin: 2px 0; }
+.wyd-chat-log time { font: 11px ui-monospace, monospace; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wyd-chat-log b { color: #9fd3ff; font-weight: 600; }
+.wyd-chat-log .wyd-chat-mine b { color: var(--gold); }
+.wyd-chat-log .wyd-chat-sys { font-size: 12px; font-style: italic; color: var(--muted); }
+
+.wyd-chat-form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid #3a3426; }
+.wyd-chat-form input { flex: 1; min-width: 0; padding: 5px 8px; font: inherit; color: var(--text);
+  background: #0f1013; border: 1px solid #454036; border-radius: 3px; }
+.wyd-chat-form input:focus-visible { outline: 1px solid var(--gold); border-color: var(--gold-deep); }
+.wyd-chat-form button { padding: 5px 12px; font: 600 13px system-ui, sans-serif; color: #1c160a; cursor: pointer;
+  background: linear-gradient(#ecd08a, #b38c3c); border: 1px solid #f3dca0; border-radius: 3px; }
+.wyd-chat-form :disabled { opacity: .5; cursor: default; }
+.wyd-chat-note { margin: 0; padding: 0 10px 8px; font-size: 12px; color: #c9a35a; }
+
+/* Janela estreita: o chat vai para baixo do jogo. */
+@media (max-width: 1139px) {
+  .wyd-play { flex-direction: column; align-items: center; }
+  .wyd-stage, .wyd-stage:has(canvas.wyd-fit) { flex: 0 0 auto; width: 100%; }
+  .wyd-chat { flex: 0 0 auto; width: min(800px, 100%); height: 320px; min-height: 0; }
+}

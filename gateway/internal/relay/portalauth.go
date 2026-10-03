@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -73,6 +74,9 @@ type handoff struct {
 type sessionClaims struct {
 	Sub string `json:"sub"`
 	Exp int64  `json:"exp"`
+	// Name is the account's login name when the ticket carried a well-formed
+	// one; the page chat uses it as the nick (ADR 018).
+	Name string `json:"name,omitempty"`
 }
 
 type portalGate struct {
@@ -116,8 +120,8 @@ func (p *portalGate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.handleGameLogin(w, r)
 		return
 	}
-	if _, ok := p.session(r); ok {
-		p.next.ServeHTTP(w, r)
+	if s, ok := p.session(r); ok {
+		p.next.ServeHTTP(w, r.WithContext(withIdentity(r.Context(), identity{Sub: s.Sub, Name: s.Name})))
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
@@ -151,6 +155,10 @@ func (p *portalGate) handleTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	exp := p.now().Add(p.ttl)
+	session := sessionClaims{Sub: t.Sub, Exp: exp.Unix()}
+	if loginNameRe.MatchString(t.Name) {
+		session.Name = t.Name
+	}
 	if id := p.keepLogin(r, t); id != "" {
 		http.SetCookie(w, &http.Cookie{
 			Name:     loginName,
@@ -164,7 +172,7 @@ func (p *portalGate) handleTicket(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionName,
-		Value:    sign(p.key, sessionLabel, sessionClaims{Sub: t.Sub, Exp: exp.Unix()}),
+		Value:    sign(p.key, sessionLabel, session),
 		Path:     "/",
 		MaxAge:   int(p.ttl / time.Second),
 		HttpOnly: true,
@@ -174,23 +182,42 @@ func (p *portalGate) handleTicket(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// session returns the account of a valid gateway session cookie.
-func (p *portalGate) session(r *http.Request) (string, bool) {
+// session returns the claims of a valid gateway session cookie.
+func (p *portalGate) session(r *http.Request) (sessionClaims, bool) {
 	c, err := r.Cookie(sessionName)
 	if err != nil {
-		return "", false
+		return sessionClaims{}, false
 	}
 	var s sessionClaims
 	if verify(p.key, sessionLabel, c.Value, &s) != nil || s.Sub == "" || p.now().Unix() >= s.Exp {
-		return "", false
+		return sessionClaims{}, false
 	}
-	return s.Sub, true
+	if !loginNameRe.MatchString(s.Name) {
+		s.Name = ""
+	}
+	return s, true
+}
+
+// identity is the portal account behind a request, put in its context by the gate.
+type identity struct{ Sub, Name string }
+
+type identityKey struct{}
+
+func withIdentity(ctx context.Context, id identity) context.Context {
+	return context.WithValue(ctx, identityKey{}, id)
+}
+
+// identityFrom returns the request's portal account; ok is false without the portal gate.
+func identityFrom(ctx context.Context) (identity, bool) {
+	id, ok := ctx.Value(identityKey{}).(identity)
+	return id, ok
 }
 
 // keepLogin stores the ticket's game login, if any, and returns its handoff id.
 // A malformed login is dropped: the player then types the password in the game.
 func (p *portalGate) keepLogin(r *http.Request, t ticketClaims) string {
-	if t.Name == "" && t.Code == "" {
+	// A name alone only names the session (chat nick); there is no login to hand off.
+	if t.Code == "" {
 		return ""
 	}
 	if !loginNameRe.MatchString(t.Name) || !loginCodeRe.MatchString(t.Code) {
@@ -228,7 +255,8 @@ func (p *portalGate) handleGameLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	sub, ok := p.session(r)
+	s, ok := p.session(r)
+	sub := s.Sub
 	if !ok {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return

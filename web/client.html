@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="client.css">
 <link rel="stylesheet" href="settings.css">
 <link rel="stylesheet" href="loader.css">
+<link rel="stylesheet" href="chat.css">
 <div id="loader" class="wyd-loader indeterminate" role="status" aria-live="polite" aria-busy="true">
   <div class="wyd-loader-card">
     <svg class="wyd-loader-emblem" viewBox="0 0 120 120" aria-hidden="true">
@@ -38,8 +39,22 @@
 </div>
 <h1>WYD</h1>
 <p id="status"></p>
-<canvas id="canvas" width="800" height="600" tabindex="0" aria-label="Cliente WYD"></canvas>
+<div class="wyd-play">
+  <div class="wyd-stage">
+    <canvas id="canvas" width="800" height="600" tabindex="0" aria-label="Cliente WYD"></canvas>
+  </div>
+  <aside id="chat" class="wyd-chat" aria-label="Chat dos jogadores" hidden>
+    <header class="wyd-chat-head"><h2>Chat</h2><span id="chat-status" class="wyd-chat-status">Desligado</span></header>
+    <ol id="chat-log" class="wyd-chat-log" aria-live="polite"></ol>
+    <form id="chat-form" class="wyd-chat-form" autocomplete="off">
+      <input id="chat-input" type="text" maxlength="200" placeholder="Mensagem" aria-label="Mensagem para todos os jogadores" disabled>
+      <button type="submit" disabled>Enviar</button>
+    </form>
+    <p id="chat-note" class="wyd-chat-note" hidden></p>
+  </aside>
+</div>
 <p id="identity"></p>
 <script src="settings.js"></script>
+<script src="chat.js"></script>
 <script src="client.js"></script>
 </html>
