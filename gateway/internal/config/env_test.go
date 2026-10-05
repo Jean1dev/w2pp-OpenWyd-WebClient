@@ -173,3 +173,17 @@ func TestFromEnvBucket(t *testing.T) {
 		}
 	}
 }
+
+func TestFromEnvChat(t *testing.T) {
+	c, err := FromEnv(env(nil))
+	if err != nil || !c.Chat.On() || c.Chat.MaxClients != 256 || c.Chat.MaxPerIP != 4 {
+		t.Fatalf("chat default: %v %+v", err, c.Chat)
+	}
+	c, err = FromEnv(env(map[string]string{EnvChatEnabled: "false"}))
+	if err != nil || c.Chat.On() {
+		t.Fatalf("chat not disabled: %v", err)
+	}
+	if _, err := FromEnv(env(map[string]string{EnvChatEnabled: "off"})); err == nil {
+		t.Fatal("accepted a non-boolean chat flag")
+	}
+}

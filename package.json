@@ -20,6 +20,7 @@
     "loading:ui": "node tools/verify_loading_ui.mjs",
     "auto:server": "node tools/verify_auto_server.mjs",
     "auto:login": "node tools/verify_auto_login.mjs",
+    "chat:ui": "node tools/verify_chat_ui.mjs",
     "measure": "python tools/build_local_scene.py --page-only && node tools/measure_scene.mjs"
   }
 }

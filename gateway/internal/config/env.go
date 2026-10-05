@@ -35,6 +35,7 @@ const (
 	EnvAllowPublic   = "WYD_ALLOW_PUBLIC"         // "true" to run without a credential
 	EnvMaxConns      = "WYD_MAX_CONNS"            // optional limits
 	EnvMaxConnsPerIP = "WYD_MAX_CONNS_PER_IP"
+	EnvChatEnabled   = "WYD_CHAT_ENABLED" // "false" removes the page chat (default on)
 )
 
 // FromEnv builds a configuration for a TLS-terminating platform. It requires a
@@ -109,6 +110,14 @@ func FromEnv(getenv func(string) string) (*Config, error) {
 			}
 			*dst = n
 		}
+	}
+	switch v := strings.TrimSpace(getenv(EnvChatEnabled)); v {
+	case "", "true":
+	case "false":
+		off := false
+		c.Chat.Enabled = &off
+	default:
+		errs = append(errs, fmt.Errorf("%s must be true or false", EnvChatEnabled))
 	}
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("environment configuration: %w", errors.Join(errs...))

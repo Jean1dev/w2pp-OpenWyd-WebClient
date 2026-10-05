@@ -908,3 +908,30 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - **`auto:login` 9/9 na stack local**: login automático até a seleção de personagem, handoff de uso único, nada vazado e, sem segredo, login manual.
 - **Observado:** a primeira execução de ponta a ponta deu `DeadlineExceeded` no dbserver. A hipótese é a ordem de boot do compose somada à CPU disputada; a execução seguinte passou, e os detalhes estão na evidência.
 - **Próximo passo:** PRs nos três repositórios; deploy na ordem servidor, portal, cliente web, com `W2PP_PLAY_CODE_SECRET`/`PLAY_CODE_SECRET`.
+
+### 03/10/2026 — chat global ao lado do jogo (ADR 018)
+
+- **Pedido do usuário:** chat em tempo real com os outros jogadores, ao lado da janela do jogo, sem persistência, com o nick igual ao nome da conta do login. Plano aprovado: sala global única no gateway, nick vindo da sessão do portal.
+- **Arquivos:**
+  - gateway:
+    - `internal/chat/` (hub e testes);
+    - `relay/relay.go` (`/chat/ws`, limitador separado, `chat` no `config.json`);
+    - `relay/portalauth.go` (nome na sessão, identidade no contexto);
+    - `relay/chat_test.go`;
+    - `config` (bloco `chat`, `WYD_CHAT_ENABLED`);
+    - `cmd/wydgateway/main.go`;
+  - página: `web/chat.js`, `web/chat.css`, `web/client.html`, `web/client.js` e `web/settings.js` (ampliar respeita o chat);
+  - testes: `tools/verify_chat_ui.mjs` e `package.json` (`chat:ui`);
+  - docs: ADR 018, a [evidência](evidence/07-web/2026-10-03-web-chat.md) e `deploy.md`.
+- **Comandos e resultados:**
+  - gateway: `go vet` limpo e `go test -count=3 ./...` ok;
+  - `chat:ui` **50/50** em Chromium e Firefox, com o gateway real e duas sessões;
+  - `loading:ui` 52/52, `settings:ui` 36/36, `test_public_exports` 4/4 e `node --test` 39/39.
+- **Confirmado em fonte:** o portal só põe `name` no ticket junto com o código do ADR 017. Sem ele, o chat fica em somente leitura.
+- **Não executado:**
+  - `go test -race`, por falta de cgo local; fica com a CI;
+  - runtime real, tm-server e Railway.
+- **Próximo passo:**
+  - PR, CI e deploy;
+  - no portal, enviar `name` sempre;
+  - conferir com duas contas reais pelo portal.
