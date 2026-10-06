@@ -1,0 +1,32 @@
+Etapa 5: read-only probes of the private message memo (m_pHelpList[3]),
+where a received whisper shows its sender (string 226) and text. The chat
+probes of 0018 read only m_pChatList, so the harness could not see who the
+client names as the sender.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -1185,6 +1185,23 @@ extern "C" WYD_EXPORT const char* wyd_field_chat_line(int k) {
+   return it && it->GetText() ? it->GetText() : "";
+ }
+ 
++// Private message memo (m_pHelpList[3]): a received whisper adds a blank line,
++// the "from <sender> [time]" line (string 226) and the text (&String[1]),
++// TMFieldScene/TMHuman OnPacketMessageWhisper. Count, and line k from the
++// newest (0). Read-only.
++extern "C" WYD_EXPORT int wyd_field_memo_count() {
++  TMFieldScene* f = WydField();
++  return f && f->m_pHelpList[3] ? f->m_pHelpList[3]->m_nNumItem : -1;
++}
++
++extern "C" WYD_EXPORT const char* wyd_field_memo_line(int k) {
++  TMFieldScene* f = WydField();
++  SListBox* memo = f ? f->m_pHelpList[3] : nullptr;
++  if (!memo || k < 0 || k >= memo->m_nNumItem) return "";
++  SListBoxItem* it = memo->m_pItemList[memo->m_nNumItem - 1 - k];
++  return it && it->GetText() ? it->GetText() : "";
++}
++
+ // Gold buttons of the inventory/cargo windows and the amount box OK
+ // (B_MONEY 65563, B_CARGO_MONEY 65688, B_IG_OK 65886): center as drawn, or -1.
+ extern "C" WYD_EXPORT int wyd_field_button_screen(unsigned int id, int which) {

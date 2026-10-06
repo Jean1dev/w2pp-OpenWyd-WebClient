@@ -72,3 +72,9 @@ Na revisão anterior, o dialeto descartava como desconhecidos, nos dois sentidos
 - `0x0339` @12: **confirmado em execução** com saldo diferente de zero entre sessões. 74 de ouro no banco antes e depois do relogin, iguais ao log `cargo deposit coin=37 cargo=74` ([fatia A](../evidence/05-gameplay/2026-10-01-slice-a.md)).
 - Teleporte pago: o OK da caixa 16 envia `0x0290` sem conferir o ouro, e o servidor recusa em silêncio quando falta ouro. Confirmado em execução; a falta do aviso continua como lacuna do servidor.
 - Avisos do servidor: o dialeto traduz os códigos 0–33 de `handler/notice.go` em texto próprio (antes eram 0–15).
+
+## Revisão de 06/10/2026
+
+- **Lacuna 3 (sussurro): corrigida no servidor, sem deploy.** O PR [#374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374) (`patches/server/0008`) grava o nome de quem envia no `MobName` e põe um espaço na frente do texto. O espaço compensa o `&String[1]` do memo, que também cortava com o servidor C++. O PR também zera o `Color` e traz o `/r`. Ver [ADR 019](019-duplicate-login-and-whisper.md).
+- **"Sussurro exibido sem o primeiro caractere":** a hipótese de que o servidor legado reescrevia o texto estava errada. O `_MSG_MessageWhisper.cpp` só troca o `MobName`; o corte é do próprio 7662.
+- **Probe:** o nome do remetente aparece no memo privado (`m_pHelpList[3]`), que os probes desta ADR não liam. Por isso o `senderShown` da fase `chat` saía "none". O patch `0027-memo-probes` acrescenta `wyd_field_memo_count`/`_line`.

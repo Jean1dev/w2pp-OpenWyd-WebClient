@@ -44,7 +44,7 @@ import { checkGuildChat, checkParty, checkPartyChat, checkPartyEvidence } from '
 import { fsTraceInit, packageIndex, openedByDir } from './fs_trace.mjs';
 import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, checkBuff, checkHealOther, checkRestart, checkSettings, itemAmount } from './world_checks.mjs';
+  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, checkBuff, checkHealOther, checkRestart, checkSettings, checkConcurrent, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -3311,19 +3311,38 @@ async function main() {
       res.say.bLines = await b.chatLines(4);
       res.say.aLines = await a.chatLines(4);
       await b.shot('chat-heard');
-      // 2. Whisper A -> B ("/name text"): record what B shows as the sender.
-      // The receiver's private memo shows &String[1] (OnPacketMessageWhisper):
-      // the first character is cut, so the check looks for the tag only.
-      const bCount0 = await b.eval(() => Module._wyd_field_chat_count());
-      res.whisper = await a.say(`/${B.char} psiu ${tag}`);
-      res.whisper.heard = await inChat(b, tag);
-      res.whisper.bLines = await b.chatLines(4);
-      // Which name B shows as the sender (names stay out of the evidence).
-      res.whisper.senderShown = await b.eval(([self, other, n0]) => {
+      // 2. Whisper A -> B ("/name text"). The receiver shows it in the private
+      // memo (m_pHelpList[3], patch 0027): a "from <sender> [time]" line built
+      // from MobName and the text as &String[1] (OnPacketMessageWhisper). The
+      // server writes the sender's name and a leading space (server patch 0008),
+      // so B must show A as the sender and the whole text.
+      const memo = async (s, n0) => s.eval(n0 => {
         const lines = [];
-        for (let k = 0; k < Module._wyd_field_chat_count() - n0; k++) lines.push(Module.UTF8ToString(Module._wyd_field_chat_line(k)));
-        return lines.some(l => l.includes(other)) ? 'sender' : lines.some(l => l.includes(self)) ? 'receiver' : 'none';
-      }, [B.char, A.char, bCount0]);
+        for (let k = 0; k < Module._wyd_field_memo_count() - n0; k++) lines.push(Module.UTF8ToString(Module._wyd_field_memo_line(k)));
+        return lines;
+      }, n0);
+      const memoCount = s => s.eval(() => Module._wyd_field_memo_count());
+      const whisperSeen = async (s, n0, text, self, other) => {
+        const end = Date.now() + 20000;
+        let lines = [];
+        while (Date.now() < end) {
+          lines = await memo(s, n0);
+          if (lines.some(l => l.includes(text.slice(-8)))) break;
+          await sleep(500);
+        }
+        return { heard: lines.some(l => l.includes(text.slice(-8))), fullText: lines.includes(text),
+          senderShown: lines.some(l => l.includes(other)) ? 'sender' : lines.some(l => l.includes(self)) ? 'receiver' : 'none',
+          // Names stay out of the evidence.
+          memo: lines.map(l => l.split(other).join('<sender>').split(self).join('<self>')) };
+      };
+      const bMemo0 = await memoCount(b);
+      res.whisper = await a.say(`/${B.char} psiu ${tag}`);
+      Object.assign(res.whisper, await whisperSeen(b, bMemo0, `psiu ${tag}`, B.char, A.char));
+      res.whisper.bLines = await b.chatLines(4);
+      // 2b. B answers with "/r" (server patch 0008, legacy LastChat): A receives it from B.
+      const aMemo0 = await memoCount(a);
+      res.reply = await b.say(`/r volta ${tag}`);
+      Object.assign(res.reply, await whisperSeen(a, aMemo0, `volta ${tag}`, A.char, B.char));
       // 3. Whisper to nobody online: the server answers with a notice.
       const in0 = await a.eval(() => window.clientProbe().dialect.inTranslated);
       res.offline = await a.say(`/zz${tag} ninguem`);
@@ -3363,37 +3382,57 @@ async function main() {
     await step('concurrent', async () => {
       // B is unnecessary here; keep only the two connections under test alive.
       if (b?.context) { await b.healthy(); await b.close(); }
+      // Server patch 0009, as the legacy: the session in the game is told
+      // "Conta desconectada por conexão simultânea." and closed (and saved); the
+      // new login is refused with 0x011D (0x011C while the save is in flight)
+      // and the 7662 shows "Conexão anterior finalizada. Tente novamente.".
+      const before = await a.me();
       const c = await newSession('A-concurrent', A);
-      // dbserver AccountLogin at the pinned SHA has no duplicate-session guard.
-      await c.loginToSelect();
-      const second = await c.probe();
-      const first = await a.probe();
-      assert.equal(second.state, STATE.SELECT_CHAR, 'duplicate login behavior differs from pinned backend');
-      assert.equal(first.state, STATE.FIELD, 'first session left Field during duplicate login');
-      await a.healthy();
-      await c.healthy();
-      await c.shot('concurrent');
-      await c.close();
-      await sleep(2000);
-      const firstAfter = await a.probe();
-      assert.equal(firstAfter.state, STATE.FIELD, 'closing duplicate removed original Field');
-      // Require a new server entity after duplicate close, not a stale Field
-      // image or an assumption that an idle server emits periodic packets.
-      const observer = await newSession('B-after-concurrent', B);
-      await observer.loginToSelect();
-      assert.equal((await observer.pin()).result, 'lock1', 'observer PIN rejected');
-      const observerMe = await observer.enter(0);
-      assert.equal(observerMe.name, B.char, 'wrong observer character');
-      await a.until('original sees observer after duplicate close', id => Module._wyd_field_human_present(id) === 1,
-        30000, observer.id);
-      assert.equal((await a.other(observer.id)).name, B.char, 'stale entity after duplicate close');
-      await a.healthy();
-      await observer.healthy();
-      await observer.close();
-      return { secondState: second.state, secondLastRecv: '0x' + second.socket.lastRecvOpcode.toString(16),
-        firstStateDuring: first.state, firstStateAfter: firstAfter.state,
-        duplicateAccepted: true, originalStillReceives: true,
-        backendLimitation: 'Duplicate account login accepted; shared cargo replaced/released. No inventory mutations tested.' };
+      if ((await c.login()) !== 1) throw new Error('login control refused');
+      const refusal = await c.until('duplicate login reply', () => {
+        const op = window.clientProbe().socket.lastRecvOpcode;
+        return (op === 0x11d || op === 0x11c || Module._wyd_get_game_state() !== 7) &&
+          { opcode: op, state: Module._wyd_get_game_state() };
+      }, 30000);
+      const refusalPanel = await c.until('refusal message', () => Module._wyd_scene_message_visible() === 1 &&
+        { text: Module.UTF8ToString(Module._wyd_scene_message_text()) }, 5000).catch(() => ({ text: null }));
+      await c.shot('concurrent-refused');
+      // The first page: the server's message panel, then the socket closes and
+      // the client returns to server selection.
+      const kicked = await a.until('first session closed', () => Module._wyd_get_game_state() === 7 &&
+        { lastRecv: window.clientProbe().socket.lastRecvOpcode }, 30000)
+        .catch(() => ({ lastRecv: null, timedOut: true }));
+      kicked.connected = a.connected;
+      kicked.panelText = await a.eval(() => Module._wyd_scene_message_visible() === 1 ?
+        Module.UTF8ToString(Module._wyd_scene_message_text()) : null);
+      await a.shot('concurrent-kicked');
+      checkHealth(await a.probe(), a.pageErrors);
+      await a.close();
+      // Retry, as the player would after the message (the client re-enables Login
+      // after it). Refusals while the previous session saves are counted.
+      const retries = [];
+      for (let attempt = 0; ; attempt++) {
+        await sleep(5000);
+        if ((await c.login()) !== 1) throw new Error('login control refused on retry');
+        const got = await c.until('retry reply', () => {
+          const op = window.clientProbe().socket.lastRecvOpcode;
+          return Module._wyd_get_game_state() === 5 ? 'selchar' : (op === 0x11d || op === 0x11c) && `0x${op.toString(16)}`;
+        }, 30000);
+        retries.push(got);
+        if (got === 'selchar') break;
+        if (attempt >= 4) throw new Error(`still refused after ${retries.length} retries: ${retries.join(',')}`);
+      }
+      await c.until('selection scene ready', () => Module._wyd_selchar_initialized() === 1, 30000);
+      await sleep(3000);
+      const pin = await c.pin();
+      assert.equal(pin.result, 'lock1', 'PIN rejected after the retry');
+      const after = await c.enter(0);
+      await c.shot('concurrent-retry');
+      const res = { refusal, refusalPanel: refusalPanel.text, kicked, retries,
+        sameCharacter: after.name === before.name, sameEquip: JSON.stringify(after.equip) === JSON.stringify(before.equip) };
+      checkConcurrent(res);
+      a = c;
+      return res;
     });
     ev.ok = Object.values(r).every(x => x.ok);
   } catch (e) {

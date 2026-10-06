@@ -1,0 +1,243 @@
+From 072c9049d3e205b7c0f8a5b79f09782db42f5e6c Mon Sep 17 00:00:00 2001
+From: Jeanluca <jeanlucafp@gmail.com>
+Date: Tue, 6 Oct 2026 10:59:48 -0300
+Subject: [PATCH] fix(chat): whisper carries the sender's name; /r replies
+
+A private whisper was forwarded as sent, so MobName still held the
+target's own name and the receiving 7662 client showed it as the sender.
+Like the legacy _MSG_MessageWhisper.cpp (and partyChat/guildChat here),
+write the speaker's name into MobName before forwarding.
+
+The receiver's private memo prints &String[1] (TMFieldScene.cpp:17945),
+so the first character of every whisper was lost; prefix a space. This
+also stops a whisper from posing as guild/party/kingdom chat with a
+leading marker, and Color is zeroed so 7 cannot move it to the grey chat.
+The received frame length (158 web, 160 WYD.exe) is kept.
+
+"/r" (a whisper to "r") answers whoever whispered last, as the legacy
+LastChat; with no history it is the not-connected notice.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ tmserver/internal/handler/chat.go      |  54 ++++++++++++-
+ tmserver/internal/handler/chat_test.go | 105 +++++++++++++++++++++++++
+ tmserver/internal/world/session.go     |   1 +
+ 3 files changed, 159 insertions(+), 1 deletion(-)
+
+diff --git a/tmserver/internal/handler/chat.go b/tmserver/internal/handler/chat.go
+index 67cf2405..93adb893 100644
+--- a/tmserver/internal/handler/chat.go
++++ b/tmserver/internal/handler/chat.go
+@@ -1,6 +1,7 @@
+ package handler
+ 
+ import (
++	"bytes"
+ 	"fmt"
+ 	"strings"
+ 	"time"
+@@ -87,6 +88,11 @@ func (d *Dispatcher) messageWhisper(w *world.World, s *world.Session, _ protocol
+ 		d.log.Info("chat command", "conn", s.Conn, "cmd", strings.TrimPrefix(name, "/"))
+ 		return // a slash command (the client sends "/x" as a whisper to "x")
+ 	}
++	// "/r" answers whoever whispered last (the "PM, /r" region of
++	// _MSG_MessageWhisper.cpp, pUser[conn].LastChat). No one yet: not connected.
++	if name == whisperReply {
++		name = s.LastWhisperFrom
++	}
+ 	target, _ := w.SessionByName(name)
+ 	if target == nil {
+ 		d.notify(w, s, NoticeNotConnected)
+@@ -96,7 +102,53 @@ func (d *Dispatcher) messageWhisper(w *world.World, s *world.Session, _ protocol
+ 		d.notify(w, s, NoticeDenyWhisper)
+ 		return
+ 	}
+-	w.SendTo(target, protocol.Header{Type: protocol.MsgMessageWhisper, ID: uint16(s.Conn)}, payload)
++	e := w.Entity(s.Conn)
++	if e == nil {
++		return
++	}
++	// The legacy writes the speaker's name into MobName before forwarding, and
++	// the receiving client shows MobName as the sender. Forwarding the payload
++	// as sent left the target's own name there.
++	body.MobName = [16]byte{}
++	copy(body.MobName[:len(body.MobName)-1], e.Name)
++	body.String = privateWhisperText(body.String)
++	target.LastWhisperFrom = e.Name
++	w.SendTo(target, protocol.Header{Type: protocol.MsgMessageWhisper, ID: uint16(s.Conn)}, body.Encode())
++}
++
++// whisperReply is the target name the client sends for "/r".
++const whisperReply = "r"
++
++// whisperTextMax is the 7662 MSG_MessageWhisper.String size (frame offsets
++// 28..155); the receiver forces String[127] = 0.
++const whisperTextMax = 128
++
++// privateWhisperText rewrites a private whisper's String for the 7662 client,
++// keeping the received length (158 from the web dialect, 160 from WYD.exe):
++//   - the receiver's memo prints &String[1] (TMFieldScene.cpp:17945), also
++//     with the legacy server, which forwards the text as typed. A leading space
++//     keeps the whole message. It also stops a player from starting the line
++//     with a channel marker ('-' guild, '=' party, '@' kingdom) to have it
++//     shown as that channel;
++//   - Color (offset whisperColorOffset) is zeroed: 7 would move the line to the
++//     grey chat (TMFieldScene.cpp:17901).
++//
++// The text is cut to fit String with its NUL (126 bytes after the space).
++func privateWhisperText(in []byte) []byte {
++	text := in
++	if len(text) > whisperTextMax {
++		text = text[:whisperTextMax]
++	}
++	if i := bytes.IndexByte(text, 0); i >= 0 {
++		text = text[:i]
++	}
++	if len(text) > whisperTextMax-2 {
++		text = text[:whisperTextMax-2]
++	}
++	out := make([]byte, max(len(in), len(text)+2))
++	out[0] = ' '
++	copy(out[1:], text)
++	return out
+ }
+ 
+ // partyChat routes a "=text" line (MobName empty) to the speaker's party, as the
+diff --git a/tmserver/internal/handler/chat_test.go b/tmserver/internal/handler/chat_test.go
+index 3842f5fd..e8880d74 100644
+--- a/tmserver/internal/handler/chat_test.go
++++ b/tmserver/internal/handler/chat_test.go
+@@ -3,6 +3,7 @@ package handler
+ import (
+ 	"encoding/binary"
+ 	"net"
++	"strings"
+ 	"testing"
+ 
+ 	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/protocol"
+@@ -472,6 +473,110 @@ func TestWhisperDeliver(t *testing.T) {
+ 	}
+ }
+ 
++// whisperFrameSized sends a whisper laid out like the 7662 struct: MobName[16],
++// String[128], Color (frame 156) and the given total body size (146 from the
++// web dialect, 148 from WYD.exe).
++func whisperFrameSized(t *testing.T, c net.Conn, target, text string, color uint16, size int) {
++	t.Helper()
++	body := make([]byte, size)
++	copy(body[:15], target)
++	copy(body[16:16+127], text)
++	binary.LittleEndian.PutUint16(body[16+whisperColorOffset:], color)
++	send(t, c, protocol.MsgMessageWhisper, body)
++}
++
++func readWhisper(t *testing.T, c net.Conn) (name, text string, color uint16, size int) {
++	t.Helper()
++	ty, p, ok := readMaybe(t, c)
++	if !ok || ty != protocol.MsgMessageWhisper {
++		t.Fatalf("got %#x ok=%v, want MessageWhisper", ty, ok)
++	}
++	var body protocol.MsgWhisperBody
++	if err := body.Decode(p); err != nil {
++		t.Fatalf("decode: %v", err)
++	}
++	if len(body.String) >= whisperColorOffset+2 {
++		color = binary.LittleEndian.Uint16(body.String[whisperColorOffset:])
++	}
++	return cstr(body.MobName[:]), cstr(body.String), color, len(p)
++}
++
++// TestWhisperRewrite: the receiver's client shows MobName as the sender and
++// prints &String[1] in the private memo, so the server writes the speaker's
++// name and prefixes a space (_MSG_MessageWhisper.cpp copies the name; the
++// space is ours, see privateWhisperText). Markers and Color cannot be forged.
++func TestWhisperRewrite(t *testing.T) {
++	long := strings.Repeat("x", 140)
++	cases := []struct {
++		name, text string
++		color      uint16
++		size       int
++		wantText   string
++	}{
++		{"windows layout", "psst", 0, 148, " psst"},
++		{"web dialect layout", "psst", 0, 146, " psst"},
++		{"short frame", "psst", 0, 0, " psst"},
++		{"guild marker", "-fake guild", 3, 148, " -fake guild"},
++		{"party marker", "=fake party", 0, 148, " =fake party"},
++		{"kingdom marker", "@@fake", 0, 148, " @@fake"},
++		{"grey color", "grey", 7, 148, " grey"},
++		{"cut to fit", long, 0, 148, " " + strings.Repeat("x", 126)},
++	}
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			addr, stop, _ := startServerClock(t, chatDB())
++			defer stop()
++			a := enterWorldAs(t, addr, "tester") // name "Hero"
++			defer a.Close()
++			b := enterWorldAs(t, addr, "tradeb") // name "HeroB"
++			defer b.Close()
++
++			if tc.size == 0 {
++				whisperFrame(t, a, "HeroB", tc.text)
++			} else {
++				whisperFrameSized(t, a, "HeroB", tc.text, tc.color, tc.size)
++			}
++			name, text, color, size := readWhisper(t, b)
++			if name != "Hero" {
++				t.Errorf("sender = %q, want Hero", name)
++			}
++			if text != tc.wantText {
++				t.Errorf("text = %q, want %q", text, tc.wantText)
++			}
++			if color != 0 {
++				t.Errorf("color = %d, want 0", color)
++			}
++			if tc.size != 0 && size != tc.size {
++				t.Errorf("size = %d, want the received %d", size, tc.size)
++			}
++		})
++	}
++}
++
++// TestWhisperReply: "/r" (a whisper to "r") goes to whoever whispered last;
++// with no one yet it is the offline notice.
++func TestWhisperReply(t *testing.T) {
++	addr, stop, _ := startServerClock(t, chatDB())
++	defer stop()
++	a := enterWorldAs(t, addr, "tester") // name "Hero"
++	defer a.Close()
++	b := enterWorldAs(t, addr, "tradeb") // name "HeroB"
++	defer b.Close()
++
++	whisperFrame(t, b, "r", "nobody yet")
++	if ty, p, ok := readMaybe(t, b); !ok || ty != protocol.MsgMessageBoxOk || noticeCode(t, p) != NoticeNotConnected {
++		t.Fatalf("got %#x, want not-connected notice for /r without history", ty)
++	}
++
++	whisperFrame(t, a, "HeroB", "hi")
++	readWhisper(t, b)
++	whisperFrame(t, b, "r", "hello back")
++	name, text, _, _ := readWhisper(t, a)
++	if name != "HeroB" || text != " hello back" {
++		t.Errorf("reply = %q/%q, want HeroB/\" hello back\"", name, text)
++	}
++}
++
+ func TestWhisperOffline(t *testing.T) {
+ 	addr, stop, _ := startServerClock(t, chatDB())
+ 	defer stop()
+diff --git a/tmserver/internal/world/session.go b/tmserver/internal/world/session.go
+index 6dae0308..7f369adc 100644
+--- a/tmserver/internal/world/session.go
++++ b/tmserver/internal/world/session.go
+@@ -64,6 +64,7 @@ type Session struct {
+ 	IP                string
+ 	CrackError        int             // anti-cheat violation count (CUser.NumError)
+ 	Whisper           bool            // true blocks incoming whispers
++	LastWhisperFrom   string          // who last whispered to this player; "/r" replies there (legacy LastChat)
+ 	PartyChat         bool            // true blocks the party channel (partychat)
+ 	GuildChat         bool            // true blocks the guild channel (guildchat)
+ 	GuildDisable      bool            // hide guild tag (guildon/guildoff)
+-- 
+2.54.0.windows.1
+

@@ -56,7 +56,9 @@ Na mesma linha, também confirmado em execução em 30/09:
 - o ouro dos mobs nunca é pago, porque `ParseMobBasics`/`SpawnMobAt` não leem o `Coin` do template;
 - o snapshot de login traz o score do template da classe até o primeiro `0x0336`.
 
-Até lá, "coleta/drop no chão" fica **bloqueada pelo servidor** na etapa 5. O loot provado é o que o servidor realmente implementa: direto ao carry e ao Coin.
+Até lá, "coleta/drop no chão" fica **bloqueada pelo servidor** na etapa 5.
+
+**Revisão de 06/10/2026:** por decisão do usuário, itens no chão ficam **fora de escopo**. A entrega no servidor descrita acima não será feita. Os opcodes continuam descartados, e um drop feito pelo jogador segue sem efeito, sem perda de item. O loot provado é o que o servidor realmente implementa: direto ao carry e ao Coin.
 
 ## Limites
 
