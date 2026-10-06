@@ -3411,13 +3411,27 @@ async function main() {
       // Retry, as the player would after the message (the client re-enables Login
       // after it). Refusals while the previous session saves are counted.
       const retries = [];
+      const controlRefused = [];
+      const loginState = () => c.eval(() => ({ state: Module._wyd_get_game_state(), socket: window.clientProbe().socket,
+        message: Module._wyd_scene_message_visible() === 1 ? Module.UTF8ToString(Module._wyd_scene_message_text()) : null }));
       for (let attempt = 0; ; attempt++) {
         await sleep(5000);
-        if ((await c.login()) !== 1) throw new Error('login control refused on retry');
-        const got = await c.until('retry reply', () => {
-          const op = window.clientProbe().socket.lastRecvOpcode;
-          return Module._wyd_get_game_state() === 5 ? 'selchar' : (op === 0x11d || op === 0x11c) && `0x${op.toString(16)}`;
-        }, 30000);
+        let accepted = await c.login();
+        for (let k = 0; accepted !== 1 && k < 3; k++) {
+          // Diagnostic: what the page looks like when the login control refuses.
+          controlRefused.push({ result: accepted, ...(await loginState()) });
+          await sleep(3000);
+          accepted = await c.login();
+        }
+        if (accepted !== 1) throw Object.assign(new Error('login control refused on retry'), { res: { refusal, refusalPanel, kicked, retries, controlRefused } });
+        // lastRecvOpcode still holds the previous refusal (and the socket is
+        // reopened on each login), so wait for character selection first and
+        // only then read a refusal.
+        const got = await c.until('character selection after the retry', () => Module._wyd_get_game_state() === 5 && 'selchar',
+          20000).catch(async () => {
+          const op = (await loginState()).socket.lastRecvOpcode;
+          return op === 0x11d || op === 0x11c ? `0x${op.toString(16)}` : `none 0x${op.toString(16)}`;
+        });
         retries.push(got);
         if (got === 'selchar') break;
         if (attempt >= 4) throw new Error(`still refused after ${retries.length} retries: ${retries.join(',')}`);
@@ -3428,7 +3442,7 @@ async function main() {
       assert.equal(pin.result, 'lock1', 'PIN rejected after the retry');
       const after = await c.enter(0);
       await c.shot('concurrent-retry');
-      const res = { refusal, refusalPanel: refusalPanel.text, kicked, retries,
+      const res = { refusal, refusalPanel: refusalPanel.text, kicked, retries, controlRefused,
         sameCharacter: after.name === before.name, sameEquip: JSON.stringify(after.equip) === JSON.stringify(before.equip) };
       checkConcurrent(res);
       a = c;

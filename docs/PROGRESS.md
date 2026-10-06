@@ -38,7 +38,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
 6. Servidor ([ADR 019](decisions/019-duplicate-login-and-whisper.md)):
    - sussurro (nome de quem envia, espaço contra o corte do `&String[1]`, `/r`): [PR #374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374), `patches/server/0008`;
    - login duplicado como o original (derruba e salva a sessão antiga; a nova recebe `0x011D`/`0x011C` e tenta de novo): [PR #375](https://github.com/Jean1dev/w2pp-OpenWYD/pull/375), `patches/server/0009`;
-   - falta: merge e deploy pelo operador; depois, `--phases login,enter,second,chat` e `--phases login,enter,concurrent` no Railway e a conferência com o cliente Windows;
+   - em produção desde 06/10 (`25016ab3`): `chat` e `concurrent` aprovados no Railway, sem regressão em `logout` e `bank` ([evidência](evidence/05-gameplay/2026-10-06-whisper-duplicate-login.md#após-o-deploy-confirmado-em-execução-tm-server-25016ab3)); falta a conferência com o cliente Windows;
    - ainda não feitas: aviso na recusa do teleporte pago e nas recusas de compra, venda e banco ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
    - Itens no chão ficam fora de escopo (decisão do usuário, 06/10).
 
@@ -995,3 +995,9 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - cliente Windows.
   Sem merge nem deploy.
 - **Próximo passo:** merge e deploy dos #374/#375 pelo operador; depois, `chat` e `concurrent` no Railway.
+- **Merge e deploy (mesmo dia, a pedido do usuário):**
+  - merge dos PRs do servidor #374/#375 (`25016ab3`) e dos PRs deste repositório #26/#27; o Railway implantou o tm-server sozinho (SUCCESS às 12:41);
+  - no Railway, aprovados `login,enter,second,chat` (remetente, texto inteiro, `/r`, aviso de offline) e `login,enter,concurrent` (recusa `0x011D`, derrubada com `0x0101`, nova tentativa com o mesmo personagem);
+  - regressões `move,logout` e `bank` ok;
+  - falha do harness corrigida: a nova tentativa da `concurrent` lia o `0x011D` antigo como recusa nova;
+  - falta só o cliente Windows (operador).

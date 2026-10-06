@@ -1,6 +1,6 @@
 # Sussurro e login duplicado: correção no servidor e linha de base (06/10/2026)
 
-Decisão e desenho na [ADR 019](../../decisions/019-duplicate-login-and-whisper.md). Servidor: PRs [#374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374) e [#375](https://github.com/Jean1dev/w2pp-OpenWYD/pull/375), sem merge nem deploy.
+Decisão e desenho na [ADR 019](../../decisions/019-duplicate-login-and-whisper.md). Servidor: PRs [#374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374) e [#375](https://github.com/Jean1dev/w2pp-OpenWYD/pull/375). Merge a pedido do usuário e deploy automático no Railway em 06/10: tm-server `25016ab3`, em SUCCESS às 12:41.
 
 ## Servidor (confirmado em teste)
 
@@ -26,8 +26,25 @@ Na primeira versão do #375, 24 testes de handler falharam porque punham dois jo
 
 A fase reprovou na nova regra (`B shows the whisper as from receiver`), como esperado antes do deploy. Isso também confirma a hipótese da ADR 008: o nome do remetente fica no memo privado (`m_pHelpList[3]`), que os probes antigos não liam.
 
+## Após o deploy (confirmado em execução, tm-server `25016ab3`)
+
+Um processo por cenário, com as contas de 06/10 e o runtime com o patch 0027.
+
+| Cenário | Execução | Resultado |
+|---|---|---|
+| `login,enter,second,chat` | `2026-10-06T15-41-54` ([JSON](2026-10-06-whisper-deployed.json)) | **ok**. Memo de B: `"Mensagem enviada pelo jogador <A>."` e `"psiu wyd26611"` inteiro. O `/r` de B chega a A com B como remetente (`"volta wyd26611"`). Offline: `0x0102`. Fala e teleportes iguais |
+| `login,enter,concurrent` | `2026-10-06T16-05-36` ([JSON](../04-login-mundo/2026-10-06-concurrent-deployed.json)) | **ok**. A segunda página recebe `0x011D` e "Conexão anterior finalizada. Tente novamente."; a primeira recebe o painel `0x0101` e é desconectada; a primeira nova tentativa, 5 s depois, entra com o mesmo personagem e o mesmo equipamento |
+| `login,enter,second,move,logout` | `2026-10-06T16-09-21` | **ok** (regressão do relogin) |
+| `login,enter,bank` | `2026-10-06T16-16-39` | **ok** (regressão do banco com relogin) |
+
+**Falhas do harness, corrigidas:**
+- duas execuções de `concurrent` (`15-53-39`, `15-58-54`) reprovaram com "login control refused on retry", mas o servidor estava certo;
+- o diagnóstico registrado mostrou a página já na seleção de personagem (`0x010A`) depois do primeiro retry;
+- causa: o `lastRecvOpcode` ainda guardava o `0x011D` da primeira recusa, o harness contou uma recusa falsa e tentou logar de novo na seleção;
+- correção: a nova tentativa espera a seleção de personagem antes de ler uma recusa.
+
+O "�" no texto lido pelo probe vem do `UTF8ToString` sobre a string Windows-1252 do 7662. O cliente desenha o texto corretamente.
+
 ## Pendente
 
-1. Merge e deploy dos #374 e #375 pelo operador.
-2. No Railway, um processo por cenário: `--phases login,enter,second,chat` e `--phases login,enter,concurrent`.
-3. Cliente Windows com o relay: sussurro web ↔ Windows e login duplicado entre os dois.
+Cliente Windows com o relay, pelo operador: sussurro web ↔ Windows e login duplicado entre os dois.

@@ -1,6 +1,6 @@
 # ADR 019: login duplicado e sussurro no servidor
 
-Data: 06/10/2026. Estado: **implementado no servidor, com testes Go; PRs [#374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374) (sussurro) e [#375](https://github.com/Jean1dev/w2pp-OpenWYD/pull/375) (login duplicado) abertos, sem merge nem deploy**. Espelhados em `patches/server/0008-whisper-sender.patch` e `0009-duplicate-login.patch`.
+Data: 06/10/2026. Estado: **implementado, em produção (tm-server `25016ab3`) e aprovado online nas fases `chat` e `concurrent`, sem regressão em `logout` e `bank` ([evidência](../evidence/05-gameplay/2026-10-06-whisper-duplicate-login.md#após-o-deploy-confirmado-em-execução-tm-server-25016ab3))**. PRs [#374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374) (sussurro) e [#375](https://github.com/Jean1dev/w2pp-OpenWYD/pull/375) (login duplicado). Espelhados em `patches/server/0008-whisper-sender.patch` e `0009-duplicate-login.patch`.
 
 ## Contexto
 
@@ -70,4 +70,4 @@ Nada muda no protocolo, no dialeto ou nas páginas. O `WydDialect` já repassa `
 - A trava vale por instância de tm-server: o `dbserver` não rastreia contas online.
 - O relogin logo depois de fechar a página pode receber "Tente novamente" por um instante, enquanto o salvamento anterior termina. No original era igual.
 - O espaço no sussurro diverge do servidor C++ para corrigir um corte que o próprio 7662 faz. Ele vale para o cliente web e para o Windows.
-- **Pendente:** merge e deploy pelo operador; execução online de `chat` e `concurrent`; conferência com o cliente Windows (sussurro web ↔ Windows e login duplicado entre os dois).
+- **Pendente:** conferência com o cliente Windows (sussurro web ↔ Windows e login duplicado entre os dois).
