@@ -100,3 +100,5 @@ Próximo passo operacional: publicar o par de assets e manifesto em prefixo novo
 aplicar a imagem do gateway e trocar prefixo/versão conforme `docs/deploy.md`;
 depois medir no domínio público. Safari, multiplayer e desempenho em produção
 não foram testados nesta fatia. Etapa 7 permanece em andamento.
+
+Atualização de 06/10/2026: executado com o pacote e o runtime reais; resultados e pendências em [2026-10-06-real-package.md](2026-10-06-real-package.md).

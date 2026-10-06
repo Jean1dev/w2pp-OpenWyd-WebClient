@@ -1,0 +1,318 @@
+[
+  {
+    "browser": "chromium",
+    "version": "139.0.7258.5",
+    "cases": [
+      {
+        "name": "cold",
+        "ms": 837,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "warm",
+        "ms": 148,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "restart",
+        "ms": 178,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unchanged-rebuild",
+        "ms": 51,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "changed",
+        "ms": 186,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "updated-warm",
+        "ms": 44,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unavailable",
+        "ms": 110,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-failure",
+        "ms": 187,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-recovery",
+        "ms": 141,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "real-cold",
+        "ms": 30340,
+        "dataRequests": 1,
+        "dataBytes": 319802941,
+        "totalBytes": 323715533,
+        "fromCache": false,
+        "loader": {
+          "stages": [
+            "",
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Baixando dados do jogo…",
+            "Guardando os dados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 29,
+          "hiddenAt": 14139,
+          "shownTotalMB": 305,
+          "realTotalMiB": 305,
+          "downloadMs": 2124,
+          "sampleDetail": "141 / 305 MB · 137,8 MB/s · ~2 s"
+        }
+      },
+      {
+        "name": "real-warm",
+        "ms": 24197,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3912592,
+        "fromCache": true,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Abrindo os dados guardados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 6,
+          "hiddenAt": 11167,
+          "cacheReadMs": 10836
+        }
+      },
+      {
+        "name": "real-restart",
+        "ms": 33835,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3912592,
+        "fromCache": true,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Abrindo os dados guardados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 6,
+          "hiddenAt": 10383,
+          "cacheReadMs": 9995
+        }
+      },
+      {
+        "name": "real-fast4g",
+        "ms": 56936,
+        "dataRequests": 1,
+        "dataBytes": 319802941,
+        "totalBytes": 323715533,
+        "fromCache": false,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Baixando dados do jogo…",
+            "Guardando os dados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 65,
+          "hiddenAt": 41111,
+          "shownTotalMB": 305,
+          "realTotalMiB": 305,
+          "downloadMs": 27929,
+          "sampleDetail": "16 / 305 MB · 1,1 MB/s · ~5 min"
+        },
+        "throttled": {
+          "windowMs": 30000,
+          "samples": 44,
+          "lastRate": 1.1,
+          "lastEta": "5 min",
+          "lastDetail": "28 / 305 MB · 1,1 MB/s · ~5 min"
+        }
+      }
+    ]
+  },
+  {
+    "browser": "firefox",
+    "version": "140.0.2",
+    "cases": [
+      {
+        "name": "cold",
+        "ms": 410,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "warm",
+        "ms": 242,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "restart",
+        "ms": 328,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unchanged-rebuild",
+        "ms": 225,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "changed",
+        "ms": 283,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "updated-warm",
+        "ms": 226,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unavailable",
+        "ms": 151,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-failure",
+        "ms": 229,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-recovery",
+        "ms": 211,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "real-cold",
+        "ms": 40417,
+        "dataRequests": 1,
+        "dataBytes": 319802941,
+        "totalBytes": 323715533,
+        "fromCache": false,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Baixando dados do jogo…",
+            "Guardando os dados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 36,
+          "hiddenAt": 34564,
+          "shownTotalMB": 305,
+          "realTotalMiB": 305,
+          "downloadMs": 2935,
+          "sampleDetail": "138 / 305 MB · 96,8 MB/s · ~2 s"
+        }
+      },
+      {
+        "name": "real-warm",
+        "ms": 21130,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3912592,
+        "fromCache": true,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Abrindo os dados guardados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 6,
+          "hiddenAt": 20293,
+          "cacheReadMs": 19724
+        }
+      },
+      {
+        "name": "real-restart",
+        "ms": 20293,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3912592,
+        "fromCache": true,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Abrindo os dados guardados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 6,
+          "hiddenAt": 19558,
+          "cacheReadMs": 18922
+        }
+      }
+    ]
+  }
+]

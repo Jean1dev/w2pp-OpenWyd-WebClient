@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkBank, checkPaidTeleport, checkChat } from './world_checks.mjs';
+  itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkBank, checkPaidTeleport, checkChat,
+  checkSettings, musicCentibels, musicElementVolume } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
   const value = { error: 'fixture-secret', nested: ['prefix fixture-secret suffix'], x: 123456 };
@@ -351,4 +352,33 @@ test('chat needs B to show the line and the whisper, and the /city commands to m
     { teleport: { moved: 3, bLost: true } }, { teleport: { moved: 400, bLost: false } }, { back: { moved: 0 } },
   ];
   for (const x of bad) assert.throws(() => checkChat({ ...c, ...x }), JSON.stringify(Object.keys(x)));
+});
+
+test('settings: music levels follow the original curve, mute survives a zone change, relogin restores', () => {
+  assert.equal(musicCentibels(50), -1500);
+  assert.equal(musicCentibels(0), -10000);
+  assert.equal(musicElementVolume(-10000), 0);
+  const m = level => ({ level, cB: musicCentibels(level), audioVolume: musicElementVolume(musicCentibels(level)) });
+  const point = (x, y) => ({ expected: [x, y], got: [x + 1, y] });
+  const res = (resolution, fit = false) => ({ resolution, canvas: resolution, fit, inField: true,
+    displayed: fit ? [1550, 1240] : [1036, 829],
+    points: [point(256, 192)], walk: { from: [2100, 2100], to: [2103, 2101] } });
+  const ok = { slider: { musicLevel: 50, effectsLevel: 40, effects: 40, music: m(50) },
+    mute: { music: m(0) },
+    zone: { teleported: true, playCallsBefore: 1, playCallsAfter: 2, music: m(0) },
+    relogin: { saved: { music: 35, effects: 0 }, beforeEnter: { music: 35, effects: 0 }, music: m(35) },
+    resolutions: [res('1024x768'), res('1280x1024'), res('1280x1024', true)] };
+  checkSettings(ok);
+  const bad = patch => assert.throws(() => checkSettings({ ...structuredClone(ok), ...patch }));
+  // Original -30 dB on a zone change while muted: audible, must fail.
+  bad({ zone: { ...ok.zone, music: { level: 0, cB: -3000, audioVolume: musicElementVolume(-3000) } } });
+  bad({ zone: { ...ok.zone, playCallsAfter: 1 } });
+  bad({ relogin: { ...ok.relogin, beforeEnter: { music: 50, effects: 40 } } });
+  bad({ resolutions: [res('1024x768'), { ...res('1280x1024'), points: [{ expected: [640, 512], got: [512, 410] }] }, res('1280x1024', true)] });
+  bad({ resolutions: [res('1024x768'), res('1280x1024')] });
+  bad({ mute: { music: m(50) } });
+  // "fit" that did not enlarge (the canvas already shrunk by max-width) proves nothing.
+  bad({ resolutions: [res('1024x768'), res('1280x1024'), { ...res('1280x1024', true), displayed: [1036, 828] }] });
+  assert.throws(() => validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,enter,second,settings' }));
+  validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,create,enter,settings' });
 });

@@ -10,7 +10,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
 | 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco, fatia 5 (reinício controlado) e cura em outro jogador aprovadas; o checklist não tem mais item pendente que dependa só do cliente) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
-| 7 Experiência web | Em andamento (cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente; 02/10: painel de música, efeitos e resolução compilado e testado com runtime falso, áudio real ainda não verificado; tela de carregamento com progresso real, cache e erros testada com runtime falso, pacote real ainda não verificado; seleção automática do servidor quando todos os canais têm o mesmo destino (patch 0025), aprovada com runtime real contra o tm-server do Railway; login automático pela conta do portal (ADR 017) aprovado de ponta a ponta na stack local, deploy pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md), [painel de configurações](evidence/07-web/2026-10-02-settings.md), [tela de carregamento](evidence/07-web/2026-10-02-loading-screen.md), [seleção automática do servidor](evidence/07-web/2026-10-02-auto-server.md), [login automático](evidence/07-web/2026-10-02-auto-login.md) |
+| 7 Experiência web | Em andamento (06/10, com o pacote real e o runtime real: cache e tela de carregamento aprovados em Chromium e Firefox, inclusive "Fast 4G"; painel de configurações aprovado online no Railway (sliders, mudo na troca de zona, relogin, 1024×768, 1280×1024 e "ampliar" para 1467×1174); cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente; 02/10: painel de música, efeitos e resolução compilado e testado com runtime falso, áudio real ainda não verificado; tela de carregamento com progresso real, cache e erros testada com runtime falso, pacote real ainda não verificado; seleção automática do servidor quando todos os canais têm o mesmo destino (patch 0025), aprovada com runtime real contra o tm-server do Railway; login automático pela conta do portal (ADR 017) aprovado de ponta a ponta na stack local, deploy pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md), [painel de configurações](evidence/07-web/2026-10-02-settings.md), [tela de carregamento](evidence/07-web/2026-10-02-loading-screen.md), [seleção automática do servidor](evidence/07-web/2026-10-02-auto-server.md), [login automático](evidence/07-web/2026-10-02-auto-login.md), [pacote real e configurações online](evidence/07-web/2026-10-06-real-package.md) |
 | 8 Entrega | Em andamento (02/10: gate por conta do portal no lugar do Basic Auth, implantado e confirmado no domínio público; falta o login real pelo portal) | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md), [gate do portal](evidence/08-entrega/2026-10-02-portal-gate.md) |
 
 ## Próxima ação
@@ -21,7 +21,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - PRs #364 e #365 implantados (`bc7b3923`); chat de grupo e nível confirmados em execução em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-partychat-level-deployed.md)). Em produção real, rodar migrações de personagem com jogadores deslogados;
    - fatia 5 aprovada em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-restart.md));
    - buff e cura aprovados em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-buff-cure.md)). O modelo da BM voltava a humano no relogin; corrigido pelo PR [#366](https://github.com/Jean1dev/w2pp-OpenWYD/pull/366) e confirmado em execução em `9d9af882`. A cura em outro jogador foi aprovada em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-buff-cure.md#cura-em-outro-jogador-loginhealother---class-1-aprovada));
-   - chat de guilda confirmado em execução no `3ae11009` (PR #367; [evidência](evidence/05-gameplay/2026-10-02-guildchat.md)). Falta o painel do toggle: merge e deploy do PR [#368](https://github.com/Jean1dev/w2pp-OpenWYD/pull/368) e uma nova execução de `login,enter,second,guildchat`. A guilda de teste (id 1) continua no banco.
+   - chat de guilda confirmado em execução no `3ae11009` (PR #367; [evidência](evidence/05-gameplay/2026-10-02-guildchat.md)). O PR [#368](https://github.com/Jean1dev/w2pp-OpenWYD/pull/368) (painel do toggle) já está no deploy `dbb3ad85` (lido em 06/10); falta uma nova execução de `login,enter,second,guildchat`. A guilda de teste (id 1) é das contas antigas, e o `.env` desta máquina tem contas novas de 06/10.
 
    Rodar os cenários online em processos separados. Antes de abrir A e B, confirmar ≥ 2 GB livres: órfãos `tail`/`grep`, Docker e Chrome em segundo plano custaram ~1,3 GB nesta sessão ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar (os cenários de duas sessões passaram em 01/10, [evidência](evidence/04-login-mundo/2026-10-01-two-sessions.md)):
@@ -31,7 +31,10 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    Build público sem `wyd_debug_*` e IP do cliente pela primeira entrada do `X-Forwarded-For` ([ADR 016](decisions/016-public-build-and-client-ip.md)): implantados e confirmados em produção em 02/10. O operador testou o login pelo portal e o jogo no navegador com o build público, e está OK.
    Também: confirmar o `X-Forwarded-For` e verificar a CI no GitHub. Deploy, assets no bucket e reenvio da credencial no WebSocket já têm prova na [etapa 8](evidence/08-entrega/README.md). Conferir o deploy automático após os merges; esta retomada não publica builds.
 4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6.
-5. Etapa 7 — painel de configurações: com o dataset, verificar no Railway música e efeitos ao vivo, mudo na troca de zona, persistência no relogin e as resoluções 1024×768/1280×1024 ([roteiro](evidence/07-web/2026-10-02-settings.md#próximo-passo)). Tela de carregamento: `npm run assets:cache -- --real` e um primeiro acesso em rede lenta com o pacote real ([evidência](evidence/07-web/2026-10-02-loading-screen.md#próximo-passo)).
+5. Etapa 7 ([evidência de 06/10](evidence/07-web/2026-10-06-real-package.md#próximo-passo)):
+   - operador: o `Config.bin` do dataset traz música 0, então o jogador entra sem música; decidir se a página define um padrão;
+   - a leitura do pacote do IndexedDB leva 10–20 s sem progresso; avaliar mostrar o tempo decorrido;
+   - operador, no domínio público: primeiro acesso e reabertura pelo portal.
 6. Servidor, entregas separadas (não feitas):
    - itens no chão: `0x026E`, CNF de 28 bytes, decay e dono ([ADR 007](decisions/007-inventory-dialect.md));
    - aviso na recusa do teleporte pago (o original avisa, o Go fica em silêncio);
@@ -935,3 +938,37 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - PR, CI e deploy;
   - no portal, enviar `name` sempre;
   - conferir com duas contas reais pelo portal.
+
+### 06/10/2026 — etapa 7 com o pacote real (cache, carregamento e configurações)
+
+- **Pedido do usuário:** levantar as pendências e, entre elas, validar a etapa 7. Decisões do usuário: montar o ambiente local do zero e criar duas contas novas no portal.
+- **Ambiente:** montado do zero:
+  - upstream e servidor nos SHAs do lock;
+  - emsdk 6.0.0 (`d223ae7`) e Go 1.25.13, com hash conferido;
+  - patches 0001–0026 aplicados;
+  - objetos certificados e link `--dev` com 0 símbolos indefinidos;
+  - assets do `Client-aws`: 7.093 arquivos, 319.802.941 bytes.
+  Contas novas via `create_test_account.mjs` (201 nas duas), só no `.env`. tm-server lido com a CLI do Railway: deploy `dbb3ad85` em SUCCESS, que já contém o #368.
+- **Arquivos:**
+  - `tools/verify_asset_cache.mjs`: rastreio da tela de carregamento nos casos reais e `--slow` com "Fast 4G";
+  - `tools/verify_world.mjs`: fase `settings` e `Session.reload()`;
+  - `tools/world_checks{,.test}.mjs`: `checkSettings`;
+  - evidência [`2026-10-06-real-package.md`](evidence/07-web/2026-10-06-real-package.md), com dois JSONs sanitizados;
+  - este progresso.
+  `web/` não mudou.
+- **Comandos e resultados:**
+  - `npm run world:checks`: 40/40;
+  - `node tools/verify_asset_cache.mjs --real --slow`: exit 0 em Chromium 139 e Firefox 140. Acesso frio com 305 MiB e o total mostrado correto; reabertura com 0 bytes do `.data` e leitura do cache de 10,8 s (Chromium) e 19,7 s (Firefox); "Fast 4G" mostrou "1,1 MB/s · ~5 min";
+  - fase `settings` no Railway, três execuções:
+    - 1ª (`login,create,enter,settings`) ok, mas o "ampliar" não aumentou e o check foi endurecido;
+    - 2ª encerrada pelo Claude Code por falta de memória;
+    - **3ª (`login,enter,settings`) ok com a regra atual**, depois de o usuário fechar Docker e Chrome. Teve sliders ao vivo, mudo mantido na troca Armia → Armia Field (`town01` → `field02`, -10000 cB), níveis restaurados no relogin do mesmo perfil, 1024×768, 1280×1024 e "ampliar" para 1467×1174 com ponteiro ≤ 1 px, caminhada e HUD conferidos. Protocolo limpo.
+- **Achados:**
+  - a música do `Config.bin` do operador é 0;
+  - a leitura do cache não mostra progresso;
+  - o `max-width: 100%` do `client.css` já reduz um canvas maior que a janela; o "ampliar" só muda algo quando há espaço para crescer.
+- **Não executado:**
+  - `settings:ui`, `loading:ui`, `scene` e `client:stream`, porque `web/` e o runtime não mudaram de fonte;
+  - Firefox online, Safari, domínio público e áudio ouvido.
+  Sem commit nem deploy.
+- **Próximo passo:** decisão do operador sobre a música padrão; `guildchat` com o #368 já implantado; o operador confere a etapa 7 no domínio público.

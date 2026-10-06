@@ -24,6 +24,8 @@
 //   trade     A trades an item and gold to B by the original window; refusal, check reset, cancel, relogin, return
 //   delete    B creates a throwaway character, a wrong password is refused, the right one deletes it; relogin
 //   concurrent A's account logs in a second time while A is in the Field
+//   settings  A uses the page's settings panel: live music/effects, mute across a
+//             zone change, relogin in the same profile, 1024x768/1280x1024/fit
 //
 // Credentials come from W2PP_TEST_{ACCOUNT,PASSWORD,PIN,CHAR}[2] (env or --env-file)
 // and are handed to the game UI only. Evidence holds counters, opcodes, states,
@@ -42,7 +44,7 @@ import { checkGuildChat, checkParty, checkPartyChat, checkPartyEvidence } from '
 import { fsTraceInit, packageIndex, openedByDir } from './fs_trace.mjs';
 import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, checkBuff, checkHealOther, checkRestart, itemAmount } from './world_checks.mjs';
+  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, checkBuff, checkHealOther, checkRestart, checkSettings, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -164,6 +166,17 @@ class Session {
     });
     this.page.on('pageerror', e => this.pageErrors.push(e.message.slice(0, 300)));
     await this.page.goto(`${this.origin}/client.html`, { waitUntil: 'load' });
+    await this.until('server selection', () => window.clientEvidence?.ready &&
+      window.Module?._wyd_get_game_state?.() === 7 && window.clientEvidence.frames > 20, 120000);
+  }
+
+  // Reload in the same browser context, so the profile (localStorage, the
+  // package cache) survives as it would for a player. trigger performs the
+  // reload (e.g. the settings panel's "apply"); default is a plain reload.
+  async reload(trigger) {
+    const loaded = this.page.waitForEvent('load', { timeout: 120000 });
+    await (trigger ? trigger() : this.page.reload({ waitUntil: 'commit' }));
+    await loaded;
     await this.until('server selection', () => window.clientEvidence?.ready &&
       window.Module?._wyd_get_game_state?.() === 7 && window.clientEvidence.frames > 20, 120000);
   }
@@ -1005,7 +1018,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'partychat', 'guildchat', 'trade', 'paidteleport'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'partychat', 'guildchat', 'trade', 'paidteleport', 'settings'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -1059,7 +1072,9 @@ async function main() {
     for (const two of ['party', 'trade'])
       if (phases.has(two)) assert(freemem() >= 2 * 1024 ** 3, `${two} requires 2 GiB free before opening A/B`);
     gw = await startGateway(await freePort(), opt.target);
-    browser = await chromium.launch({ headless: !opt.headed });
+    // settings measures the zone music: headless has no user gesture to unlock audio.
+    browser = await chromium.launch({ headless: !opt.headed,
+      args: phases.has('settings') ? ['--autoplay-policy=no-user-gesture-required'] : [] });
     await step('badpass', async () => {
       const s = await newSession('A-badpass', A);
       const before = await s.probe();
@@ -1301,6 +1316,117 @@ async function main() {
         return { equip: equip.map(item), carry: carry.map(item), uiTextures: tex, meshes };
       });
       return { shots: ['A-character.png', 'A-inventory.png'], diag };
+    });
+
+    // Etapa 7, settings panel (web/settings.js, patch 0023) on the real runtime
+    // and the operator's server: live sliders, mute across a zone change,
+    // persistence across a relogin in the same browser profile, and the pointer
+    // mapping at 1024x768, 1280x1024 and "fit". Only the page's own panel is
+    // used (clicks and the range inputs), never the audio exports to set levels.
+    await step('settings', async () => {
+      const pg = a.page;
+      // Room for a 1280x1024 canvas under the panel, without page scroll.
+      await pg.setViewportSize({ width: 1400, height: 1200 });
+      const levels = () => a.eval(() => ({ music: Module._wyd_audio_get_level(1), effects: Module._wyd_audio_get_level(0) }));
+      const music = () => a.eval(() => ({ level: Module._wyd_audio_get_level(1), cB: Module._wyd_audio_get_music_volume(),
+        audioVolume: Module.wydMusic?.audio ? Module.wydMusic.audio.volume : null, state: Module._wyd_audio_music_state(),
+        plays: Module._wyd_audio_music_play_calls(), track: Module.wydMusic?.url?.split('/').pop() ?? null }));
+      const panel = pg.locator('details.wyd-settings');
+      const setOpen = async open => {
+        if ((await panel.evaluate(d => d.open)) !== open) await panel.locator('summary').click();
+        await a.frames(1);
+      };
+      const muteOf = kind => pg.locator('.wyd-settings-row', { has: pg.locator(`#wyd-${kind}`) }).locator('.wyd-mute');
+      const enterAgain = async () => {
+        await a.loginToSelect();
+        const pin = await a.pin();
+        assert.equal(pin.result, 'lock1', 'relogin PIN rejected');
+        return a.enter(0);
+      };
+      // Logical pointer seen by the runtime at fractions of the displayed canvas.
+      const pointer = async () => {
+        const box = await pg.locator('#canvas').boundingBox();
+        const [w, h] = await a.eval(() => [document.getElementById('canvas').width, document.getElementById('canvas').height]);
+        const points = [];
+        for (const [fx, fy] of [[0.25, 0.25], [0.5, 0.5], [0.8, 0.7]]) {
+          await pg.mouse.move(box.x + fx * box.width, box.y + fy * box.height, { steps: 2 });
+          await a.frames(2);
+          points.push({ expected: [Math.round(fx * w), Math.round(fy * h)],
+            got: await a.eval(() => [Module._wyd_input_mouse_x(), Module._wyd_input_mouse_y()]) });
+        }
+        return { displayed: [Math.round(box.width), Math.round(box.height)], points };
+      };
+      const measure = async (resolution, fit) => {
+        const snap = await a.eval(() => WydSettings.snapshot());
+        const p = await pointer();
+        const walk = await a.walk(140, 60);
+        await a.shot(`settings-${resolution}${fit ? '-fit' : ''}`);
+        return { resolution, fit, canvas: snap.resolution, displayed: p.displayed, points: p.points,
+          inField: (await a.state()) === 0, walk: { from: walk.from, to: walk.to } };
+      };
+
+      await a.closePanels();
+      const initial = { levels: await levels(), music: await music(), snapshot: await a.eval(() => WydSettings.snapshot()) };
+      await a.until('zone music element', () => !!Module.wydMusic?.audio, 30000);
+
+      await setOpen(true);
+      await pg.locator('#wyd-music').fill('50');
+      await pg.locator('#wyd-effects').fill('40');
+      await a.frames(2);
+      const slider = { musicLevel: 50, effectsLevel: 40, effects: (await levels()).effects, music: await music() };
+
+      await muteOf('music').click();
+      await a.frames(2);
+      const mute = { music: await music(), pressed: await muteOf('music').getAttribute('aria-pressed') };
+      await setOpen(false);
+
+      // Muted, cross Armia -> Armia Field: the scene recreates the BGM.
+      const before = await music();
+      const tp = await a.toArmiaField();
+      await a.until('zone music restarted', n => Module._wyd_audio_music_play_calls() > n, 30000, before.plays).catch(() => false);
+      await sleep(2000);
+      const afterZone = await music();
+      const zone = { teleported: !tp.already, playCallsBefore: before.plays, playCallsAfter: afterZone.plays,
+        trackBefore: before.track, trackAfter: afterZone.track, music: afterZone };
+
+      // Preferences for the relogin: music 35, effects muted (kept at 40).
+      await setOpen(true);
+      await muteOf('music').click();
+      await pg.locator('#wyd-music').fill('35');
+      await muteOf('effects').click();
+      await a.frames(1);
+      const saved = await a.eval(() => WydSettings.snapshot().saved);
+      await setOpen(false);
+      await a.reload();
+      const relogin = { saved, beforeEnter: await levels() };
+      await enterAgain();
+      await a.until('zone music element', () => !!Module.wydMusic?.audio, 30000);
+      relogin.music = await music();
+
+      // Resolutions through the panel's confirmation (reload, then relogin).
+      const resolutions = [];
+      for (const res of ['1024x768', '1280x1024']) {
+        await setOpen(true);
+        await pg.locator('#wyd-resolution').selectOption(res);
+        const confirm = pg.locator('.wyd-settings-confirm');
+        assert(await confirm.isVisible(), `${res}: no confirmation`);
+        const warns = (await confirm.locator('p').textContent()).includes('sairá do servidor');
+        await a.reload(() => confirm.getByRole('button', { name: 'Aplicar e recarregar' }).click());
+        await enterAgain();
+        resolutions.push({ ...(await measure(res, false)), warnedLeavingServer: warns });
+      }
+      // client.css already shrinks a canvas wider than the room (max-width:
+      // 100%); "fit" matters when there is room to grow, so widen the window.
+      await pg.setViewportSize({ width: 1900, height: 1300 });
+      await setOpen(true);
+      await pg.locator('#wyd-fit').check();
+      await setOpen(false);
+      await sleep(1000);
+      resolutions.push(await measure('1280x1024', true));
+
+      const res = { initial, slider, mute, zone, relogin, resolutions };
+      checkSettings(res);
+      return res;
     });
 
     await step('second', async () => {
