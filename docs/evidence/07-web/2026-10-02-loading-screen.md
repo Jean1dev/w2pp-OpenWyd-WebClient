@@ -56,3 +56,5 @@ As capturas ficam em `.cache/loading-ui/` (ignorado): desktop durante o download
 ## Próximo passo
 
 Com o dataset local: `npm run assets:cache -- --real` e um primeiro acesso manual com DevTools em "Fast 4G" (IndexedDB limpo e depois quente). Depois do deploy, o operador confere a tela no domínio público.
+
+Atualização de 06/10/2026: executado com o pacote e o runtime reais; resultados e pendências em [2026-10-06-real-package.md](2026-10-06-real-package.md).

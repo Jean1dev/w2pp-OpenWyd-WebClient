@@ -15,7 +15,7 @@ export function redactEvidence(value, secrets) {
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
   'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea',
-  'equip', 'potion', 'loot', 'shop', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent'];
+  'equip', 'potion', 'loot', 'shop', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent', 'settings'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -54,6 +54,10 @@ export function validateOptions(opt) {
     ['delete', ['delete']]]) {
     if (phases.has(p)) assert.deepEqual([...phases].sort(), only, `${p} runs only with ${only.join(',')}`);
   }
+  // Etapa 7: the settings panel reloads A's page (relogin, resolution), alone.
+  if (phases.has('settings'))
+    assert([...phases].every(n => ['login', 'create', 'enter', 'settings'].includes(n)) && phases.has('enter'),
+      'settings runs only with login,[create,]enter');
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
     move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], buff: ['login'], healother: ['login'], loot: ['login'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
@@ -479,4 +483,51 @@ export function checkHealOther(r) {
   assert(r.after.target.hp - r.before.target.hp > r.before.target.level + 30,
     `B's HP rose ${r.after.target.hp - r.before.target.hp}, no more than one regeneration step`);
   assert(r.after.seenByCaster > r.before.seenByCaster, 'A did not see B healed');
+}
+
+// Etapa 7, settings panel (patch 0023, web/settings.js). Music level n -> the
+// original 30*n-3000 hundredths of dB; 0 and anything <= -3000 are mute
+// (DirShow.cpp clamp). The compat layer plays it on an <audio> element with
+// volume 10^(cB/2000) (win32_emscripten_stubs.cpp WydWebMusicSetVolume).
+export const musicCentibels = level => level > 0 ? 30 * level - 3000 : -10000;
+export const musicElementVolume = cB => cB <= -10000 ? 0 : Math.min(1, Math.pow(10, cB / 2000));
+
+function checkMusic(m, level, what) {
+  assert.equal(m.level, level, `${what}: runtime music level ${m.level}, expected ${level}`);
+  assert.equal(m.cB, musicCentibels(level), `${what}: music volume ${m.cB} cB`);
+  assert(m.audioVolume !== null, `${what}: no music element`);
+  assert(Math.abs(m.audioVolume - musicElementVolume(m.cB)) < 1e-3, `${what}: element volume ${m.audioVolume}`);
+}
+
+export function checkSettings(s) {
+  checkMusic(s.slider.music, s.slider.musicLevel, 'slider');
+  assert.equal(s.slider.effects, s.slider.effectsLevel, 'slider: effects level not applied');
+  assert(s.slider.music.audioVolume > 0, 'slider: music silent at a non-zero level');
+  checkMusic(s.mute.music, 0, 'mute');
+  assert.equal(s.mute.music.audioVolume, 0, 'mute: music still audible');
+  // A zone change recreates the BGM from m_nMusic (TMFieldScene.cpp).
+  assert(s.zone.teleported, 'zone: no teleport');
+  assert(s.zone.playCallsAfter > s.zone.playCallsBefore, 'zone: no new music started, the check proves nothing');
+  checkMusic(s.zone.music, 0, 'zone');
+  assert.equal(s.zone.music.audioVolume, 0, 'zone: music audible after the zone change while muted');
+  // Relogin in the same browser profile: localStorage wins over Config.bin before boot.
+  assert.deepEqual(s.relogin.beforeEnter, s.relogin.saved, 'relogin: levels not restored before entering');
+  checkMusic(s.relogin.music, s.relogin.saved.music, 'relogin');
+  for (const r of s.resolutions) {
+    assert.equal(r.canvas, r.resolution, `${r.resolution}: canvas is ${r.canvas}`);
+    assert(r.inField, `${r.resolution}: did not enter the Field`);
+    for (const p of r.points)
+      assert(Math.abs(p.got[0] - p.expected[0]) <= 2 && Math.abs(p.got[1] - p.expected[1]) <= 2,
+        `${r.resolution}${r.fit ? ' fit' : ''}: pointer ${p.got} for ${p.expected}`);
+    if (r.walk) assert(Math.hypot(r.walk.to[0] - r.walk.from[0], r.walk.to[1] - r.walk.from[1]) >= 1,
+      `${r.resolution}${r.fit ? ' fit' : ''}: ground click did not move the character`);
+  }
+  const seen = new Set(s.resolutions.map(r => r.resolution));
+  for (const need of ['1024x768', '1280x1024']) assert(seen.has(need), `resolution ${need} not exercised`);
+  // "fit" must actually enlarge the canvas (aspect kept), not only keep clicks right.
+  const fit = s.resolutions.find(r => r.fit);
+  assert(fit, 'fit mode not exercised');
+  const [w, h] = fit.canvas.split('x').map(Number);
+  assert(fit.displayed[0] > w && Math.abs(fit.displayed[0] / fit.displayed[1] - w / h) < 0.01,
+    `fit shows ${fit.displayed} for ${fit.canvas}`);
 }
