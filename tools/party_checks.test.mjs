@@ -112,6 +112,10 @@ test('guild chat needs both directions, the -- line, Color 3 and the toggle', ()
     { otherSays: { ...line, lastSent: '0x333' } }, { toggleOff: { confirmed: false } },
     { silenced: { sent: true, heard: true } }, { toggleOn: undefined }, { restored: { ...line, heard: false } }];
   for (const x of bad) assert.throws(() => checkGuildChat({ ...ok, ...x }), JSON.stringify(x));
+  // With the button probe (patch 0028), "on" must restore the state before "off".
+  const off = { confirmed: true, selectedBefore: 0, selectedAfter: 1, panelShown: 'translated' };
+  checkGuildChat({ ...ok, toggleOff: off, toggleOn: { confirmed: true, selectedBefore: 1, selectedAfter: 0 } });
+  assert.throws(() => checkGuildChat({ ...ok, toggleOff: off, toggleOn: { confirmed: true, selectedBefore: 1, selectedAfter: 1 } }));
 });
 
 test('guild chat runs only with login,enter,second', () => {
