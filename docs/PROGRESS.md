@@ -39,7 +39,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - sussurro (nome de quem envia, espaço contra o corte do `&String[1]`, `/r`): [PR #374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374), `patches/server/0008`;
    - login duplicado como o original (derruba e salva a sessão antiga; a nova recebe `0x011D`/`0x011C` e tenta de novo): [PR #375](https://github.com/Jean1dev/w2pp-OpenWYD/pull/375), `patches/server/0009`;
    - em produção desde 06/10 (`25016ab3`): `chat` e `concurrent` aprovados no Railway, sem regressão em `logout` e `bank` ([evidência](evidence/05-gameplay/2026-10-06-whisper-duplicate-login.md#após-o-deploy-confirmado-em-execução-tm-server-25016ab3)); falta a conferência com o cliente Windows;
-   - avisos nas recusas de compra sem ouro, saque/depósito inválido e teleporte pago sem ouro: [PR #376](https://github.com/Jean1dev/w2pp-OpenWYD/pull/376), `patches/server/0010`, aguardando merge e deploy. Linha de base sem painel em `25016ab3` ([evidência](evidence/05-gameplay/2026-10-06-refusal-panels.md)); depois do deploy, rodar `shop`, `bank` e `paidteleport`. Na venda, o Go não tem recusa que o legado avise ([ADR 008](decisions/008-shop-cargo-chat-dialect.md#revisão-de-06102026-tarde-lacuna-1)).
+   - avisos nas recusas de compra sem ouro, saque/depósito inválido e teleporte pago sem ouro: [PR #376](https://github.com/Jean1dev/w2pp-OpenWYD/pull/376), `patches/server/0010`, em produção desde 06/10 (`b8488a56`). `shop`, `bank` e `paidteleport` aprovados no Railway ([evidência](evidence/05-gameplay/2026-10-06-refusal-panels.md)); falta conferir com o cliente Windows. Na venda, o Go não tem recusa que o legado avise ([ADR 008](decisions/008-shop-cargo-chat-dialect.md#revisão-de-06102026-tarde-lacuna-1)).
    - Itens no chão ficam fora de escopo (decisão do usuário, 06/10).
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
@@ -1053,3 +1053,8 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Achado (confirmado em fonte):** o legado também fica em silêncio com preço negativo e slot vazio da loja, então a proposta original da ADR 008 cobria casos demais. Na venda, o Go não tem recusa que o legado avise.
 - **Não executado:** `-race` e `golangci-lint` no servidor (sem cgo); as fases com o #376 implantado; cliente Windows. Sem merge nem deploy.
 - **Próximo passo:** merge e deploy do #376 pelo operador; depois, `shop`, `bank` e `paidteleport` no Railway.
+- **Merge e deploy (mesmo dia, a pedido do usuário):**
+  - CI do #376 verde (Build & Test, Lint, Docker, Vulnerabilities); merge em `b8488a56`, e o Railway implantou o tm-server sozinho (SUCCESS);
+  - merge do #29 deste repositório (`62a3443b`), com o #30 redirecionado para `main`;
+  - no Railway, `login,enter,bank`, `login,enter,shop` e `login,enter,paidteleport` aprovados, com o painel nas três recusas e sem painel no teleporte pago com ouro;
+  - o aviso de depósito do servidor fica coberto só pelo teste Go, porque o cliente recusa antes de enviar.

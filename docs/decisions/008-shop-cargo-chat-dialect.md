@@ -81,7 +81,7 @@ Na revisão anterior, o dialeto descartava como desconhecidos, nos dois sentidos
 
 ## Revisão de 06/10/2026 (tarde): lacuna 1
 
-- **Lacuna 1 (recusas sem resposta): corrigida no servidor, sem deploy.** O PR [#376](https://github.com/Jean1dev/w2pp-OpenWYD/pull/376) (`patches/server/0010-refusal-panels.patch`) envia, como o legado, um `SendClientMessage` com a string do `Language.txt`:
+- **Lacuna 1 (recusas sem resposta): corrigida no servidor e confirmada em execução no `b8488a56`** ([evidência](../evidence/05-gameplay/2026-10-06-refusal-panels.md)). O PR [#376](https://github.com/Jean1dev/w2pp-OpenWYD/pull/376) (`patches/server/0010-refusal-panels.patch`) envia, como o legado, um `SendClientMessage` com a string do `Language.txt`:
   - compra sem ouro: `_NN_Not_Enough_Money` (113), `_MSG_Buy.cpp:147-151`;
   - depósito negativo ou acima do ouro carregado: `_NN_Cant_Deposit_That_Much` (44), `_MSG_Deposit.cpp:34-56`;
   - saque negativo ou acima do banco: `_NN_Cant_Withdraw_That_Much` (45), `_MSG_Withdraw.cpp:34-55`;

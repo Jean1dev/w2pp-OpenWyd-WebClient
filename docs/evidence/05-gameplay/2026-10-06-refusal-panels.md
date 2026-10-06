@@ -43,7 +43,18 @@ As três reprovaram só na regra nova, como esperado. As contas de 06/10 têm ce
 
 Protocolo limpo nas três.
 
+## Com o #376 implantado (`b8488a56`): aprovado
+
+O merge do #376 foi feito às 19:19 UTC, a pedido do usuário, e o Railway implantou o tm-server sozinho (SUCCESS). As três fases foram aprovadas (**confirmado em execução**):
+
+- [`bank`](2026-10-06-refusal-bank-passed.json), 19:21 UTC: o saque acima do banco mostrou `_NN_Cant_Withdraw_That_Much` (`notice: true`), sem mudar o ouro. Depósito, saque, item e relogin passaram como antes;
+- [`shop`](2026-10-06-refusal-shop-passed.json), 19:37 UTC: a compra do item 693 (20.080.000) mostrou `_NN_Not_Enough_Money`, com ouro e itens iguais. Venda, compra, clique repetido e relogin passaram;
+- [`paidteleport`](2026-10-06-refusal-paidteleport-passed.json), 19:44 UTC: com ouro, cobrou 700 e não mostrou painel; com 500, mostrou `_NN_Not_Enough_Money`, sem mover nem cobrar. O relogin manteve só a cobrança.
+
+Não houve erros de página, e a saúde de protocolo das fases passou.
+
+**Limitação:** o depósito acima do ouro carregado é recusado pelo próprio cliente (mensagem 34), que não envia o pedido. O aviso `_NN_Cant_Deposit_That_Much` do servidor fica coberto só pelo teste Go.
+
 ## Pendente
 
-- Merge e deploy do #376 pelo operador. Depois, as mesmas três fases no Railway.
 - Cliente Windows: o painel é o mesmo `SendClientMessage` do legado, mas não foi conferido.
