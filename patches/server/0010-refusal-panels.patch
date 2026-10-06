@@ -1,0 +1,284 @@
+From 62bfb69d100ba5036b8f357b4da1c27921923039 Mon Sep 17 00:00:00 2001
+From: Jeanluca <jeanlucafp@gmail.com>
+Date: Tue, 6 Oct 2026 15:24:00 -0300
+Subject: [PATCH] fix(handler): send the legacy panels on refused buy, bank and
+ paid teleport
+
+A buy short of gold, a deposit or withdraw of a negative amount or more
+than the balance, and a paid teleport short of gold were refused in
+silence; the 7662 client keeps waiting and the player sees nothing. The
+legacy server answers each with SendClientMessage and a Language.txt
+string:
+
+- _MSG_Buy.cpp:147-151: _NN_Not_Enough_Money (113);
+- _MSG_Deposit.cpp:34-56: _NN_Cant_Deposit_That_Much (44);
+- _MSG_Withdraw.cpp:34-55: _NN_Cant_Withdraw_That_Much (45);
+- _MSG_ReqTeleport.cpp:39-64: _NN_Not_Enough_Money (113).
+
+The texts keep the table's Windows-1252 bytes and go through
+sendClientMessage (HEADER.ID 0). Refusals the legacy also keeps silent
+stay silent: a negative or missing item price, an empty shop slot, a zero
+deposit/withdraw. The 2G ceiling keeps its current notice.
+
+Tests: the panel for each refusal, the silent cases, and a paid teleport
+with enough gold sends no panel. The new tests fail without the fix.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ tmserver/internal/handler/cargo.go            | 16 +++++-
+ tmserver/internal/handler/cargo_test.go       | 38 ++++++++++++-
+ .../internal/handler/dungeon_teleport_test.go | 56 +++++++++++++++++++
+ tmserver/internal/handler/movement.go         |  3 +-
+ tmserver/internal/handler/notice.go           |  8 +++
+ tmserver/internal/handler/shop.go             |  5 ++
+ tmserver/internal/handler/shop_test.go        | 29 ++++++++++
+ 7 files changed, 150 insertions(+), 5 deletions(-)
+
+diff --git a/tmserver/internal/handler/cargo.go b/tmserver/internal/handler/cargo.go
+index c6ff0636..84e6c636 100644
+--- a/tmserver/internal/handler/cargo.go
++++ b/tmserver/internal/handler/cargo.go
+@@ -41,7 +41,13 @@ func (d *Dispatcher) deposit(w *world.World, s *world.Session, _ protocol.Header
+ 		return // no vault loaded for this account
+ 	}
+ 	coin, ok := protocol.StandardParm(payload)
+-	if !ok || coin <= 0 || coin > maxCoin || coin > e.Coin {
++	if !ok || coin == 0 {
++		return
++	}
++	// _MSG_Deposit.cpp:34-56: a negative amount or more than the character
++	// carries gets _NN_Cant_Deposit_That_Much.
++	if coin < 0 || coin > maxCoin || coin > e.Coin {
++		d.sendClientMessage(w, s, cantDepositThatMuch)
+ 		return
+ 	}
+ 	if int64(cargo.Coin)+int64(coin) > maxCoin {
+@@ -67,7 +73,13 @@ func (d *Dispatcher) withdraw(w *world.World, s *world.Session, _ protocol.Heade
+ 		return
+ 	}
+ 	coin, ok := protocol.StandardParm(payload)
+-	if !ok || coin <= 0 || coin > maxCoin || coin > cargo.Coin {
++	if !ok || coin == 0 {
++		return
++	}
++	// _MSG_Withdraw.cpp:34-55: a negative amount or more than the vault holds
++	// gets _NN_Cant_Withdraw_That_Much.
++	if coin < 0 || coin > maxCoin || coin > cargo.Coin {
++		d.sendClientMessage(w, s, cantWithdrawThatMuch)
+ 		return
+ 	}
+ 	if int64(e.Coin)+int64(coin) > maxCoin {
+diff --git a/tmserver/internal/handler/cargo_test.go b/tmserver/internal/handler/cargo_test.go
+index 8508d58c..a5b95107 100644
+--- a/tmserver/internal/handler/cargo_test.go
++++ b/tmserver/internal/handler/cargo_test.go
+@@ -85,8 +85,41 @@ func TestCargoDepositInsufficient(t *testing.T) {
+ 	defer c.Close()
+ 
+ 	depositFrame(t, c, 500) // more than the 100 carried
++	expectPanel(t, c, cantDepositThatMuch)
+ 	if ty, _, ok := readMaybe(t, c); ok {
+-		t.Errorf("over-deposit produced %#x; should be rejected", ty)
++		t.Errorf("over-deposit also produced %#x; should be rejected", ty)
++	}
++}
++
++// TestCargoAmountRefusals: the legacy refuses a negative amount with the same
++// panel as an amount over the balance (_MSG_Deposit/_MSG_Withdraw.cpp:34),
++// and a zero amount stays silent here.
++func TestCargoAmountRefusals(t *testing.T) {
++	for _, tc := range []struct {
++		name  string
++		send  func(*testing.T, net.Conn, int32)
++		coin  int32
++		panel string
++	}{
++		{"deposit-negative", depositFrame, -1, cantDepositThatMuch},
++		{"withdraw-negative", withdrawFrame, -1, cantWithdrawThatMuch},
++		{"deposit-zero", depositFrame, 0, ""},
++		{"withdraw-zero", withdrawFrame, 0, ""},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			addr, stop, _ := startServerClock(t, cargoDB(100, 100, 0, 0))
++			defer stop()
++			c := enterWorld(t, addr)
++			defer c.Close()
++
++			tc.send(t, c, tc.coin)
++			if tc.panel != "" {
++				expectPanel(t, c, tc.panel)
++			}
++			if ty, _, ok := readMaybe(t, c); ok {
++				t.Errorf("refused amount %d produced %#x", tc.coin, ty)
++			}
++		})
+ 	}
+ }
+ 
+@@ -127,8 +160,9 @@ func TestCargoWithdrawTooMuch(t *testing.T) {
+ 	defer c.Close()
+ 
+ 	withdrawFrame(t, c, 500) // cargo only has 100
++	expectPanel(t, c, cantWithdrawThatMuch)
+ 	if ty, _, ok := readMaybe(t, c); ok {
+-		t.Errorf("over-withdraw produced %#x; should be rejected", ty)
++		t.Errorf("over-withdraw also produced %#x; should be rejected", ty)
+ 	}
+ }
+ 
+diff --git a/tmserver/internal/handler/dungeon_teleport_test.go b/tmserver/internal/handler/dungeon_teleport_test.go
+index c0b1b8d7..20c7cce0 100644
+--- a/tmserver/internal/handler/dungeon_teleport_test.go
++++ b/tmserver/internal/handler/dungeon_teleport_test.go
+@@ -101,6 +101,62 @@ func TestReqTeleportDungeon(t *testing.T) {
+ 		request(t, 148, 3780)
+ 		request(t, 1004, 4028)
+ 	})
++	// panels drains the stream (earlier jumps leave view updates behind) and
++	// returns every message panel text in it.
++	panels := func(t *testing.T) []string {
++		t.Helper()
++		var texts []string
++		for {
++			h, p, ok := readMaybeHeader(t, c)
++			if !ok {
++				return texts
++			}
++			if h.Type == protocol.MsgMessagePanel {
++				if h.ID != 0 {
++					t.Fatalf("panel HEADER.ID = %d, want 0", h.ID)
++				}
++				texts = append(texts, cstr(p))
++			}
++		}
++	}
++	// Armia -> Noatum costs 700: short of gold, the legacy answers
++	// _NN_Not_Enough_Money (_MSG_ReqTeleport.cpp:39-64) and nothing moves.
++	t.Run("paid-without-gold", func(t *testing.T) {
++		panels(t)
++		var changed bool
++		runInLoop(t, w, func() {
++			w.SetEntityPos(s.Conn, 2116, 2100)
++			e := w.Entity(s.Conn)
++			e.Coin = 699
++			jumps := w.SentOfType(s, protocol.MsgAction)
++			d.Handle(w, s, protocol.Header{Type: protocol.MsgReqTeleport}, nil)
++			changed = e.X != 2116 || e.Y != 2100 || e.Coin != 699 || w.SentOfType(s, protocol.MsgAction) != jumps
++		})
++		if changed {
++			t.Fatal("refused paid teleport changed position/gold or sent a jump")
++		}
++		if got := panels(t); len(got) != 1 || got[0] != notEnoughMoney {
++			t.Fatalf("panels = %q, want [%q]", got, notEnoughMoney)
++		}
++	})
++	t.Run("paid-with-gold", func(t *testing.T) {
++		panels(t)
++		var coin int32
++		var x int16
++		runInLoop(t, w, func() {
++			w.SetEntityPos(s.Conn, 2116, 2100)
++			e := w.Entity(s.Conn)
++			e.Coin = 700
++			d.Handle(w, s, protocol.Header{Type: protocol.MsgReqTeleport}, nil)
++			coin, x = e.Coin, e.X
++		})
++		if coin != 0 || x == 2116 {
++			t.Fatalf("paid teleport left gold %d at x %d; want 0 gold and a jump", coin, x)
++		}
++		if got := panels(t); len(got) != 0 {
++			t.Fatalf("paid teleport with enough gold sent panels %q", got)
++		}
++	})
+ 	for _, name := range []string{"dead", "not-playing", "outside-portal"} {
+ 		t.Run(name, func(t *testing.T) {
+ 			var changed bool
+diff --git a/tmserver/internal/handler/movement.go b/tmserver/internal/handler/movement.go
+index 0b72be70..991cb114 100644
+--- a/tmserver/internal/handler/movement.go
++++ b/tmserver/internal/handler/movement.go
+@@ -258,7 +258,8 @@ func (d *Dispatcher) reqTeleport(w *world.World, s *world.Session, _ protocol.He
+ 	}
+ 	if cost > 0 {
+ 		if cost > e.Coin {
+-			return // not enough money (the original shows a notice)
++			d.sendClientMessage(w, s, notEnoughMoney) // _MSG_ReqTeleport.cpp:39-64
++			return
+ 		}
+ 		e.Coin -= cost
+ 		d.sendEtc(w, s, e)
+diff --git a/tmserver/internal/handler/notice.go b/tmserver/internal/handler/notice.go
+index 77235bf5..cbbd53ee 100644
+--- a/tmserver/internal/handler/notice.go
++++ b/tmserver/internal/handler/notice.go
+@@ -116,6 +116,14 @@ func (d *Dispatcher) sendClientMessage(w *world.World, s *world.Session, text st
+ 	w.SendTo(s, protocol.Header{Type: protocol.MsgMessagePanel}, protocol.EncodeMessagePanelBody(text))
+ }
+ 
++// Legacy refusal panels (Release/TMsrv/run/Language.txt), in the table's
++// Windows-1252 bytes like the rest of the legacy string table.
++const (
++	cantDepositThatMuch  = "Esta quantia n\xe3o pode ser armazenada." // _NN_Cant_Deposit_That_Much (44)
++	cantWithdrawThatMuch = "Esta quantia n\xe3o pode ser retirada."   // _NN_Cant_Withdraw_That_Much (45)
++	notEnoughMoney       = "N\xe3o possui gold suficiente."           // _NN_Not_Enough_Money (113)
++)
++
+ // cstr trims a fixed-size NUL/space-padded C char array to a Go string.
+ func cstr(b []byte) string {
+ 	if i := indexByte(b, 0); i >= 0 {
+diff --git a/tmserver/internal/handler/shop.go b/tmserver/internal/handler/shop.go
+index 409d5663..2df04367 100644
+--- a/tmserver/internal/handler/shop.go
++++ b/tmserver/internal/handler/shop.go
+@@ -83,6 +83,11 @@ func (d *Dispatcher) buy(w *world.World, s *world.Session, _ protocol.Header, pa
+ 	price, ok := d.itemPrices[int(item.Index)]
+ 	if !ok || price < 0 || price > e.Coin {
+ 		d.log.Info("buy denied", "conn", s.Conn, "item", item.Index, "price", price, "gold", e.Coin)
++		// Only the gold check answers (_MSG_Buy.cpp:147-151); a negative price
++		// returns in silence there, and a missing price has no legacy path.
++		if ok && price >= 0 {
++			d.sendClientMessage(w, s, notEnoughMoney)
++		}
+ 		return
+ 	}
+ 	e.Coin -= price
+diff --git a/tmserver/internal/handler/shop_test.go b/tmserver/internal/handler/shop_test.go
+index 42079dc1..73119494 100644
+--- a/tmserver/internal/handler/shop_test.go
++++ b/tmserver/internal/handler/shop_test.go
+@@ -191,3 +191,32 @@ func TestBuyRejectsMissingPrice(t *testing.T) {
+ 		t.Errorf("missing-price buy produced %#x; should be rejected", ty)
+ 	}
+ }
++
++// TestBuyNotEnoughMoney: short of gold, the legacy answers _NN_Not_Enough_Money
++// (_MSG_Buy.cpp:147-151) and the item stays in the shop.
++func TestBuyNotEnoughMoney(t *testing.T) {
++	addr, stop := startServerShop(t, shopDB(99), map[int]int32{1100: 100})
++	defer stop()
++	c := enterWorld(t, addr)
++	defer c.Close()
++
++	buyFrame(t, c, shopNPCID, 0, 3)
++	expectPanel(t, c, notEnoughMoney)
++	if ty, _, ok := readMaybe(t, c); ok {
++		t.Errorf("refused buy also produced %#x", ty)
++	}
++}
++
++// TestBuyNegativePriceSilent: the legacy returns without a panel on a negative
++// price (_MSG_Buy.cpp, "if (Price < 0) return").
++func TestBuyNegativePriceSilent(t *testing.T) {
++	addr, stop := startServerShop(t, shopDB(1000), map[int]int32{1100: -1})
++	defer stop()
++	c := enterWorld(t, addr)
++	defer c.Close()
++
++	buyFrame(t, c, shopNPCID, 0, 3)
++	if ty, _, ok := readMaybe(t, c); ok {
++		t.Errorf("negative-price buy produced %#x; should be silent", ty)
++	}
++}
+-- 
+2.54.0.windows.1
+
