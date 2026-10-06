@@ -70,6 +70,9 @@ export function checkGuildChat(r) {
   assert(r.silenced?.sent, 'line during guildchat off not sent');
   assert.equal(r.silenced.heard, false, 'member with guildchat off still showed the guild line');
   assert.equal(r.toggleOn?.confirmed, true, 'guildchat on not confirmed');
+  // SetGuildChat flips the button on every recognized panel (TMFieldScene.cpp).
+  if ('selectedBefore' in r.toggleOff)
+    assert.equal(r.toggleOn.selectedAfter, r.toggleOff.selectedBefore, 'guild button not back after guildchat on');
   assert.equal(r.restored?.heard, true, 'guild line not shown after guildchat on');
   assert.equal(r.restored.prefixShown, false, 'restored line shown with the "-" prefix');
 }

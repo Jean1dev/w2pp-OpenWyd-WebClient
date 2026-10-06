@@ -21,7 +21,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - PRs #364 e #365 implantados (`bc7b3923`); chat de grupo e nível confirmados em execução em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-partychat-level-deployed.md)). Em produção real, rodar migrações de personagem com jogadores deslogados;
    - fatia 5 aprovada em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-restart.md));
    - buff e cura aprovados em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-buff-cure.md)). O modelo da BM voltava a humano no relogin; corrigido pelo PR [#366](https://github.com/Jean1dev/w2pp-OpenWYD/pull/366) e confirmado em execução em `9d9af882`. A cura em outro jogador foi aprovada em 02/10 ([evidência](evidence/05-gameplay/2026-10-02-buff-cure.md#cura-em-outro-jogador-loginhealother---class-1-aprovada));
-   - chat de guilda confirmado em execução no `3ae11009` (PR #367; [evidência](evidence/05-gameplay/2026-10-02-guildchat.md)). O PR [#368](https://github.com/Jean1dev/w2pp-OpenWYD/pull/368) (painel do toggle) já está no deploy `dbb3ad85` (lido em 06/10); falta uma nova execução de `login,enter,second,guildchat`. A guilda de teste (id 1) é das contas antigas, e o `.env` desta máquina tem contas novas de 06/10.
+   - chat de guilda confirmado em execução no `3ae11009` (PR #367; [evidência](evidence/05-gameplay/2026-10-02-guildchat.md)). Com o #368 no `25016ab3`, o toggle foi confirmado em execução em 06/10: o botão inverte no Off e volta no On (patch 0028). A regra final foi aprovada por reavaliação offline da execução 3. Opcional: uma execução com a regra final. A guilda de teste (id 1) agora tem os personagens 204/205 (contas antigas) e 218/219 (contas atuais do `.env`).
 
    Rodar os cenários online em processos separados. Antes de abrir A e B, confirmar ≥ 2 GB livres: órfãos `tail`/`grep`, Docker e Chrome em segundo plano custaram ~1,3 GB nesta sessão ([issue #6](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/6)).
 2. Etapa 4 — fechar (os cenários de duas sessões passaram em 01/10, [evidência](evidence/04-login-mundo/2026-10-01-two-sessions.md)):
@@ -1001,3 +1001,38 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - regressões `move,logout` e `bank` ok;
   - falha do harness corrigida: a nova tentativa da `concurrent` lia o `0x011D` antigo como recusa nova;
   - falta só o cliente Windows (operador).
+
+### 06/10/2026 — chat de guilda com o #368 implantado
+
+- **Pedido do usuário:** levantar os próximos passos e começar pelo primeiro (`guildchat` com o #368). Decisões do usuário:
+  - remontar o ambiente;
+  - criar contas novas;
+  - adicionar os personagens novos à guilda de teste sem remover os antigos;
+  - fechar outros programas para liberar memória.
+- **Ambiente:** o `.env` e o `.cache/` de 06/10 não existiam mais nesta máquina (ficavam num worktree removido). Remontado do zero neste worktree:
+  - checkouts nos SHAs do lock;
+  - emsdk 6.0.0 (`d223ae7`) e Go 1.25.13, com hash conferido;
+  - patches 0001–0028, com 115 objetos certificados e link `--dev` com 0 indefinidos;
+  - assets do `Client-aws`: 7.093 arquivos, 319.802.941 bytes;
+  - `npm run scene:package` ok.
+  Duas contas novas criadas no portal (201 nas duas), só no `.env`. tm-server `25016ab3` em SUCCESS, lido com a CLI do Railway.
+- **Banco:** personagens 218 (líder) e 219 (membro) adicionados à guilda `WebTeste` (id 1) às 17:20:15 UTC, numa transação ([preparação](evidence/05-gameplay/2026-10-02-guildchat.md#06102026-com-o-368-implantado-tm-server-25016ab3)).
+- **Arquivos:**
+  - `patches/openwyd/0028-guild-chat-probe.patch` (probe só de leitura do botão de guilda);
+  - `tools/verify_world.mjs` (confirmação do toggle pelo botão);
+  - `tools/party_checks{,.test}.mjs`;
+  - evidência [`2026-10-02-guildchat.md`](evidence/05-gameplay/2026-10-02-guildchat.md) e [JSON da execução 3](evidence/05-gameplay/2026-10-06-guildchat-run3.json);
+  - checklist da etapa 5 e este progresso.
+  `web/` não mudou.
+- **Comandos e resultados:**
+  - `login,create,enter,second`: ok;
+  - `login,enter,second,guildchat`, três tentativas:
+    - execução 2: chat ok, mas a regra do texto do painel reprovou;
+    - uma tentativa encerrada pelo Claude Code por falta de memória;
+    - execução 3: chat ok e botão invertido no Off e no On, mas a regra intermediária reprovou porque o painel já tinha sumido;
+  - JSON da execução 3 reavaliado offline com a regra final: ok;
+  - `npm run world:checks`: 41/41;
+  - `npm run scene`: ok depois do relink.
+- **Achado (confirmado em fonte e em execução):** o painel `Guild Chatting : Off/On` mostra o texto cru só por 4 s (`TMScene.cpp:1603`). O runtime só inverte o botão com o texto exato, e a lista de chat recebe as strings 450 + 447/446. A reprovação de 02/10 depois do #368 era do harness; o servidor está correto.
+- **Não executado:** uma execução online com a regra final; cliente Windows. Sem commit nem deploy.
+- **Próximo passo:** item A2 do plano, avisos nas recusas de compra, venda, banco e teleporte pago ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).

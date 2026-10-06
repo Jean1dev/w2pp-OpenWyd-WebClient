@@ -38,7 +38,38 @@ Feita com autorização do usuário (ambiente de testes), como o ajuste de níve
 - correção no PR [#368](https://github.com/Jean1dev/w2pp-OpenWYD/pull/368) (`sendClientMessage` com ID 0). `TestGuildChatToggle` e `TestGuildChatOutsideGuild` passam a exigir ID 0 e falham sem a correção.
 - **Achado:** os demais envios de `MsgMessagePanel` do Go têm o mesmo defeito: `kefra.go:47`, `refine_feedback.go:32`, `nightmare.go:122`, `guild.go:69/117/309` e a linha de relógio `!!` em `chat.go`. Ficam fora do #368.
 
+## 06/10/2026: com o #368 implantado (tm-server `25016ab3`)
+
+O ambiente local de 02/10 e as contas de teste de 06/10 não existiam mais nesta máquina (ficavam num worktree removido). Por isso:
+- o ambiente foi remontado do zero;
+- duas contas novas foram criadas no portal, com credenciais só no `.env`;
+- os personagens foram criados com `login,create,enter,second` (ok).
+
+**Preparação no banco**, com o mesmo utilitário e as mesmas regras (DSN só no ambiente do processo, uma transação, cada escrita em exatamente uma linha, contas offline). Decisão do usuário: adicionar as contas novas sem remover as antigas. Às 17:20:15 UTC, o TK de A (id 218) entrou como líder (9) e o de B (id 219) como membro (0). A guilda 1 passou de 2 para 4 membros.
+
+**Execução 2 (17:20–17:37 UTC): o chat foi aprovado de novo, mas a regra do toggle reprovou.** A→B, B→A e `--` chegaram com o remetente e sem o prefixo, a linha com B desligado não chegou e voltou a chegar depois de religar. A regra `guildchat off not confirmed` reprovou outra vez: o harness esperava o painel com o texto `Guild Chatting : Off`.
+
+**Causa, confirmada em fonte e em execução:** era defeito do harness.
+- O runtime mostra o texto cru no painel por 4 s (`TMScene.cpp:1603`);
+- só com o texto exato ele chama `SetGuildChat`, que inverte o botão (`TMScene.cpp:1660-1669`, `TMFieldScene.cpp:14989`);
+- depois, grava na lista de chat as strings localizadas 450 + 447/446;
+- o fallback digitado (`say`) volta depois que o painel já sumiu.
+
+A correção não muda `web/` nem o comportamento do runtime:
+- `patches/openwyd/0028-guild-chat-probe.patch`: probe só de leitura `wyd_field_guild_chat_selected()`;
+- a fase passa a confirmar pela inversão do botão;
+- `checkGuildChat` exige que o On devolva o botão ao estado de antes do Off.
+
+**Execução 3 (17:48–18:06 UTC), [JSON](2026-10-06-guildchat-run3.json):**
+- o chat passou nos três sentidos, e a linha com B desligado ficou bloqueada (`silenced.heard = false`, `restored.heard = true`);
+- no Off o botão foi de 1 para 0, e no On de 0 para 1. Isso confirma em execução que o painel `0x0101` agora chega com ID 0 e é reconhecido (o #368 funciona);
+- a execução ainda usava a regra intermediária (botão **e** painel visível) e reprovou, porque o painel já tinha sumido;
+- **o JSON reavaliado offline com a regra final passa** (`checkGuildChat`, 41/41 em `npm run world:checks`);
+- protocolo limpo e sem erros de página. A execução 2 do harness tinha sido encerrada pelo Claude Code por falta de memória; esta rodou depois de fechar Chrome, Insomnia e Adobe Collab Sync.
+
+**Limitação:** nenhuma execução online passou com a regra final de ponta a ponta. A aprovação vem da reavaliação offline de uma execução real.
+
 ## Pendente
 
-- Merge e deploy do #368 e uma nova execução da fase, sem mudar a preparação do banco.
-- Quando o item for fechado, decidir se a guilda de teste fica no banco ou é removida (`guildprep restore`).
+- Opcional: uma execução de `login,enter,second,guildchat` com a regra final.
+- Quando o item for fechado, decidir se a guilda de teste fica no banco ou é removida. O `guildprep restore` remove a guilda inteira, então os personagens antigos 204/205 precisam ser tratados à parte.

@@ -3278,16 +3278,22 @@ async function main() {
       // The original toggle is B_CHAT_GUILD (65680, OnControlEvent sends
       // "guildchat"). The server answers with a message panel whose exact text
       // the runtime matches to flip the guild button (TMScene.cpp:1660-1669).
+      // The panel shows the raw text for 4 s (TMScene.cpp:1603) and may be gone
+      // when the typed fallback returns; the chat list gets strings 450 +
+      // 447/446. The button (patch 0028) flips only on the exact text.
+      const guildSelected = () => b.eval(() => Module._wyd_field_guild_chat_selected());
       const toggle = async state => {
+        const selectedBefore = await guildSelected();
         const out0 = await b.outCount();
         let via = 'button';
         try { await b.uiButton(65680); await b.frames(3); } catch { via = 'typed'; }
         const res = via === 'button' ? { sent: (await b.outCount()) > out0, lastSent: '0x' + (await b.lastSent()).toString(16) }
           : await b.say('guildchat', { clear: true, keepPanels: true });
-        const want = `Guild Chatting : ${state}`;
-        const confirmed = await b.until(`panel "${want}"`, w => Module._wyd_scene_message_visible() === 1 &&
-          Module.UTF8ToString(Module._wyd_scene_message_text()) === w, 10000, want).then(() => true, () => false);
-        return { ...res, via, confirmed };
+        const raw = `Guild Chatting : ${state}`;
+        const confirmed = await b.until(`guild button after "${raw}"`, s0 => Module._wyd_field_guild_chat_selected() !== s0,
+          10000, selectedBefore).then(() => true, () => false);
+        const selectedAfter = await guildSelected();
+        return { ...res, via, selectedBefore, selectedAfter, confirmed };
       };
       res.toggleOff = await toggle('Off');
       res.silenced = await line(a, b, A.char, B.char, `-${tag} silencio`);
