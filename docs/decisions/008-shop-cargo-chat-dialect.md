@@ -78,3 +78,14 @@ Na revisão anterior, o dialeto descartava como desconhecidos, nos dois sentidos
 - **Lacuna 3 (sussurro): corrigida no servidor, sem deploy.** O PR [#374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374) (`patches/server/0008`) grava o nome de quem envia no `MobName` e põe um espaço na frente do texto. O espaço compensa o `&String[1]` do memo, que também cortava com o servidor C++. O PR também zera o `Color` e traz o `/r`. Ver [ADR 019](019-duplicate-login-and-whisper.md).
 - **"Sussurro exibido sem o primeiro caractere":** a hipótese de que o servidor legado reescrevia o texto estava errada. O `_MSG_MessageWhisper.cpp` só troca o `MobName`; o corte é do próprio 7662.
 - **Probe:** o nome do remetente aparece no memo privado (`m_pHelpList[3]`), que os probes desta ADR não liam. Por isso o `senderShown` da fase `chat` saía "none". O patch `0027-memo-probes` acrescenta `wyd_field_memo_count`/`_line`.
+
+## Revisão de 06/10/2026 (tarde): lacuna 1
+
+- **Lacuna 1 (recusas sem resposta): corrigida no servidor, sem deploy.** O PR [#376](https://github.com/Jean1dev/w2pp-OpenWYD/pull/376) (`patches/server/0010-refusal-panels.patch`) envia, como o legado, um `SendClientMessage` com a string do `Language.txt`:
+  - compra sem ouro: `_NN_Not_Enough_Money` (113), `_MSG_Buy.cpp:147-151`;
+  - depósito negativo ou acima do ouro carregado: `_NN_Cant_Deposit_That_Much` (44), `_MSG_Deposit.cpp:34-56`;
+  - saque negativo ou acima do banco: `_NN_Cant_Withdraw_That_Much` (45), `_MSG_Withdraw.cpp:34-55`;
+  - teleporte pago sem ouro: `_NN_Not_Enough_Money` (113), `_MSG_ReqTeleport.cpp:39-64`.
+- **A proposta original estava parcialmente errada (confirmado em fonte):** o legado também fica em silêncio com preço negativo e slot vazio da loja (`return` sem mensagem). Esses casos continuam em silêncio. Na venda, o servidor Go não tem caminho de recusa que o legado avise. As recusas por comerciante errado (112/116) e de poção (167) ficam para quando o Go tiver essas regras.
+- O teto de 2G continua com o `NoticeCargoFull` do Go. O legado usa `_NN_Cant_get_more_than_2G` (273), e o dialeto do cliente web já traduz a notice.
+- **Harness:** `Session.panels()` coleta dentro da página os textos do painel (que dura 4 s). As regras de `shop`, `bank` e `paidteleport` passam a exigir o painel na recusa, e a ausência dele no teleporte pago com ouro.

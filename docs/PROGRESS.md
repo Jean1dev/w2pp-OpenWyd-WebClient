@@ -39,7 +39,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - sussurro (nome de quem envia, espaço contra o corte do `&String[1]`, `/r`): [PR #374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374), `patches/server/0008`;
    - login duplicado como o original (derruba e salva a sessão antiga; a nova recebe `0x011D`/`0x011C` e tenta de novo): [PR #375](https://github.com/Jean1dev/w2pp-OpenWYD/pull/375), `patches/server/0009`;
    - em produção desde 06/10 (`25016ab3`): `chat` e `concurrent` aprovados no Railway, sem regressão em `logout` e `bank` ([evidência](evidence/05-gameplay/2026-10-06-whisper-duplicate-login.md#após-o-deploy-confirmado-em-execução-tm-server-25016ab3)); falta a conferência com o cliente Windows;
-   - ainda não feitas: aviso na recusa do teleporte pago e nas recusas de compra, venda e banco ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
+   - avisos nas recusas de compra sem ouro, saque/depósito inválido e teleporte pago sem ouro: [PR #376](https://github.com/Jean1dev/w2pp-OpenWYD/pull/376), `patches/server/0010`, aguardando merge e deploy. Linha de base sem painel em `25016ab3` ([evidência](evidence/05-gameplay/2026-10-06-refusal-panels.md)); depois do deploy, rodar `shop`, `bank` e `paidteleport`. Na venda, o Go não tem recusa que o legado avise ([ADR 008](decisions/008-shop-cargo-chat-dialect.md#revisão-de-06102026-tarde-lacuna-1)).
    - Itens no chão ficam fora de escopo (decisão do usuário, 06/10).
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
@@ -1036,3 +1036,20 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Achado (confirmado em fonte e em execução):** o painel `Guild Chatting : Off/On` mostra o texto cru só por 4 s (`TMScene.cpp:1603`). O runtime só inverte o botão com o texto exato, e a lista de chat recebe as strings 450 + 447/446. A reprovação de 02/10 depois do #368 era do harness; o servidor está correto.
 - **Não executado:** uma execução online com a regra final; cliente Windows. Sem commit nem deploy.
 - **Próximo passo:** item A2 do plano, avisos nas recusas de compra, venda, banco e teleporte pago ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
+
+### 06/10/2026 — avisos nas recusas de compra, banco e teleporte pago (ADR 008, lacuna 1)
+
+- **Pedido do usuário:** começar o item A2 do plano. Decisão do usuário: ajustar o ouro de A no banco, se fosse preciso. Não foi preciso, porque a Aki vende itens acima de 1.000.000; nada foi escrito no banco nesta etapa.
+- **Arquivos:**
+  - servidor, em `.cache/server-src` (clone de `25016ab3`, fora do Git deste repositório): PR [#376](https://github.com/Jean1dev/w2pp-OpenWYD/pull/376), espelhado em `patches/server/0010-refusal-panels.patch`;
+  - este repositório:
+    - `tools/verify_world.mjs` (`Session.panels()`/`panelSeen()` e o painel em `shop`, `bank` e `paidteleport`);
+    - `tools/world_checks{,.test}.mjs`;
+    - revisão da ADR 008, checklist da etapa 5, [evidência](evidence/05-gameplay/2026-10-06-refusal-panels.md) com três JSONs sanitizados, e este progresso.
+- **Comandos e resultados:**
+  - servidor: `go vet ./tmserver/...` limpo e `go test ./tmserver/...` ok; os testes novos ficaram estáveis com `-count=10`, e sem a correção 5 falham;
+  - `npm run world:checks`: 41/41;
+  - linha de base em `25016ab3`, com `bank`, `shop` e `paidteleport`: as três reprovaram só na regra nova (sem painel na recusa), com saldo, itens e posição inalterados e protocolo limpo.
+- **Achado (confirmado em fonte):** o legado também fica em silêncio com preço negativo e slot vazio da loja, então a proposta original da ADR 008 cobria casos demais. Na venda, o Go não tem recusa que o legado avise.
+- **Não executado:** `-race` e `golangci-lint` no servidor (sem cgo); as fases com o #376 implantado; cliente Windows. Sem merge nem deploy.
+- **Próximo passo:** merge e deploy do #376 pelo operador; depois, `shop`, `bank` e `paidteleport` no Railway.

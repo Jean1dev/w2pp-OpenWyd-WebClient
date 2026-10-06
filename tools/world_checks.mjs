@@ -338,7 +338,8 @@ export function checkLoot(l) {
 
 // NPC shop (slice 3). Gold and items move only on the server's word: the
 // sale by its 0x037A echo, 0x0182 clear and 0x0337 gold; the purchase by the
-// 0x0379 echo, 0x0337 and 0x0182. A refused buy leaves both untouched.
+// 0x0379 echo, 0x0337 and 0x0182. A refused buy leaves both untouched and
+// shows the legacy panel.
 export function checkShop(s) {
   assert(s.merchant > 0 && s.cells.length > 0, 'shop window did not list items');
   assert(s.sell.sent >= 1, 'no 0x037A left the client');
@@ -351,6 +352,7 @@ export function checkShop(s) {
     assert(s.poor.sent >= 1, 'refused buy sent nothing');
     assert.equal(s.poor.coinAfter, s.poor.coinBefore, 'refused buy changed gold');
     assert.equal(s.poor.gained, 0, 'refused buy added an item');
+    assert.equal(s.poor.notice, true, 'refused buy: no _NN_Not_Enough_Money panel');
   }
   // Every unit gained was paid for, at one unit price, also on a repeated click.
   const spent = s.buy.coinBefore - s.buy.coinAfter;
@@ -372,6 +374,7 @@ export function checkBank(b) {
   assert.equal(b.overdraw.sent, 1, 'overdraw: one 0x0387 expected');
   assert.equal(b.overdraw.coin, b.withdraw.coin, 'overdraw changed carry gold');
   assert.equal(b.overdraw.cargo, b.withdraw.cargo, 'overdraw changed cargo gold');
+  assert.equal(b.overdraw.notice, true, 'overdraw: no _NN_Cant_Withdraw_That_Much panel');
   assert.equal(b.overdeposit.sent, 0, 'deposit above carry gold must be refused by the client');
   assert.equal(b.store.cargoItem, b.store.item, 'item did not reach the cargo');
   assert.equal(b.store.carryItem, 0, 'stored item still in the carry');
@@ -397,6 +400,8 @@ export function checkPaidTeleport(t, price) {
   assert.equal(t.refused.lastSent, 0x290, 'refused: no 0x0290 after OK');
   assert(t.refused.moved < 3, 'refused: A was teleported without the price');
   assert.equal(t.refused.coinAfter, t.refused.coinBefore, 'refused: gold changed');
+  assert.equal(t.refused.notice, true, 'refused: no _NN_Not_Enough_Money panel');
+  assert.equal(t.paid.notice, false, 'paid: a not-enough-money panel showed');
   assert.equal(t.restore.sent, 1, 'restore: one 0x0387 expected');
   assert.equal(t.restore.coin, t.paid.coinAfter, 'restore: gold differs from after the charge');
   assert.equal(t.relogin.coin, t.paid.coinAfter, 'relogin: gold differs from after the charge');

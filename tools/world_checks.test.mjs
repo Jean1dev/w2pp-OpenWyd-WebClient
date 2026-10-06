@@ -287,7 +287,7 @@ test('shop needs a server-confirmed sale and purchase, a silent refusal and paid
   const s = { merchant: 12474, cells: [{ item: 400, price: 10 }],
     sell: { sent: 1, after: { index: 0 }, coinBefore: 0, coinAfter: 50 },
     buy: { sent: 1, gained: 1, coinBefore: 50, coinAfter: 40 },
-    poor: { sent: 1, coinBefore: 40, coinAfter: 40, gained: 0 },
+    poor: { sent: 1, coinBefore: 40, coinAfter: 40, gained: 0, notice: true },
     repeat: { sent: 2, coinBefore: 40, coinAfter: 20, gained: 2 },
     beforeRelogin: end, relogin: structuredClone(end) };
   checkShop(s);
@@ -297,7 +297,7 @@ test('shop needs a server-confirmed sale and purchase, a silent refusal and paid
   const bad = [
     { cells: [] }, { sell: { ...s.sell, sent: 0 } }, { sell: { ...s.sell, after: { index: 7 } } },
     { sell: { ...s.sell, coinAfter: 0 } }, { buy: { ...s.buy, gained: 0 } }, { buy: { ...s.buy, coinAfter: 50 } },
-    { poor: { ...s.poor, coinAfter: 30 } }, { poor: { ...s.poor, gained: 1 } },
+    { poor: { ...s.poor, coinAfter: 30 } }, { poor: { ...s.poor, gained: 1 } }, { poor: { ...s.poor, notice: false } },
     { repeat: { sent: 2, coinBefore: 40, coinAfter: 30, gained: 2 } },
     { buy: { sent: 2, gained: 2, coinBefore: 60, coinAfter: 45 } },
     { relogin: bagOf({}, { 0: it(401, [61, 120]), 1: it(400) }, { coin: 20 }) },
@@ -310,7 +310,7 @@ test('bank moves gold both ways by the amount, refuses overdraws and keeps both 
   const b = { opened: true, amount: 25,
     deposit: { coinBefore: 50, cargoBefore: 0, coin: 25, cargo: 25 },
     withdraw: { coin: 50, cargo: 0 },
-    overdraw: { sent: 1, coin: 50, cargo: 0 }, overdeposit: { sent: 0, coin: 50, cargo: 0 },
+    overdraw: { sent: 1, coin: 50, cargo: 0, notice: true }, overdeposit: { sent: 0, coin: 50, cargo: 0 },
     store: { item: 400, cargoItem: 400, carryItem: 0 }, fetch: { carryItem: 400 },
     keep: { amount: 37, sent: 1, coin: 13, cargo: 37 },
     relogin: { coin: 13, cargo: 37 }, restore: { coin: 50, cargo: 0 } };
@@ -319,6 +319,7 @@ test('bank moves gold both ways by the amount, refuses overdraws and keeps both 
     { opened: false }, { deposit: { ...b.deposit, cargo: 0 } }, { deposit: { ...b.deposit, coin: 50 } },
     { withdraw: { coin: 25, cargo: 25 } }, { overdraw: { sent: 0, coin: 50, cargo: 0 } },
     { overdraw: { sent: 1, coin: 1050, cargo: -1000 } }, { overdeposit: { sent: 1, coin: 50, cargo: 0 } },
+    { overdraw: { sent: 1, coin: 50, cargo: 0, notice: false } },
     { store: { item: 400, cargoItem: 0, carryItem: 400 } }, { fetch: { carryItem: 0 } },
     { relogin: { coin: 50, cargo: 25 } }, { relogin: { coin: 13, cargo: 0 } }, { relogin: { coin: 50, cargo: 0 } },
     { keep: { amount: 37, sent: 0, coin: 13, cargo: 37 } }, { keep: { amount: 37, sent: 1, coin: 50, cargo: 37 } },
@@ -328,15 +329,16 @@ test('bank moves gold both ways by the amount, refuses overdraws and keeps both 
 });
 
 test('paid portal charges the price once, refuses without it and keeps the charge after relogin', () => {
-  const t = { paid: { lastSent: 0x290, moved: 900, nearNoatum: true, coinBefore: 1000, coinAfter: 300 },
+  const t = { paid: { lastSent: 0x290, moved: 900, nearNoatum: true, coinBefore: 1000, coinAfter: 300, notice: false },
     back: { sent: true }, parked: { sent: 1, amount: 800 },
-    refused: { lastSent: 0x290, moved: 0, coinBefore: 500, coinAfter: 500 },
+    refused: { lastSent: 0x290, moved: 0, coinBefore: 500, coinAfter: 500, notice: true },
     restore: { sent: 1, coin: 300 }, relogin: { coin: 300 } };
   checkPaidTeleport(t, 700);
   const bad = [
     { paid: { ...t.paid, coinAfter: 1000 } }, { paid: { ...t.paid, nearNoatum: false } }, { paid: { ...t.paid, lastSent: 0x36c } },
     { refused: { ...t.refused, moved: 900 } }, { refused: { ...t.refused, coinAfter: 0 } }, { refused: { ...t.refused, coinBefore: 800 } },
     { restore: { sent: 1, coin: 1000 } }, { relogin: { coin: 1000 } }, { back: { sent: false } },
+    { refused: { ...t.refused, notice: false } }, { paid: { ...t.paid, notice: true } },
   ];
   for (const x of bad) assert.throws(() => checkPaidTeleport({ ...t, ...x }, 700), JSON.stringify(Object.keys(x)));
   validateOptions(options('login,enter,paidteleport'));

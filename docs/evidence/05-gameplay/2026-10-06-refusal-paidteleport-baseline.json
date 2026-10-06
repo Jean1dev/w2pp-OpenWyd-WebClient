@@ -1,0 +1,129 @@
+{
+ "when": "2026-10-06T18:48:40.954Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "enter",
+  "paidteleport"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "ok": false,
+ "error": "refused: no _NN_Not_Enough_Money panel\n\nfalse !== true\n",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "9a55b612b1e4ae066171b169b7a19bfdce950fb3",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "results": {
+  "paidteleport": {
+   "paid": {
+    "at": [
+     2119.5,
+     2100.5
+    ],
+    "lastSent": 656,
+    "to": [
+     1045.5,
+     1726.5
+    ],
+    "moved": 1137.2563475311977,
+    "coinBefore": 999500,
+    "coinAfter": 998800,
+    "notice": false,
+    "nearNoatum": true
+   },
+   "back": {
+    "sent": true,
+    "lastSent": "0x291"
+   },
+   "parked": {
+    "amount": 998300,
+    "sent": 1,
+    "coin": 500
+   },
+   "refused": {
+    "at": [
+     2117.5,
+     2100.5
+    ],
+    "lastSent": 656,
+    "to": [
+     2117.5,
+     2100.5
+    ],
+    "moved": 0,
+    "coinBefore": 500,
+    "coinAfter": 500,
+    "notice": false
+   },
+   "restore": {
+    "sent": 1,
+    "coin": 998800
+   },
+   "relogin": {
+    "coin": 998800
+   },
+   "ok": false,
+   "error": "refused: no _NN_Not_Enough_Money panel\n\nfalse !== true\n",
+   "ms": 738146,
+   "at": "2026-10-06T19:01:55.302Z"
+  }
+ },
+ "pageErrors": {
+  "A": [],
+  "A-paid-relogin": []
+ }
+}

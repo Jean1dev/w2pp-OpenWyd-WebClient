@@ -206,6 +206,28 @@ class Session {
     }
   }
 
+  // Message panel texts (TMScene m_pMessagePanel) seen since the last call.
+  // Sampled inside the page, so a panel that lasts 4 s is caught while the
+  // harness waits elsewhere. The first call starts the sampler.
+  panels() {
+    return this.eval(() => {
+      if (!window.__wydPanels) {
+        window.__wydPanels = [];
+        let last = '';
+        setInterval(() => {
+          const t = Module._wyd_scene_message_visible() === 1 ? Module.UTF8ToString(Module._wyd_scene_message_text()) : '';
+          if (t && t !== last) window.__wydPanels.push(t);
+          last = t;
+        }, 100);
+      }
+      return window.__wydPanels.splice(0);
+    });
+  }
+
+  // Whether a panel matching re (ASCII part of a Windows-1252 legacy string,
+  // which reaches the page through UTF8ToString) showed since the last panels().
+  async panelSeen(re) { return (await this.panels()).some(t => re.test(t)); }
+
   probe() { return this.eval(() => window.clientProbe()); }
   state() { return this.eval(() => Module._wyd_get_game_state()); }
 
@@ -2631,15 +2653,18 @@ async function main() {
         coinAfter: bag2.coin, gained: a.countItem(bag2, cheap.item) - a.countItem(bag1, cheap.item),
         clientCount: await a.eval(countIn, [cheap.item]) };
       console.log(`    buy ${cheap.item}: gold ${res.buy.coinBefore}->${res.buy.coinAfter}, gained ${res.buy.gained}`);
-      // 3. An item the gold does not cover: the server refuses in silence.
+      // 3. An item the gold does not cover: the server refuses it with
+      // _NN_Not_Enough_Money (_MSG_Buy.cpp:147-151, server patch 0010).
       const dear = res.cells.filter(c => c.price > bag2.coin).sort((p, q) => q.price - p.price)[0];
       if (dear) {
         sent0 = await a.outCount();
+        await a.panels();
         await a.tapCanvas(dear.sx, dear.sy);
         await sleep(4000);
         const bag3 = await a.bag();
         res.poor = { item: dear.item, clientPrice: dear.price, sent: (await a.outCount()) - sent0, coinBefore: bag2.coin,
-          coinAfter: bag3.coin, gained: a.countItem(bag3, dear.item) - a.countItem(bag2, dear.item) };
+          coinAfter: bag3.coin, gained: a.countItem(bag3, dear.item) - a.countItem(bag2, dear.item),
+          notice: await a.panelSeen(/possui gold suficiente/) };
       }
       // 4. Two clicks inside one rendered frame on the cheap item.
       const bag4 = await a.bag();
@@ -2707,10 +2732,13 @@ async function main() {
       const c2 = await a.cargo();
       res.withdraw = { sent, coin: c2.coin, cargo: c2.cargo };
       console.log(`    gold ${c0.coin}/${c0.cargo} -> deposit ${c1.coin}/${c1.cargo} -> withdraw ${c2.coin}/${c2.cargo}`);
-      // 4. Withdraw more than the cargo holds: sent, refused by the server.
+      // 4. Withdraw more than the cargo holds: sent, refused by the server
+      // with _NN_Cant_Withdraw_That_Much (_MSG_Withdraw.cpp:34-55, patch 0010).
+      await a.panels();
       sent = await a.goldBox(65688, c2.cargo + 1000);
+      await sleep(1500);
       const c3 = await a.cargo();
-      res.overdraw = { sent, coin: c3.coin, cargo: c3.cargo };
+      res.overdraw = { sent, coin: c3.coin, cargo: c3.cargo, notice: await a.panelSeen(/pode ser retirada/) };
       // 5. Deposit more than the carry holds: the client refuses (message 34)
       // and keeps the box open; the relogin below discards it.
       sent = await a.goldBox(65563, c3.coin + 1000);
@@ -2853,7 +2881,8 @@ async function main() {
 
     // Stage 5, slice A: the paid city portal (teleport.go, Armia -> Noatum for
     // 700). The client shows box 16 with the price and sends 0x0290 on OK
-    // without checking gold; the server charges or refuses in silence.
+    // without checking gold; the server charges, or refuses with
+    // _NN_Not_Enough_Money (_MSG_ReqTeleport.cpp:39-64, server patch 0010).
     await step('paidteleport', async () => {
       const res = {}; r.paidteleport = res;
       const PRICE = 700, NOATUM = [1045, 1725];
@@ -2866,6 +2895,7 @@ async function main() {
       const attempt = async label => {
         const coinBefore = (await a.bag()).coin;
         await tile();
+        await a.panels();
         await a.until(`${label} portal box`, () => Module._wyd_scene_msgbox_message() === 16, 20000);
         const at = await a.me();
         await a.shot(`paid-${label}`);
@@ -2877,7 +2907,7 @@ async function main() {
         await sleep(3000);
         const to = await a.me();
         return { at: [at.x, at.y], lastSent, to: [to.x, to.y], moved: Math.hypot(to.x - at.x, to.y - at.y),
-          coinBefore, coinAfter: (await a.bag()).coin };
+          coinBefore, coinAfter: (await a.bag()).coin, notice: await a.panelSeen(/possui gold suficiente/) };
       };
       // 1. Paid: A has the 700.
       res.paid = await attempt('paid');
