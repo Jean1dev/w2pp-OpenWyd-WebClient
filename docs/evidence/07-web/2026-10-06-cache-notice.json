@@ -1,0 +1,290 @@
+[
+  {
+    "browser": "chromium",
+    "version": "139.0.7258.5",
+    "cases": [
+      {
+        "name": "cold",
+        "ms": 247,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "warm",
+        "ms": 24,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "restart",
+        "ms": 160,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unchanged-rebuild",
+        "ms": 23,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "changed",
+        "ms": 157,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "updated-warm",
+        "ms": 23,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unavailable",
+        "ms": 26,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-failure",
+        "ms": 162,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-recovery",
+        "ms": 129,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "real-cold",
+        "ms": 15875,
+        "dataRequests": 1,
+        "dataBytes": 319802941,
+        "totalBytes": 323716196,
+        "fromCache": false,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Baixando dados do jogo…",
+            "Guardando os dados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 17,
+          "hiddenAt": 9742,
+          "shownTotalMB": 305,
+          "realTotalMiB": 305,
+          "downloadMs": 1003,
+          "sampleDetail": "143 / 305 MB"
+        }
+      },
+      {
+        "name": "real-warm",
+        "ms": 20790,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3913255,
+        "fromCache": true,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Abrindo os dados guardados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 6,
+          "hiddenAt": 7697,
+          "cacheReadMs": 7439,
+          "cacheDetail": "Isso leva alguns segundos, e a tela pode parecer parada."
+        }
+      },
+      {
+        "name": "real-restart",
+        "ms": 15612,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3913255,
+        "fromCache": true,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Abrindo os dados guardados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 6,
+          "hiddenAt": 6588,
+          "cacheReadMs": 6244,
+          "cacheDetail": "Isso leva alguns segundos, e a tela pode parecer parada."
+        }
+      }
+    ]
+  },
+  {
+    "browser": "firefox",
+    "version": "140.0.2",
+    "cases": [
+      {
+        "name": "cold",
+        "ms": 306,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "warm",
+        "ms": 206,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "restart",
+        "ms": 163,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unchanged-rebuild",
+        "ms": 213,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "changed",
+        "ms": 192,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "updated-warm",
+        "ms": 203,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 13069,
+        "fromCache": true
+      },
+      {
+        "name": "unavailable",
+        "ms": 73,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-failure",
+        "ms": 270,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "write-recovery",
+        "ms": 186,
+        "dataRequests": 1,
+        "dataBytes": 9,
+        "totalBytes": 13078,
+        "fromCache": false
+      },
+      {
+        "name": "real-cold",
+        "ms": 35697,
+        "dataRequests": 1,
+        "dataBytes": 319802941,
+        "totalBytes": 323716196,
+        "fromCache": false,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Baixando dados do jogo…",
+            "Guardando os dados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 27,
+          "hiddenAt": 31487,
+          "shownTotalMB": 305,
+          "realTotalMiB": 305,
+          "downloadMs": 2017,
+          "sampleDetail": "144 / 305 MB · 141,2 MB/s · ~2 s"
+        }
+      },
+      {
+        "name": "real-warm",
+        "ms": 16342,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3913255,
+        "fromCache": true,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Abrindo os dados guardados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 6,
+          "hiddenAt": 15828,
+          "cacheReadMs": 15550,
+          "cacheDetail": "Isso leva alguns segundos, e a tela pode parecer parada."
+        }
+      },
+      {
+        "name": "real-restart",
+        "ms": 19627,
+        "dataRequests": 0,
+        "dataBytes": 0,
+        "totalBytes": 3913255,
+        "fromCache": true,
+        "loader": {
+          "stages": [
+            "Carregando…",
+            "Verificando acesso…",
+            "Baixando o jogo…",
+            "Abrindo os dados guardados no navegador…"
+          ],
+          "maxValue": 100,
+          "rows": 6,
+          "hiddenAt": 18255,
+          "cacheReadMs": 17668,
+          "cacheDetail": "Isso leva alguns segundos, e a tela pode parecer parada."
+        }
+      }
+    ]
+  }
+]

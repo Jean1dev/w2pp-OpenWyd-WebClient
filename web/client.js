@@ -10,6 +10,7 @@ const identityEl = document.getElementById("identity");
 
 const SESSION_EXPIRED = "Sua sessão expirou. Entre novamente pelo portal.";
 const DOWNLOAD_FAILED = "Não foi possível baixar os dados do jogo. Verifique a conexão e tente novamente.";
+const CACHE_WAIT = "Isso leva alguns segundos, e a tela pode parecer parada.";
 
 // Tela de carregamento: mostra só etapas e a contagem de bytes do pacote,
 // nunca conta, URL ou payload.
@@ -392,11 +393,12 @@ async function start() {
     }
   };
   // O file_packager marca fromCache antes de ler o IndexedDB; a leitura do
-  // cache não informa progresso.
+  // cache não informa progresso e bloqueia a página por vários segundos (um
+  // contador ficaria parado), por isso o aviso é fixo.
   const cacheWatch = setInterval(() => {
     if (Module.preloadResults?.["openwyd_assets.data"]?.fromCache) {
       clearInterval(cacheWatch);
-      Loader.stage("Abrindo os dados guardados no navegador…");
+      Loader.stage("Abrindo os dados guardados no navegador…", CACHE_WAIT);
     }
   }, 200);
   Loader.stage("Baixando o jogo…");

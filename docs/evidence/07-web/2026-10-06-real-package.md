@@ -128,3 +128,17 @@ A tabela e o JSON sanitizado [`2026-10-06-settings-online.json`](2026-10-06-sett
 1. Operador: decidir o padrão de música quando o `Config.bin` traz 0.
 2. Avaliar mostrar o tempo decorrido em "Abrindo os dados guardados no navegador…".
 3. Operador, no domínio público: primeiro acesso e reabertura pelo portal, e o painel com áudio ouvido.
+
+## Revisão de 06/10/2026 (noite): aviso na leitura do cache
+
+Item 2 do próximo passo. [JSON](2026-10-06-cache-notice.json).
+
+- **Primeira tentativa: contador de tempo decorrido. Reprovada (confirmado em execução).** No trace do pacote real no Chromium, o detalhe ficou em "0 s" de 271 ms até o primeiro quadro, em 7.869 ms. A leitura do pacote de 305 MiB do IndexedDB e o boot bloqueiam a thread principal, e o `setInterval` não dispara. Um contador parado parece travamento, então ele foi descartado.
+- **Solução:** a etapa "Abrindo os dados guardados no navegador…" ganhou um aviso fixo, "Isso leva alguns segundos, e a tela pode parecer parada." (`web/client.js`). O aviso não depende da thread principal.
+- **Verificação:**
+  - `npm run loading:ui` (runtime falso): o aviso aparece e se mantém na etapa de cache, em Chromium e Firefox;
+  - `node tools/verify_asset_cache.mjs --real` (exit 0), com a regra nova de que o aviso existe durante a leitura:
+    - acesso frio sem mudança;
+    - leitura do cache no Chromium 139: 7,4 s no acesso com cache e 6,2 s na reabertura;
+    - no Firefox 140: 15,6 s e 17,7 s.
+- **Não executado:** Safari e o domínio público. A frase não foi revista pelo operador.

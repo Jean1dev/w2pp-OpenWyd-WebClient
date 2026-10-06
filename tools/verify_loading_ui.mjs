@@ -40,6 +40,9 @@ const fakePackage = scenario => `
       Module.preloadResults[name] = { fromCache: true };
       await wait(700);
       fake.snapshots.push(snap());
+      // The cache read reports no progress: the page keeps a fixed notice.
+      await wait(1600);
+      fake.snapshots.push(snap());
       Module.setStatus('Downloading...');
       return;
     }
@@ -196,9 +199,11 @@ try {
       // Acesso com cache: etapa própria, sem nota de download.
       {
         const page = await visit('warm');
-        await until(page, () => (window.fake?.snapshots.length ?? 0) >= 1);
-        const [snap] = await page.evaluate(() => fake.snapshots);
+        await until(page, () => (window.fake?.snapshots.length ?? 0) >= 2);
+        const [snap, later] = await page.evaluate(() => fake.snapshots);
         check('warm: etapa de cache', snap.stage === 'Abrindo os dados guardados no navegador…', snap.stage);
+        check('warm: aviso de espera', snap.detail === 'Isso leva alguns segundos, e a tela pode parecer parada.' &&
+          later.stage === snap.stage && later.detail === snap.detail, `${snap.detail} → ${later.detail}`);
         check('warm: sem nota de download', snap.note === null);
         check('warm: some após o primeiro quadro', await until(page, () => document.getElementById('loader').hidden));
         // Sem login pendente (204): fica no login manual e não chama o runtime.
