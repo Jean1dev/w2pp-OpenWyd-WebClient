@@ -409,6 +409,14 @@ export function checkChat(c) {
   assert(c.say.heard, "B did not show A's line");
   assert(c.whisper.sent, 'no 0x0334 left the client');
   assert(c.whisper.heard, 'B did not show the whisper');
+  // Server patch 0008: the sender's name in MobName and a leading space, so the
+  // memo (&String[1]) names A and shows the whole text.
+  assert.equal(c.whisper.senderShown, 'sender', `B shows the whisper as from ${c.whisper.senderShown}`);
+  assert(c.whisper.fullText, 'B shows the whisper text cut');
+  assert(c.reply?.sent && c.reply.heard, 'the /r reply did not reach A');
+  assert.equal(c.reply.senderShown, 'sender', `A shows the /r reply as from ${c.reply.senderShown}`);
+  assert(c.reply.fullText, 'A shows the /r reply cut');
+  assert(c.offline?.lastRecv === '0x102' && c.offline.inTranslated >= 1, 'no notice for a whisper to nobody online');
   assert(c.teleport.moved > 50, 'the /city command did not move A');
   assert(c.teleport.bLost, 'B still sees A after the teleport');
   assert(c.back.moved > 50, 'the return command did not move A');
@@ -483,6 +491,19 @@ export function checkHealOther(r) {
   assert(r.after.target.hp - r.before.target.hp > r.before.target.level + 30,
     `B's HP rose ${r.after.target.hp - r.before.target.hp}, no more than one regeneration step`);
   assert(r.after.seenByCaster > r.before.seenByCaster, 'A did not see B healed');
+}
+
+// Duplicate login (server patch 0009, legacy DBSrv/TMSrv): the new login is
+// refused with _MSG_StillPlaying (0x011D) or, while the kicked session saves,
+// _MSG_AlreadyPlaying (0x011C), and the 7662 says to try again; the session in
+// the game is closed back to server selection; a retry enters the same character.
+export function checkConcurrent(c) {
+  assert([0x11d, 0x11c].includes(c.refusal.opcode), `duplicate login answered 0x${c.refusal.opcode?.toString(16)}`);
+  assert.equal(c.refusal.state, 7, 'the refused page left server selection');
+  assert(c.refusalPanel?.includes('Tente novamente'), `refusal shows "${c.refusalPanel}"`);
+  assert(!c.kicked.timedOut && c.kicked.connected === false, 'the first session was not closed');
+  assert.equal(c.retries.at(-1), 'selchar', 'the retry did not reach character selection');
+  assert(c.sameCharacter && c.sameEquip, 'the retry entered a different character or equipment');
 }
 
 // Etapa 7, settings panel (patch 0023, web/settings.js). Music level n -> the

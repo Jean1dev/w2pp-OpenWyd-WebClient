@@ -8,7 +8,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
 | 2 Build e cena | Validada (01/10: build limpo, importador com testes sintéticos e cena Field/Select Server em Chromium e Firefox; Field é fixture offline; Safari não testado) | [Cena real no navegador](evidence/02-build/README.md), [reprodução de 01/10](evidence/02-build/2026-10-01-reproduction.md) |
 | 3 Protocolo | Validada (01/10: vetores, streaming adversarial, login real e DeleteCharacter com recusa `0x011B` no Railway `2e532afa`; login real no tm-server do operador, não numa stack local) | [Gateway, vetores, dialeto e login real](evidence/03-protocolo/README.md) |
 | 4 Login e mundo | Em andamento (01/10: duas sessões web aprovadas no Railway, com movimento, logout/relogin, troca de mapa e login concorrente; Windows × web com movimento nos dois sentidos e despawn; falta o relogin do Windows) | [Login, Field e duas sessões](evidence/04-login-mundo/README.md) |
-| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão bloqueado pelo servidor; grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco, fatia 5 (reinício controlado) e cura em outro jogador aprovadas; o checklist não tem mais item pendente que dependa só do cliente) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
+| 5 Gameplay | Em andamento (fatias 1–3 aprovadas no Railway: combate, morte/respawn, skills das quatro classes, área em dois alvos, equipar, poção, loot, loja, banco, chat e teleporte por comando; drop no chão fora de escopo (decisão do usuário, 06/10); grupo e troca aprovados; fatia A de 01/10: venda, ouro no banco entre sessões, teleporte pago e troca com bolsa cheia/desconexão; score do login aprovado com o #363; em 02/10, chat de grupo (#364) e nível (#365) aprovados no servidor `bc7b3923`, buff (Lobisomem) e cura (Cura) aprovados com nível ajustado no banco, fatia 5 (reinício controlado) e cura em outro jogador aprovadas; o checklist não tem mais item pendente que dependa só do cliente) | [Checklist por funcionalidade](evidence/05-gameplay/README.md) |
 | 6 Paridade | Em andamento (01/10: linha de base offline em Chromium headless; a cena abre 50,5 de 305 MiB do pacote, com heap JS de 527 MiB; sem comparação Windows) | [Linha de base](evidence/06-paridade/README.md) |
 | 7 Experiência web | Em andamento (06/10, com o pacote real e o runtime real: cache e tela de carregamento aprovados em Chromium e Firefox, inclusive "Fast 4G"; painel de configurações aprovado online no Railway (sliders, mudo na troca de zona, relogin, 1024×768, 1280×1024 e "ampliar" para 1467×1174); cache do pacote principal validado localmente em Chromium e Firefox; publicação pendente; 02/10: painel de música, efeitos e resolução compilado e testado com runtime falso, áudio real ainda não verificado; tela de carregamento com progresso real, cache e erros testada com runtime falso, pacote real ainda não verificado; seleção automática do servidor quando todos os canais têm o mesmo destino (patch 0025), aprovada com runtime real contra o tm-server do Railway; login automático pela conta do portal (ADR 017) aprovado de ponta a ponta na stack local, deploy pendente) | [Cache local de assets](evidence/07-web/2026-09-30-asset-cache.md), [painel de configurações](evidence/07-web/2026-10-02-settings.md), [tela de carregamento](evidence/07-web/2026-10-02-loading-screen.md), [seleção automática do servidor](evidence/07-web/2026-10-02-auto-server.md), [login automático](evidence/07-web/2026-10-02-auto-login.md), [pacote real e configurações online](evidence/07-web/2026-10-06-real-package.md) |
 | 8 Entrega | Em andamento (02/10: gate por conta do portal no lugar do Basic Auth, implantado e confirmado no domínio público; falta o login real pelo portal) | [Imagem, CI e deploy no Railway verificados](evidence/08-entrega/README.md), [gate do portal](evidence/08-entrega/2026-10-02-portal-gate.md) |
@@ -35,11 +35,12 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - operador: o `Config.bin` do dataset traz música 0, então o jogador entra sem música; decidir se a página define um padrão;
    - a leitura do pacote do IndexedDB leva 10–20 s sem progresso; avaliar mostrar o tempo decorrido;
    - operador, no domínio público: primeiro acesso e reabertura pelo portal.
-6. Servidor, entregas separadas (não feitas):
-   - itens no chão: `0x026E`, CNF de 28 bytes, decay e dono ([ADR 007](decisions/007-inventory-dialect.md));
-   - aviso na recusa do teleporte pago (o original avisa, o Go fica em silêncio);
-   - sussurro: gravar o nome de quem envia e reproduzir a reescrita legada; enviar aviso nas recusas de compra, venda, banco e teleporte; confirmar o layout de 57 bytes do `0x0339` ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
-6. Servidor, entrega separada: proteção contra login duplicado na mesma conta (`AccountLogin` aceita; cargo compartilhado é substituído/liberado). Não fazer no cliente nem no gateway.
+6. Servidor ([ADR 019](decisions/019-duplicate-login-and-whisper.md)):
+   - sussurro (nome de quem envia, espaço contra o corte do `&String[1]`, `/r`): [PR #374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374), `patches/server/0008`;
+   - login duplicado como o original (derruba e salva a sessão antiga; a nova recebe `0x011D`/`0x011C` e tenta de novo): [PR #375](https://github.com/Jean1dev/w2pp-OpenWYD/pull/375), `patches/server/0009`;
+   - falta: merge e deploy pelo operador; depois, `--phases login,enter,second,chat` e `--phases login,enter,concurrent` no Railway e a conferência com o cliente Windows;
+   - ainda não feitas: aviso na recusa do teleporte pago e nas recusas de compra, venda e banco ([ADR 008](decisions/008-shop-cargo-chat-dialect.md)).
+   - Itens no chão ficam fora de escopo (decisão do usuário, 06/10).
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
 
@@ -972,3 +973,25 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - Firefox online, Safari, domínio público e áudio ouvido.
   Sem commit nem deploy.
 - **Próximo passo:** decisão do operador sobre a música padrão; `guildchat` com o #368 já implantado; o operador confere a etapa 7 no domínio público.
+
+### 06/10/2026 — sussurro e login duplicado no servidor (ADR 019)
+
+- **Pedido do usuário:** tirar itens no chão do escopo e planejar o sussurro e o login duplicado. Plano aprovado, com decisões do usuário: login duplicado como o original, espaço antes do texto do sussurro e `/r`.
+- **Arquivos:**
+  - servidor, em `.cache/server-src` (clone de `dbb3ad85`, fora do Git deste repositório): PRs [#374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374) e [#375](https://github.com/Jean1dev/w2pp-OpenWYD/pull/375), espelhados em `patches/server/0008-whisper-sender.patch` e `0009-duplicate-login.patch`;
+  - este repositório:
+    - `patches/openwyd/0027-memo-probes.patch` (probes só de leitura do memo privado);
+    - `tools/verify_world.mjs` (fases `chat` e `concurrent`);
+    - `tools/world_checks{,.test}.mjs` (`checkChat`, `checkConcurrent`);
+    - ADR 019, revisão das ADRs 007 e 008, checklist da etapa 5, [evidência](evidence/05-gameplay/2026-10-06-whisper-duplicate-login.md) e este progresso.
+- **Comandos e resultados:**
+  - servidor: `go vet` limpo e `go test ./tmserver/...` com 17 pacotes ok; os testes novos ficaram estáveis com `-count=10`;
+  - `npm run world:checks`: 41/41;
+  - runtime religado com o patch 0027: objetos certificados, 0 indefinidos;
+  - linha de base `login,enter,second,chat` na produção `dbb3ad85`: reprovada na regra nova, como esperado. B mostra o próprio nome como remetente, "psiu" chega como "siu" e o `/r` não chega.
+- **Não executado:**
+  - `-race` e `golangci-lint` no servidor (sem cgo local; ficam com a CI);
+  - `concurrent` online, que exige o deploy do #375;
+  - cliente Windows.
+  Sem merge nem deploy.
+- **Próximo passo:** merge e deploy dos #374/#375 pelo operador; depois, `chat` e `concurrent` no Railway.

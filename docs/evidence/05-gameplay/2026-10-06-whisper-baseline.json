@@ -1,0 +1,478 @@
+{
+ "when": "2026-10-06T14:18:51.241Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "enter",
+  "second",
+  "chat"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 25268,
+   "at": "2026-10-06T14:19:17.511Z"
+  },
+  "enter": {
+   "ok": true,
+   "me": {
+    "id": 2,
+    "name": "Web*******",
+    "x": 2088.5,
+    "y": 2096.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "score": {
+    "level": 0,
+    "hp": 105,
+    "maxHp": 105,
+    "mp": 105,
+    "maxMp": 105,
+    "damage": 22,
+    "ac": 32
+   },
+   "preview": {
+    "level": 0,
+    "hp": 105,
+    "maxHp": 100,
+    "mp": 105,
+    "maxMp": 100
+   },
+   "dialect": {
+    "inTranslated": 32,
+    "inPass": 2,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 34,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "glErrors": 0,
+   "ms": 21090,
+   "at": "2026-10-06T14:19:46.152Z"
+  },
+  "second": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "me": {
+    "id": 3,
+    "name": "Web*******",
+    "x": 2088.5,
+    "y": 2100.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "dialect": {
+    "inTranslated": 36,
+    "inPass": 4,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 3,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 40,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "ms": 154356,
+   "at": "2026-10-06T14:22:29.250Z"
+  },
+  "chat": {
+   "say": {
+    "sent": true,
+    "lastSent": "0x333",
+    "heard": true,
+    "bLines": [
+     "[<redacted>]> ola wyd60907",
+     "",
+     "",
+     ""
+    ],
+    "aLines": [
+     "[<redacted>]> ola wyd60907",
+     "",
+     "",
+     ""
+    ]
+   },
+   "whisper": {
+    "sent": true,
+    "lastSent": "0x334",
+    "heard": true,
+    "fullText": false,
+    "senderShown": "receiver",
+    "memo": [
+     "siu wyd60907",
+     "Mensagem enviada pelo jogador <self>. [11:24:58]",
+     ""
+    ],
+    "bLines": [
+     "",
+     "siu wyd60907",
+     "",
+     ""
+    ]
+   },
+   "reply": {
+    "sent": true,
+    "lastSent": "0x334",
+    "heard": false,
+    "fullText": false,
+    "senderShown": "none",
+    "memo": []
+   },
+   "offline": {
+    "sent": true,
+    "lastSent": "0x334",
+    "inTranslated": 1,
+    "lastRecv": "0x102"
+   },
+   "teleport": {
+    "sent": true,
+    "lastSent": "0x334",
+    "to": [
+     2501.5,
+     1718.5
+    ],
+    "moved": 559.8687346155347,
+    "bLost": true
+   },
+   "back": {
+    "sent": true,
+    "lastSent": "0x334",
+    "to": [
+     2101.5,
+     2101.5
+    ],
+    "moved": 553.7950884578157,
+    "bSees": true
+   },
+   "ok": false,
+   "error": "B shows the whisper as from receiver\n+ actual - expected\n\n+ 'receiver'\n- 'sender'\n",
+   "ms": 390842,
+   "at": "2026-10-06T14:29:11.745Z"
+  }
+ },
+ "ok": false,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "b2b9100b071d3b0390a80dc9af47dca1de5aa3dc",
+  "external/server": "98286fdf01202f503523e89d3e50b2183f00c36c",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-10-06T14:19:18.192Z",
+   "freeMiB": 1712,
+   "totalMiB": 8014,
+   "browserMiB": 1056,
+   "pages": {
+    "A": {
+     "wasmMiB": 125,
+     "jsMiB": 441
+    }
+   }
+  },
+  {
+   "point": "end enter",
+   "at": "2026-10-06T14:19:46.827Z",
+   "freeMiB": 1608,
+   "totalMiB": 8014,
+   "browserMiB": 1192,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 441
+    }
+   }
+  },
+  {
+   "point": "end second",
+   "at": "2026-10-06T14:22:30.459Z",
+   "freeMiB": 1014,
+   "totalMiB": 8014,
+   "browserMiB": 2162,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 441
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  },
+  {
+   "point": "end chat",
+   "at": "2026-10-06T14:29:12.646Z",
+   "freeMiB": 1079,
+   "totalMiB": 8014,
+   "browserMiB": 2154,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 441
+    },
+    "B": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "field",
+   "file": ".cache/world/2026-10-06T14-18-51-227Z/A-field.png",
+   "sha256": "8f632a61f4179dc0d0f66f8944b27e7ca4ffd17012ba50a56533fffb3800af66"
+  },
+  {
+   "name": "teleported",
+   "file": ".cache/world/2026-10-06T14-18-51-227Z/A-teleported.png",
+   "sha256": "d5f61248acfcafcaca20a0120544a65229fbc924e0d635d87a95d724a8fd5501"
+  },
+  {
+   "name": "field",
+   "file": ".cache/world/2026-10-06T14-18-51-227Z/B-field.png",
+   "sha256": "be2bd8711e8ebf5181b3382830d83abbdc8e6191ccdfce5dbff3291d2144e109"
+  },
+  {
+   "name": "chat-heard",
+   "file": ".cache/world/2026-10-06T14-18-51-227Z/B-chat-heard.png",
+   "sha256": "71dae3e2dc37a6746a9893a5b2d155fab66dd505acb89aab43ccb85041ae8d45"
+  }
+ ],
+ "error": "B shows the whisper as from receiver\n+ actual - expected\n\n+ 'receiver'\n- 'sender'\n",
+ "final_A": {
+  "inTranslated": 77,
+  "inPass": 48,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 7,
+  "outPass": 3,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 125,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "final_B": {
+  "inTranslated": 40,
+  "inPass": 9,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 4,
+  "outPass": 3,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 49,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "B": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-10-06T11:18:51.7579424-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-10-06T11:18:53.4118444-03:00",
+   "msg": "chat open"
+  },
+  {
+   "time": "2026-10-06T11:19:08.1278396-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-06T11:19:56.6575324-03:00",
+   "msg": "chat open"
+  },
+  {
+   "time": "2026-10-06T11:21:18.6281954-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-06T11:29:20.3151291-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 972,
+   "bytes_down": 21700
+  },
+  {
+   "time": "2026-10-06T11:29:20.3172458-03:00",
+   "msg": "chat closed",
+   "reason": "browser closed"
+  },
+  {
+   "time": "2026-10-06T11:29:20.3794975-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 394,
+   "bytes_down": 12950
+  },
+  {
+   "time": "2026-10-06T11:29:20.5266556-03:00",
+   "msg": "chat closed",
+   "reason": "browser closed"
+  }
+ ]
+}

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
   itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkBank, checkPaidTeleport, checkChat,
-  checkSettings, musicCentibels, musicElementVolume } from './world_checks.mjs';
+  checkSettings, musicCentibels, musicElementVolume, checkConcurrent } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
   const value = { error: 'fixture-secret', nested: ['prefix fixture-secret suffix'], x: 123456 };
@@ -343,12 +343,18 @@ test('paid portal charges the price once, refuses without it and keeps the charg
   assert.throws(() => validateOptions(options('login,enter,second,paidteleport')));
 });
 
-test('chat needs B to show the line and the whisper, and the /city commands to move A by the server', () => {
-  const c = { say: { sent: true, heard: true }, whisper: { sent: true, heard: true },
+test('chat needs B to show the line and the whisper from A in full, the /r reply, and the /city commands', () => {
+  const w = { sent: true, heard: true, senderShown: 'sender', fullText: true };
+  const c = { say: { sent: true, heard: true }, whisper: w, reply: { ...w },
+    offline: { lastRecv: '0x102', inTranslated: 1 },
     teleport: { moved: 400, bLost: true }, back: { moved: 400 } };
   checkChat(c);
   const bad = [
-    { say: { sent: true, heard: false } }, { whisper: { sent: false, heard: true } },
+    { say: { sent: true, heard: false } }, { whisper: { ...w, sent: false } },
+    // Before server patch 0008: the target's own name and the first character cut.
+    { whisper: { ...w, senderShown: 'receiver' } }, { whisper: { ...w, fullText: false } },
+    { reply: { ...w, heard: false } }, { reply: { ...w, senderShown: 'none' } },
+    { offline: { lastRecv: '0x334', inTranslated: 0 } },
     { teleport: { moved: 3, bLost: true } }, { teleport: { moved: 400, bLost: false } }, { back: { moved: 0 } },
   ];
   for (const x of bad) assert.throws(() => checkChat({ ...c, ...x }), JSON.stringify(Object.keys(x)));
@@ -381,4 +387,18 @@ test('settings: music levels follow the original curve, mute survives a zone cha
   bad({ resolutions: [res('1024x768'), res('1280x1024'), { ...res('1280x1024', true), displayed: [1036, 828] }] });
   assert.throws(() => validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,enter,second,settings' }));
   validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,create,enter,settings' });
+});
+
+test('concurrent: the duplicate login is refused to try again, the first session closed, the retry enters the same character', () => {
+  const ok = { refusal: { opcode: 0x11d, state: 7 }, refusalPanel: 'Conexão anterior finalizada. Tente novamente.',
+    kicked: { lastRecv: 0x101, connected: false }, retries: ['0x11c', 'selchar'], sameCharacter: true, sameEquip: true };
+  checkConcurrent(ok);
+  checkConcurrent({ ...ok, refusal: { opcode: 0x11c, state: 7 } });
+  const bad = [
+    // The backend before server patch 0009 accepted the duplicate.
+    { refusal: { opcode: 0x10a, state: 5 } },
+    { refusalPanel: null }, { kicked: { connected: true } }, { kicked: { timedOut: true } },
+    { retries: ['0x11c', '0x11c'] }, { sameEquip: false },
+  ];
+  for (const x of bad) assert.throws(() => checkConcurrent({ ...ok, ...x }), JSON.stringify(x));
 });
