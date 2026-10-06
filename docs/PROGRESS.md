@@ -33,7 +33,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
 4. Etapas 1–3 fechadas; a paridade do cliente Windows continua na etapa 6.
 5. Etapa 7 ([evidência de 06/10](evidence/07-web/2026-10-06-real-package.md#próximo-passo)):
    - operador: o `Config.bin` do dataset traz música 0, então o jogador entra sem música; decidir se a página define um padrão;
-   - a leitura do pacote do IndexedDB leva 10–20 s sem progresso; avaliar mostrar o tempo decorrido;
+   - leitura do pacote do IndexedDB: um contador de tempo ficaria parado (a leitura bloqueia a página); em seu lugar, um aviso fixo de espera, verificado com o pacote real em Chromium e Firefox ([evidência](evidence/07-web/2026-10-06-real-package.md#revisão-de-06102026-noite-aviso-na-leitura-do-cache));
    - operador, no domínio público: primeiro acesso e reabertura pelo portal.
 6. Servidor ([ADR 019](decisions/019-duplicate-login-and-whisper.md)):
    - sussurro (nome de quem envia, espaço contra o corte do `&String[1]`, `/r`): [PR #374](https://github.com/Jean1dev/w2pp-OpenWYD/pull/374), `patches/server/0008`;
@@ -1058,3 +1058,19 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - merge do #29 deste repositório (`62a3443b`), com o #30 redirecionado para `main`;
   - no Railway, `login,enter,bank`, `login,enter,shop` e `login,enter,paidteleport` aprovados, com o painel nas três recusas e sem painel no teleporte pago com ouro;
   - o aviso de depósito do servidor fica coberto só pelo teste Go, porque o cliente recusa antes de enviar.
+
+### 06/10/2026 — etapa 7: aviso na leitura do cache
+
+- **Pedido do usuário:** concluir os merges e seguir o plano (A3, etapa 7).
+- **Arquivos:**
+  - `web/client.js` (aviso fixo na etapa de cache);
+  - `tools/verify_loading_ui.mjs` (o runtime falso fica 2,3 s na leitura e checa o aviso);
+  - `tools/verify_asset_cache.mjs` (regra do aviso no pacote real);
+  - [evidência](evidence/07-web/2026-10-06-real-package.md#revisão-de-06102026-noite-aviso-na-leitura-do-cache) com JSON, e este progresso.
+- **Comandos e resultados:**
+  - `npm run loading:ui`: ok em Chromium e Firefox;
+  - `python tools/build_local_scene.py --page-only` e `node tools/verify_asset_cache.mjs --real`: exit 0 nos dois navegadores;
+  - leitura do cache: 6,2–7,4 s no Chromium e 15,6–17,7 s no Firefox.
+- **Achado (confirmado em execução):** a leitura do cache bloqueia a thread principal, então um contador de tempo não atualiza. Por isso o aviso é fixo.
+- **Não executado:** Safari; domínio público; `settings:ui`, `scene` e `client:stream`, porque o runtime não mudou.
+- **Próximo passo:** decisão do operador sobre a música padrão; A4 (etapa 6, medição com GPU numa janela) e A5 (CI e deploy automático).

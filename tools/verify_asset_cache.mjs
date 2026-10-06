@@ -104,6 +104,10 @@ function checkLoader(trace, { cached, dataSize }) {
     assert.ok(!stages.includes('Baixando dados do jogo…'), 'warm visit showed the download stage');
     const open = trace.find(r => r.stage === 'Abrindo os dados guardados no navegador…');
     summary.cacheReadMs = firstFrameAt !== null ? firstFrameAt - open.t : null;
+    // The cache read reports no progress and blocks the page (a counter would
+    // freeze), so the stage keeps a fixed notice until the first frame.
+    summary.cacheDetail = open.detail;
+    assert.ok(open.detail.length > 0, 'warm visit showed no notice during the cache read');
   } else {
     assert.ok(stages.includes('Baixando dados do jogo…'), `cold stages: ${stages}`);
     assert.equal(summary.maxValue, 100);
