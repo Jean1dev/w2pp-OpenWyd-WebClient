@@ -1,0 +1,18 @@
+Etapa 5: the status window showed a critical of 128 or more as negative.
+The server sends Critical as 0..255 (handler/item.go refreshScore clamps
+it to 255; protocol/score.go writes it as a u8) and every combat use in
+the runtime reads it as (unsigned char), but the decompiled status
+window read the signed char: 190 (76.0%) printed as "-26.-4%".
+
+diff --git a/Projects/TMProject/TMFieldScene.cpp b/Projects/TMProject/TMFieldScene.cpp
+--- a/Projects/TMProject/TMFieldScene.cpp
++++ b/Projects/TMProject/TMFieldScene.cpp
+@@ -13962,7 +13962,7 @@
+ 		sprintf(szStr, "%d%%", nAttSpeedValue);
+ 		if (m_pAttackSpeed)
+ 			m_pAttackSpeed->SetText(szStr, 0);
+-		int nCriticalValue = pMobData->Critical;
++		int nCriticalValue = (unsigned char)pMobData->Critical;
+ 		nCriticalValue *= 4;
+ 
+ 		sprintf(szStr, "%d.%d%%", nCriticalValue / 10, nCriticalValue % 10);

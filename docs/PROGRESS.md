@@ -43,7 +43,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - Itens no chão ficam fora de escopo (decisão do usuário, 06/10).
 7. Relato de jogador (08/10, [evidência](evidence/05-gameplay/2026-10-08-trash-delete.md)):
    - a lixeira não chegava ao servidor e o item "voltava". Com o #32 (`4983f4cd`) e o servidor [PR #377](https://github.com/Jean1dev/w2pp-OpenWYD/pull/377) (`0b9a6774`) implantados, a fase `trash` foi aprovada no Railway: descarte, compra, relogin, e equipar e desequipar logo depois ([evidência](evidence/05-gameplay/2026-10-08-trash-delete.md#execução-online-08102026-aprovada));
-   - stats negativos e arco: hipóteses. Pedir ao jogador a plataforma, o personagem e prints.
+   - print do jogador (web): o crítico negativo é bug de exibição do runtime, corrigido no patch 0030. FOR/INT −88 estão gravados no banco do personagem, sem ganho de equipamento que explique; falta a decisão do operador (origem do dado, correção da ficha). Arco: falta uma print com a arma.
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
 
@@ -1113,3 +1113,14 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - `item deleted` no log do servidor.
 - **Não executado:** base com o cliente antigo; segunda sessão observando; cliente Windows; sintomas 2 e 3.
 - **Próximo passo:** dados do jogador (plataforma, personagem, prints) para os stats negativos e o arco.
+
+### 08/10/2026 — etapa 5: print do jogador (crítico e FOR/INT)
+
+- **Pedido do usuário:** analisar a print do jogador, corrigir o crítico e ler a ficha do personagem no banco (somente leitura).
+- **Arquivos:** `patches/openwyd/0030-status-critical-unsigned.patch`, a [evidência](evidence/05-gameplay/2026-10-08-trash-delete.md#print-do-jogador-08102026) e este progresso.
+- **Achados:**
+  - o crítico de 190 aparecia como `-26.-4%` (confirmado em fonte);
+  - FOR/INT −88 estão gravados no banco, e o equipamento soma 0 (confirmado no banco);
+  - a origem desses valores não está no código atual (busca no tm-server, na API e nas migrações).
+- **Não executado:** rebuild local e verificação visual do crítico (o personagem de teste tem crítico menor que 128); a correção da ficha no banco, que depende de decisão do operador.
+- **Próximo passo:** o operador decide a origem e a correção de FOR/INT; pedir ao jogador uma print com o arco.
