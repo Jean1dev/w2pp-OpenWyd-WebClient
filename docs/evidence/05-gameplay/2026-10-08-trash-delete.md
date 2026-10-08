@@ -17,7 +17,7 @@ Ele não informou a plataforma, o personagem, a classe nem prints.
 |---|---|---|
 | 1 Item descartado volta | **confirmado em fonte**, só no web | O runtime tira o item da grade ao confirmar a lixeira (upstream `SGrid.cpp:1949-1957`, `TMFieldScene.cpp:16946-16973`, caixa 740) e envia `0x02E4`. O dialeto descartava o opcode (`default` → `outDropUnknown`). O servidor ficava com o item e o reenviava na compra seguinte. |
 | 4 Não equipa/desequipa | **hipótese** (consequência do 1) | Com a grade dessincronizada, arrastar o equipamento para um slot "vazio" vira, no servidor, uma troca com o item fantasma. `tradingItem` recusa com `NoticeReqNotMet`. Sem descarte, equipar e desequipar foi aprovado em 30/09 ([inventário](2026-09-30-inventory.md)). |
-| 2 Stats negativos | **hipótese**, sem dado | Falta saber qual campo. Candidatos: score com equipamento trocado por fantasmas; `UpdateEtc` repassado. |
+| 2 Stats negativos | ver [print do jogador](#print-do-jogador-08102026) | Crítico negativo: **confirmado em fonte**, bug de exibição do runtime (patch 0030). FOR/INT −88: **confirmado no banco**, valor gravado no personagem; origem não encontrada no código. |
 | 3 Arco | **hipótese**, sem dado | É visual. Envolve `shiftWeaponToRightHand` (servidor, slot 7 → 6) e a animação por tipo de arma no runtime. Pode ocorrer também no Windows. |
 
 ## Mudanças
@@ -66,3 +66,16 @@ node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-versio
 | Saúde | nenhum descarte de entrada ou de saída, nenhum erro de página |
 
 Com isso, os sintomas 1 e 4 estão **confirmados em execução** como resolvidos neste cenário. Uma execução de base com o cliente antigo não foi feita. O "não equipa" continua sendo a hipótese mais provável para o que o jogador viu, mas falta o personagem dele para conferir no log.
+
+## Print do jogador (08/10/2026)
+
+A print é da **versão web**: página "WYD / Canal server" e painel de configurações. Mostra uma Caçadora mortal de nível 399/400. Anomalias:
+
+| Campo | Na tela | Causa |
+|---|---|---|
+| Crítico | `-26.-4%` | **Confirmado em fonte.** O servidor envia `Critical` como u8 de 0 a 255 (`refreshScore` limita a 255; `protocol/score.go` @48). Todos os usos de combate do runtime fazem `(unsigned char)`, mas a janela de status (`TMFieldScene.cpp:13965`) lia o `char` com sinal. `-26.-4` só sai de x = −66, ou seja, o servidor mandou **190 (76,0%)**. Patch `0030-status-critical-unsigned`. O combate não é afetado, porque o servidor calcula o crítico. |
+| FOR / INT | −88 / −88 | **Confirmado no banco** (leitura em transação `READ ONLY`, DSN do `db-server` só no ambiente do processo): o personagem tem `str = int = -88` gravados. Nenhum item equipado dá FOR/INT, nem na instância nem no catálogo (`ItemList.csv`), então o login deriva base = −88 e mostra −88. No código atual do tm-server, da API e do banco não há escrita que diminua esses campos (só `applyScoreBonus +=` e `deriveBaseScore`). A origem do valor é **desconhecida**: edição ou importação do personagem, ou um bug antigo já corrigido. |
+| Especialização | 196/200, 266/200, 266/200, 266/255 | Acima do limite exibido. É coerente com um personagem editado. Não investigado. |
+| Arco | não aparece na print | Sem dado. |
+
+O banco não guarda o crítico salvo (`critical = 0`), porque o servidor o recalcula do equipamento a cada `refreshScore`. Isso bate com a exibição vir só do `0x0336`.
