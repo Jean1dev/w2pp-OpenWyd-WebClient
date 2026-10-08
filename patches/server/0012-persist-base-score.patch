@@ -1,0 +1,826 @@
+From 84840488d5b79f62bca9fc34bc6314a5d3d582d7 Mon Sep 17 00:00:00 2001
+From: Jeanluca <jeanlucafp@gmail.com>
+Date: Thu, 8 Oct 2026 10:41:49 -0300
+Subject: [PATCH] fix(persistence): save the equipment-free base score instead
+ of rebuilding it
+
+A player's character showed STR/INT -88. The database held str=int=-88
+with no attribute bonus on any equipped item: exactly 100 below the 12
+the character was created with, on all four attributes (dex/con too).
+
+The character table stores the CurrentScore (base + equipment) and the
+login rebuilt the base as stored - equipment bonus, computed with the
+rules of that moment (deriveBaseScore). Any change to those rules between
+a save and a login moves the base for good. The refine scaling of
+2026-08-17 (51574996) turned a +9 Pedra Amunra from +100 into +200 per
+attribute: a character saved with it at +100 came back with a base 100
+lower on every attribute, and kept it after the stone came off. Item
+catalog edits, conditional bonuses and expiring gear do the same.
+
+Migration 0027 adds base_str/int/dex/con and base_max_hp/mp. The world
+always saves the base it simulates; the login takes it as saved and the
+existing refreshScore rebuilds the CurrentScore with today's rules, so a
+rule change can move the CurrentScore but never the base. A row saved
+before 0027 (NULL base) still derives once and the next save stores it.
+A save that does not carry the base (a tmServer older than this change,
+e.g. after a rollback) clears it, so a stale base is never trusted; both
+deploy orders are safe. A negative derived base is logged.
+
+Data is not repaired here: the test server is in alpha and players know.
+
+Tests:
+- TestBaseScoreSurvivesItemRuleChange: the reported case (saved at +100,
+  loaded at +200), a second rule change and the stone coming off; it
+  shows 112 instead of 212 without the fix;
+- TestBaseScoreLegacyRowDerivesOnceThenPersists;
+- proto mapping in dbclient and dbserver;
+- TestBaseScoreColumns (integration, Postgres 16): round trip, NULL for a
+  pre-0027 row, and the clear-on-save-without-base rule.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ api/db/v1/db.pb.go                            |  74 ++++++++-
+ api/db/v1/db.proto                            |  11 ++
+ dbserver/internal/grpcsrv/base_score_test.go  |  23 +++
+ dbserver/internal/grpcsrv/mapping.go          |  14 ++
+ internal/domain/domain.go                     |  46 +++---
+ .../0027_character_base_score.down.sql        |   7 +
+ .../0027_character_base_score.up.sql          |  16 ++
+ internal/store/base_score_integration_test.go |  60 ++++++++
+ internal/store/store_live.go                  |  30 +++-
+ tmserver/internal/dbclient/base_score_test.go |  27 ++++
+ tmserver/internal/dbclient/client.go          |  15 ++
+ tmserver/internal/handler/base_score_test.go  | 144 ++++++++++++++++++
+ tmserver/internal/handler/character.go        |  12 +-
+ tmserver/internal/handler/item.go             |  17 +++
+ tmserver/internal/world/persistence.go        |  21 +++
+ tmserver/internal/world/world.go              |   4 +
+ 16 files changed, 492 insertions(+), 29 deletions(-)
+ create mode 100644 dbserver/internal/grpcsrv/base_score_test.go
+ create mode 100644 internal/migrations/0027_character_base_score.down.sql
+ create mode 100644 internal/migrations/0027_character_base_score.up.sql
+ create mode 100644 internal/store/base_score_integration_test.go
+ create mode 100644 tmserver/internal/dbclient/base_score_test.go
+ create mode 100644 tmserver/internal/handler/base_score_test.go
+
+diff --git a/api/db/v1/db.pb.go b/api/db/v1/db.pb.go
+index 9a6256ed..dd197a9e 100644
+--- a/api/db/v1/db.pb.go
++++ b/api/db/v1/db.pb.go
+@@ -682,8 +682,18 @@ type Character struct {
+ 	KefraTicket        int32  `protobuf:"varint,49,opt,name=kefra_ticket,json=kefraTicket,proto3" json:"kefra_ticket,omitempty"`                        // Remaining Hall of Kefra entries (MobExtra.KefraTicket).
+ 	NightmareEntries   int32  `protobuf:"varint,50,opt,name=nightmare_entries,json=nightmareEntries,proto3" json:"nightmare_entries,omitempty"`         // Remaining Arcane Nightmare entries.
+ 	LastNightmareUse   int64  `protobuf:"varint,51,opt,name=last_nightmare_use,json=lastNightmareUse,proto3" json:"last_nightmare_use,omitempty"`       // Unix time of the last deed use.
+-	unknownFields      protoimpl.UnknownFields
+-	sizeCache          protoimpl.SizeCache
++	// Equipment-free BaseScore (migration 0027). str..con and max_hp/max_mp above
++	// are the CurrentScore. has_base_score is false for a row saved before the
++	// base was persisted: the tmServer then derives it once, by subtraction.
++	HasBaseScore  bool  `protobuf:"varint,52,opt,name=has_base_score,json=hasBaseScore,proto3" json:"has_base_score,omitempty"`
++	BaseStr       int32 `protobuf:"varint,53,opt,name=base_str,json=baseStr,proto3" json:"base_str,omitempty"`
++	BaseInt       int32 `protobuf:"varint,54,opt,name=base_int,json=baseInt,proto3" json:"base_int,omitempty"`
++	BaseDex       int32 `protobuf:"varint,55,opt,name=base_dex,json=baseDex,proto3" json:"base_dex,omitempty"`
++	BaseCon       int32 `protobuf:"varint,56,opt,name=base_con,json=baseCon,proto3" json:"base_con,omitempty"`
++	BaseMaxHp     int32 `protobuf:"varint,57,opt,name=base_max_hp,json=baseMaxHp,proto3" json:"base_max_hp,omitempty"`
++	BaseMaxMp     int32 `protobuf:"varint,58,opt,name=base_max_mp,json=baseMaxMp,proto3" json:"base_max_mp,omitempty"`
++	unknownFields protoimpl.UnknownFields
++	sizeCache     protoimpl.SizeCache
+ }
+ 
+ func (x *Character) Reset() {
+@@ -1073,6 +1083,55 @@ func (x *Character) GetLastNightmareUse() int64 {
+ 	return 0
+ }
+ 
++func (x *Character) GetHasBaseScore() bool {
++	if x != nil {
++		return x.HasBaseScore
++	}
++	return false
++}
++
++func (x *Character) GetBaseStr() int32 {
++	if x != nil {
++		return x.BaseStr
++	}
++	return 0
++}
++
++func (x *Character) GetBaseInt() int32 {
++	if x != nil {
++		return x.BaseInt
++	}
++	return 0
++}
++
++func (x *Character) GetBaseDex() int32 {
++	if x != nil {
++		return x.BaseDex
++	}
++	return 0
++}
++
++func (x *Character) GetBaseCon() int32 {
++	if x != nil {
++		return x.BaseCon
++	}
++	return 0
++}
++
++func (x *Character) GetBaseMaxHp() int32 {
++	if x != nil {
++		return x.BaseMaxHp
++	}
++	return 0
++}
++
++func (x *Character) GetBaseMaxMp() int32 {
++	if x != nil {
++		return x.BaseMaxMp
++	}
++	return 0
++}
++
+ type Item struct {
+ 	state protoimpl.MessageState `protogen:"open.v1"`
+ 	Slot  int32                  `protobuf:"varint,1,opt,name=slot,proto3" json:"slot,omitempty"`
+@@ -6223,7 +6282,7 @@ const file_api_db_v1_db_proto_rawDesc = "" +
+ 	"\x14LoadCharacterRequest\x12\x1d\n" +
+ 	"\n" +
+ 	"account_id\x18\x01 \x01(\x03R\taccountId\x12\x12\n" +
+-	"\x04slot\x18\x02 \x01(\x05R\x04slot\"\xe2\v\n" +
++	"\x04slot\x18\x02 \x01(\x05R\x04slot\"\xb4\r\n" +
+ 	"\tCharacter\x12\x12\n" +
+ 	"\x04slot\x18\x01 \x01(\x05R\x04slot\x12\x12\n" +
+ 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+@@ -6281,7 +6340,14 @@ const file_api_db_v1_db_proto_rawDesc = "" +
+ 	"\x12arch_crystal_stage\x180 \x01(\x05R\x10archCrystalStage\x12!\n" +
+ 	"\fkefra_ticket\x181 \x01(\x05R\vkefraTicket\x12+\n" +
+ 	"\x11nightmare_entries\x182 \x01(\x05R\x10nightmareEntries\x12,\n" +
+-	"\x12last_nightmare_use\x183 \x01(\x03R\x10lastNightmareUse\"\xcd\x01\n" +
++	"\x12last_nightmare_use\x183 \x01(\x03R\x10lastNightmareUse\x12$\n" +
++	"\x0ehas_base_score\x184 \x01(\bR\fhasBaseScore\x12\x19\n" +
++	"\bbase_str\x185 \x01(\x05R\abaseStr\x12\x19\n" +
++	"\bbase_int\x186 \x01(\x05R\abaseInt\x12\x19\n" +
++	"\bbase_dex\x187 \x01(\x05R\abaseDex\x12\x19\n" +
++	"\bbase_con\x188 \x01(\x05R\abaseCon\x12\x1e\n" +
++	"\vbase_max_hp\x189 \x01(\x05R\tbaseMaxHp\x12\x1e\n" +
++	"\vbase_max_mp\x18: \x01(\x05R\tbaseMaxMp\"\xcd\x01\n" +
+ 	"\x04Item\x12\x12\n" +
+ 	"\x04slot\x18\x01 \x01(\x05R\x04slot\x12\x14\n" +
+ 	"\x05index\x18\x02 \x01(\x05R\x05index\x12\x12\n" +
+diff --git a/api/db/v1/db.proto b/api/db/v1/db.proto
+index 8555b026..4bb5ee46 100644
+--- a/api/db/v1/db.proto
++++ b/api/db/v1/db.proto
+@@ -199,6 +199,17 @@ message Character {
+   int32 kefra_ticket = 49; // Remaining Hall of Kefra entries (MobExtra.KefraTicket).
+   int32 nightmare_entries = 50; // Remaining Arcane Nightmare entries.
+   int64 last_nightmare_use = 51; // Unix time of the last deed use.
++
++  // Equipment-free BaseScore (migration 0027). str..con and max_hp/max_mp above
++  // are the CurrentScore. has_base_score is false for a row saved before the
++  // base was persisted: the tmServer then derives it once, by subtraction.
++  bool has_base_score = 52;
++  int32 base_str = 53;
++  int32 base_int = 54;
++  int32 base_dex = 55;
++  int32 base_con = 56;
++  int32 base_max_hp = 57;
++  int32 base_max_mp = 58;
+ }
+ 
+ message Item {
+diff --git a/dbserver/internal/grpcsrv/base_score_test.go b/dbserver/internal/grpcsrv/base_score_test.go
+new file mode 100644
+index 00000000..7e0f0c7f
+--- /dev/null
++++ b/dbserver/internal/grpcsrv/base_score_test.go
+@@ -0,0 +1,23 @@
++package grpcsrv
++
++import (
++	"testing"
++
++	"github.com/jeanluca/w2pp-openwyd/internal/domain"
++)
++
++// The base columns of migration 0027 survive the domain <-> proto mapping, and
++// HasBase travels with them (false keeps a pre-0027 row on the derive path).
++func TestCharacterBaseScoreMapping(t *testing.T) {
++	ch := domain.Character{Str: 212, HasBase: true, BaseStr: 12, BaseInt: 13, BaseDex: 2512, BaseCon: 860,
++		BaseMaxHp: 2000, BaseMaxMp: 500}
++	got := protoToCharacter(characterToProto(ch))
++	if got.HasBase != ch.HasBase || got.BaseStr != ch.BaseStr || got.BaseInt != ch.BaseInt ||
++		got.BaseDex != ch.BaseDex || got.BaseCon != ch.BaseCon || got.BaseMaxHp != ch.BaseMaxHp ||
++		got.BaseMaxMp != ch.BaseMaxMp || got.Str != ch.Str {
++		t.Fatalf("round trip %+v, want %+v", got, ch)
++	}
++	if protoToCharacter(characterToProto(domain.Character{Str: 112})).HasBase {
++		t.Fatal("HasBase false must stay false")
++	}
++}
+diff --git a/dbserver/internal/grpcsrv/mapping.go b/dbserver/internal/grpcsrv/mapping.go
+index 5a2c67ef..37049b37 100644
+--- a/dbserver/internal/grpcsrv/mapping.go
++++ b/dbserver/internal/grpcsrv/mapping.go
+@@ -76,6 +76,13 @@ func characterToProto(ch domain.Character) *dbv1.Character {
+ 		Guilty:             int32(ch.Guilty),
+ 		CurKill:            int32(ch.CurKill),
+ 		TotKill:            uint32(ch.TotKill),
++		HasBaseScore:       ch.HasBase,
++		BaseStr:            int32(ch.BaseStr),
++		BaseInt:            int32(ch.BaseInt),
++		BaseDex:            int32(ch.BaseDex),
++		BaseCon:            int32(ch.BaseCon),
++		BaseMaxHp:          ch.BaseMaxHp,
++		BaseMaxMp:          ch.BaseMaxMp,
+ 	}
+ }
+ 
+@@ -153,6 +160,13 @@ func protoToCharacter(c *dbv1.Character) domain.Character {
+ 		Guilty:             uint8(c.GetGuilty()),
+ 		CurKill:            uint8(c.GetCurKill()),
+ 		TotKill:            uint16(c.GetTotKill()),
++		HasBase:            c.GetHasBaseScore(),
++		BaseStr:            int16(c.GetBaseStr()),
++		BaseInt:            int16(c.GetBaseInt()),
++		BaseDex:            int16(c.GetBaseDex()),
++		BaseCon:            int16(c.GetBaseCon()),
++		BaseMaxHp:          c.GetBaseMaxHp(),
++		BaseMaxMp:          c.GetBaseMaxMp(),
+ 	}
+ }
+ 
+diff --git a/internal/domain/domain.go b/internal/domain/domain.go
+index 6730bae7..f5b81a14 100644
+--- a/internal/domain/domain.go
++++ b/internal/domain/domain.go
+@@ -34,23 +34,35 @@ type Account struct {
+ 
+ // Character is one of an account's up to four characters.
+ type Character struct {
+-	Slot               int
+-	Name               string
+-	Class              uint8
+-	Clan               uint8
+-	GuildID            uint16
+-	GuildLevel         uint8
+-	Level              int32
+-	Exp                int64
+-	Coin               int32
+-	Str                int16
+-	Int                int16
+-	Dex                int16
+-	Con                int16
+-	ScoreBonus         uint16
+-	SpecialBonus       uint16
+-	SkillBonus         uint16
+-	Special            [4]int16 // BaseScore.Special[4]: allocated mastery points
++	Slot         int
++	Name         string
++	Class        uint8
++	Clan         uint8
++	GuildID      uint16
++	GuildLevel   uint8
++	Level        int32
++	Exp          int64
++	Coin         int32
++	Str          int16
++	Int          int16
++	Dex          int16
++	Con          int16
++	ScoreBonus   uint16
++	SpecialBonus uint16
++	SkillBonus   uint16
++	Special      [4]int16 // BaseScore.Special[4]: allocated mastery points
++	// Base is the equipment-free BaseScore (attributes and HP/MP maxima). Str..Con
++	// and MaxHp/MaxMp above are the CurrentScore; the base used to be rebuilt at
++	// login by subtracting the equipment bonus of that moment, which drifted for
++	// good whenever the bonus rules changed between a save and a login.
++	// HasBase is false for a row saved before migration 0027.
++	HasBase            bool
++	BaseStr            int16
++	BaseInt            int16
++	BaseDex            int16
++	BaseCon            int16
++	BaseMaxHp          int32
++	BaseMaxMp          int32
+ 	MaxHp              int32
+ 	MaxMp              int32
+ 	Hp                 int32
+diff --git a/internal/migrations/0027_character_base_score.down.sql b/internal/migrations/0027_character_base_score.down.sql
+new file mode 100644
+index 00000000..0bec248e
+--- /dev/null
++++ b/internal/migrations/0027_character_base_score.down.sql
+@@ -0,0 +1,7 @@
++ALTER TABLE character
++    DROP COLUMN base_str,
++    DROP COLUMN base_int,
++    DROP COLUMN base_dex,
++    DROP COLUMN base_con,
++    DROP COLUMN base_max_hp,
++    DROP COLUMN base_max_mp;
+diff --git a/internal/migrations/0027_character_base_score.up.sql b/internal/migrations/0027_character_base_score.up.sql
+new file mode 100644
+index 00000000..7c607141
+--- /dev/null
++++ b/internal/migrations/0027_character_base_score.up.sql
+@@ -0,0 +1,16 @@
++-- Persist the equipment-free BaseScore attributes and HP/MP maxima. The columns
++-- str/int/dex/con/max_hp/max_mp hold the CurrentScore (base + equipment), and the
++-- tmServer used to rebuild the base at login by subtracting the equipment bonus
++-- computed with the rules of that moment. Any change to those rules between a
++-- save and the next login (a refine formula, an item catalog row, a timed item)
++-- shifted the base for good: a +9 Pedra Amunra saved at +100 and loaded at +200
++-- (refine scaling, 2026-08-17) left a character 100 short on every attribute.
++-- NULL means "not saved yet": the login derives the base once, as before, and
++-- the next save fills these columns.
++ALTER TABLE character
++    ADD COLUMN base_str    SMALLINT,
++    ADD COLUMN base_int    SMALLINT,
++    ADD COLUMN base_dex    SMALLINT,
++    ADD COLUMN base_con    SMALLINT,
++    ADD COLUMN base_max_hp INTEGER,
++    ADD COLUMN base_max_mp INTEGER;
+diff --git a/internal/store/base_score_integration_test.go b/internal/store/base_score_integration_test.go
+new file mode 100644
+index 00000000..eb49a519
+--- /dev/null
++++ b/internal/store/base_score_integration_test.go
+@@ -0,0 +1,60 @@
++//go:build integration
++
++package store
++
++import (
++	"testing"
++
++	"github.com/jeanluca/w2pp-openwyd/internal/domain"
++)
++
++// Migration 0027: the equipment-free base round-trips through SaveCharacter /
++// LoadCharacter; a row saved before it loads with HasBase false (the tmServer
++// derives once); and a save that does not carry the base (a tmServer older than
++// 0027, e.g. after a rollback) clears it, so a stale base is never trusted.
++func TestBaseScoreColumns(t *testing.T) {
++	s, ctx := freshStore(t)
++	accID, err := s.SaveAccount(ctx, domain.Account{Name: "basescore", PassHash: "$argon2id$hash",
++		Characters: []domain.Character{{Slot: 0, Name: "Archer", Class: 3, Level: 399,
++			Str: 112, Int: 112, Dex: 2612, Con: 960, Hp: 2000, MaxHp: 2000, Mp: 500, MaxMp: 500, ClassMaster: 2}}})
++	if err != nil {
++		t.Fatalf("SaveAccount: %v", err)
++	}
++	ch, err := s.LoadCharacter(ctx, accID, 0)
++	if err != nil {
++		t.Fatalf("LoadCharacter: %v", err)
++	}
++	if ch.HasBase {
++		t.Fatalf("a row without base columns loaded HasBase true: %+v", ch)
++	}
++
++	ch.HasBase = true
++	ch.BaseStr, ch.BaseInt, ch.BaseDex, ch.BaseCon, ch.BaseMaxHp, ch.BaseMaxMp = 12, 12, 2512, 860, 1800, 450
++	ch.Str = 212
++	if err := s.SaveCharacter(ctx, accID, ch); err != nil {
++		t.Fatalf("SaveCharacter: %v", err)
++	}
++	got, err := s.LoadCharacter(ctx, accID, 0)
++	if err != nil {
++		t.Fatalf("LoadCharacter: %v", err)
++	}
++	if !got.HasBase || got.BaseStr != 12 || got.BaseInt != 12 || got.BaseDex != 2512 || got.BaseCon != 860 ||
++		got.BaseMaxHp != 1800 || got.BaseMaxMp != 450 || got.Str != 212 {
++		t.Fatalf("base round trip: %+v", got)
++	}
++
++	// A save without the base (an older writer) invalidates the stored one: the
++	// CurrentScore it wrote may carry allocations the old base does not have.
++	got.HasBase = false
++	got.Str = 213
++	if err := s.SaveCharacter(ctx, accID, got); err != nil {
++		t.Fatalf("SaveCharacter without base: %v", err)
++	}
++	again, err := s.LoadCharacter(ctx, accID, 0)
++	if err != nil {
++		t.Fatalf("LoadCharacter: %v", err)
++	}
++	if again.HasBase || again.Str != 213 {
++		t.Fatalf("a save without the base kept a stale base: %+v", again)
++	}
++}
+diff --git a/internal/store/store_live.go b/internal/store/store_live.go
+index d34c03ea..af7df9b7 100644
+--- a/internal/store/store_live.go
++++ b/internal/store/store_live.go
+@@ -155,6 +155,8 @@ func (s *Store) LoadCharacter(ctx context.Context, accountID int64, slot int) (d
+ 	var ch domain.Character
+ 	var charID int64
+ 	var skillBar, shortSkill, special []int16
++	var baseStr, baseInt, baseDex, baseCon *int16
++	var baseMaxHp, baseMaxMp *int32
+ 	err := s.pool.QueryRow(ctx, `
+ 		SELECT id, slot, name, class, clan, guild_id, guild_level, level, exp, coin,
+ 		       str, int, dex, con, score_bonus, special_bonus, skill_bonus,
+@@ -162,7 +164,8 @@ func (s *Store) LoadCharacter(ctx context.Context, accountID int64, slot int) (d
+ 		       resist_fire, resist_ice, resist_thunder, resist_magic,
+ 		       learned_skill, sec_learned_skill, magic, save_x, save_y, last_city, citizen, class_master, soul, fame,
+ 		       celestial_lv40, celestial_lv90, celestial_circle, terra_mistica, arch_lv355, arch_lv370,
+-		       skill_bar, short_skill, special, pk_point, guilty, cur_kill, tot_kill, mortal_level, celestial_arch_level, arch_crystal_stage, kefra_ticket, nightmare_entries, last_nightmare_use
++		       skill_bar, short_skill, special, pk_point, guilty, cur_kill, tot_kill, mortal_level, celestial_arch_level, arch_crystal_stage, kefra_ticket, nightmare_entries, last_nightmare_use,
++		       base_str, base_int, base_dex, base_con, base_max_hp, base_max_mp
+ 		  FROM character WHERE account_id = $1 AND slot = $2`, accountID, slot).
+ 		Scan(&charID, &ch.Slot, &ch.Name, &ch.Class, &ch.Clan, &ch.GuildID, &ch.GuildLevel,
+ 			&ch.Level, &ch.Exp, &ch.Coin, &ch.Str, &ch.Int, &ch.Dex, &ch.Con,
+@@ -170,7 +173,8 @@ func (s *Store) LoadCharacter(ctx context.Context, accountID int64, slot int) (d
+ 			&ch.Critical, &ch.RegenHP, &ch.RegenMP, &ch.ResistFire, &ch.ResistIce, &ch.ResistThunder,
+ 			&ch.ResistMagic, &ch.LearnedSkill, &ch.SecLearnedSkill, &ch.Magic, &ch.SaveX, &ch.SaveY, &ch.LastCity, &ch.Citizen,
+ 			&ch.ClassMaster, &ch.Soul, &ch.Fame, &ch.CelLv40, &ch.CelLv90, &ch.CelCircle, &ch.TerraMistica, &ch.ArchLv355, &ch.ArchLv370, &skillBar, &shortSkill, &special,
+-			&ch.PKPoint, &ch.Guilty, &ch.CurKill, &ch.TotKill, &ch.MortalLevel, &ch.CelestialArchLevel, &ch.ArchCrystalStage, &ch.KefraTicket, &ch.NightmareEntries, &ch.LastNightmareUse)
++			&ch.PKPoint, &ch.Guilty, &ch.CurKill, &ch.TotKill, &ch.MortalLevel, &ch.CelestialArchLevel, &ch.ArchCrystalStage, &ch.KefraTicket, &ch.NightmareEntries, &ch.LastNightmareUse,
++			&baseStr, &baseInt, &baseDex, &baseCon, &baseMaxHp, &baseMaxMp)
+ 	if errors.Is(err, pgx.ErrNoRows) {
+ 		return domain.Character{}, ErrNotFound
+ 	}
+@@ -182,6 +186,13 @@ func (s *Store) LoadCharacter(ctx context.Context, accountID int64, slot int) (d
+ 	for i := 0; i < len(special) && i < len(ch.Special); i++ {
+ 		ch.Special[i] = special[i]
+ 	}
++	// All six base columns are written together; any NULL means a row saved
++	// before migration 0027, whose base the tmServer still has to derive once.
++	if baseStr != nil && baseInt != nil && baseDex != nil && baseCon != nil && baseMaxHp != nil && baseMaxMp != nil {
++		ch.HasBase = true
++		ch.BaseStr, ch.BaseInt, ch.BaseDex, ch.BaseCon = *baseStr, *baseInt, *baseDex, *baseCon
++		ch.BaseMaxHp, ch.BaseMaxMp = *baseMaxHp, *baseMaxMp
++	}
+ 
+ 	if ch.Equip, err = s.loadItems(ctx, charID, "char_equip"); err != nil {
+ 		return domain.Character{}, err
+@@ -352,7 +363,11 @@ func (s *Store) DeleteCharacter(ctx context.Context, accountID int64, slot int)
+ // simulates (score_bonus, special_bonus, learned_skill, sec_learned_skill, soul,
+ // fame, special, skill_bar, short_skill), and the tier state (class_master + the
+ // celestial quest gates celestial_lv40/90/circle + the terra_mistica gate), and
+-// the PK/karma state (pk_point, guilty, cur_kill, tot_kill — issue #210).
++// the PK/karma state (pk_point, guilty, cur_kill, tot_kill — issue #210),
++// and the equipment-free base (base_str..base_max_mp, migration 0027). A caller
++// that does not send the base (HasBase false, e.g. a tmServer older than 0027)
++// clears it, so the next login derives it from the CurrentScore just saved
++// instead of trusting a base that no longer matches it.
+ // Everything else (class,
+ // regen/resist, magic, citizen) is left UNTOUCHED so an in-game save never wipes
+ // imported data the world does not simulate.
+@@ -375,7 +390,13 @@ func (s *Store) SaveCharacter(ctx context.Context, accountID int64, ch domain.Ch
+ 			special=$24, skill_bar=$25, short_skill=$26, save_x=$27, save_y=$28,
+ 			class_master=$29, celestial_lv40=$30, celestial_lv90=$31, celestial_circle=$32, terra_mistica=$33,
+ 			arch_lv355=$34, arch_lv370=$35, pk_point=$36, guilty=$37, cur_kill=$38, tot_kill=$39,
+-			mortal_level=$40, celestial_arch_level=$41, arch_crystal_stage=$42, kefra_ticket=$43, nightmare_entries=$44, last_nightmare_use=$45
++			mortal_level=$40, celestial_arch_level=$41, arch_crystal_stage=$42, kefra_ticket=$43, nightmare_entries=$44, last_nightmare_use=$45,
++			base_str=CASE WHEN $46 THEN $47::smallint END,
++			base_int=CASE WHEN $46 THEN $48::smallint END,
++			base_dex=CASE WHEN $46 THEN $49::smallint END,
++			base_con=CASE WHEN $46 THEN $50::smallint END,
++			base_max_hp=CASE WHEN $46 THEN $51::integer END,
++			base_max_mp=CASE WHEN $46 THEN $52::integer END
+ 		WHERE account_id=$1 AND slot=$2
+ 		RETURNING id`,
+ 		accountID, ch.Slot, ch.Clan, ch.GuildID, ch.GuildLevel, ch.Level, ch.Coin,
+@@ -387,6 +408,7 @@ func (s *Store) SaveCharacter(ctx context.Context, accountID int64, ch domain.Ch
+ 		ch.SaveX, ch.SaveY,
+ 		ch.ClassMaster, ch.CelLv40, ch.CelLv90, ch.CelCircle, ch.TerraMistica, ch.ArchLv355, ch.ArchLv370,
+ 		ch.PKPoint, ch.Guilty, ch.CurKill, ch.TotKill, ch.MortalLevel, ch.CelestialArchLevel, ch.ArchCrystalStage, ch.KefraTicket, ch.NightmareEntries, ch.LastNightmareUse,
++		ch.HasBase, ch.BaseStr, ch.BaseInt, ch.BaseDex, ch.BaseCon, ch.BaseMaxHp, ch.BaseMaxMp,
+ 	).Scan(&charID)
+ 	if errors.Is(err, pgx.ErrNoRows) {
+ 		return ErrNotFound
+diff --git a/tmserver/internal/dbclient/base_score_test.go b/tmserver/internal/dbclient/base_score_test.go
+new file mode 100644
+index 00000000..3fe8610c
+--- /dev/null
++++ b/tmserver/internal/dbclient/base_score_test.go
+@@ -0,0 +1,27 @@
++package dbclient
++
++import (
++	"testing"
++
++	dbv1 "github.com/jeanluca/w2pp-openwyd/api/db/v1"
++	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/world"
++)
++
++// The equipment-free base (migration 0027) crosses the wire both ways; a save
++// always carries it, and a row without it loads with HasBase false.
++func TestBaseScoreMapping(t *testing.T) {
++	c := characterSaveToProto(world.CharacterSave{Str: 212, BaseStr: 12, BaseInt: 13, BaseDex: 2512, BaseCon: 860,
++		BaseMaxHP: 2000, BaseMaxMP: 500})
++	if !c.GetHasBaseScore() || c.GetBaseStr() != 12 || c.GetBaseInt() != 13 || c.GetBaseDex() != 2512 ||
++		c.GetBaseCon() != 860 || c.GetBaseMaxHp() != 2000 || c.GetBaseMaxMp() != 500 || c.GetStr() != 212 {
++		t.Fatalf("save mapping %+v", c)
++	}
++	st := characterStateFromProto(c)
++	if !st.HasBase || st.BaseStr != 12 || st.BaseInt != 13 || st.BaseDex != 2512 || st.BaseCon != 860 ||
++		st.BaseMaxHP != 2000 || st.BaseMaxMP != 500 || st.Str != 212 {
++		t.Fatalf("load mapping %+v", st)
++	}
++	if old := characterStateFromProto(&dbv1.Character{Str: 112}); old.HasBase {
++		t.Fatal("a row without the base must load with HasBase false")
++	}
++}
+diff --git a/tmserver/internal/dbclient/client.go b/tmserver/internal/dbclient/client.go
+index 5c70d29c..bcb5d341 100644
+--- a/tmserver/internal/dbclient/client.go
++++ b/tmserver/internal/dbclient/client.go
+@@ -678,6 +678,14 @@ func characterStateFromProto(c *dbv1.Character) world.CharacterState {
+ 		LearnedSkill:    c.GetLearnedSkill(),
+ 		SecLearnedSkill: c.GetSecLearnedSkill(),
+ 		Magic:           int16(c.GetMagic()),
++
++		HasBase:   c.GetHasBaseScore(),
++		BaseStr:   int16(c.GetBaseStr()),
++		BaseInt:   int16(c.GetBaseInt()),
++		BaseDex:   int16(c.GetBaseDex()),
++		BaseCon:   int16(c.GetBaseCon()),
++		BaseMaxHP: c.GetBaseMaxHp(),
++		BaseMaxMP: c.GetBaseMaxMp(),
+ 	}
+ 	for i, v := range c.GetSpecial() {
+ 		if i >= len(st.BaseSpecial) {
+@@ -790,6 +798,13 @@ func characterSaveToProto(s world.CharacterSave) *dbv1.Character {
+ 		Guilty:             int32(s.Guilty),
+ 		CurKill:            int32(s.CurKill),
+ 		TotKill:            uint32(s.TotKill),
++		HasBaseScore:       true, // the world always knows the base it simulates
++		BaseStr:            int32(s.BaseStr),
++		BaseInt:            int32(s.BaseInt),
++		BaseDex:            int32(s.BaseDex),
++		BaseCon:            int32(s.BaseCon),
++		BaseMaxHp:          s.BaseMaxHP,
++		BaseMaxMp:          s.BaseMaxMP,
+ 		Special:            make([]int32, len(s.BaseSpecial)),
+ 		SkillBar:           make([]uint32, len(s.SkillBar)),
+ 		ShortSkill:         make([]uint32, len(s.ShortSkill)),
+diff --git a/tmserver/internal/handler/base_score_test.go b/tmserver/internal/handler/base_score_test.go
+new file mode 100644
+index 00000000..952b1eae
+--- /dev/null
++++ b/tmserver/internal/handler/base_score_test.go
+@@ -0,0 +1,144 @@
++package handler
++
++import (
++	"context"
++	"encoding/binary"
++	"io"
++	"log/slog"
++	"net"
++	"testing"
++
++	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/content"
++	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/protocol"
++	"github.com/jeanluca/w2pp-openwyd/tmserver/internal/world"
++)
++
++const itemPedraAmunra = 3464
++
++// amunraRules is the item catalog at one moment: the Pedra Amunra granting
++// `bonus` to each attribute. The refine scaling of 2026-08-17 doubled the +9
++// stone from 100 to 200; any later catalog or formula change does the same.
++func amunraRules(bonus int16) map[int][]content.BaseEffect {
++	return map[int][]content.BaseEffect{itemPedraAmunra: {
++		{Eff: efStr, Val: bonus}, {Eff: efInt, Val: bonus}, {Eff: efDex, Val: bonus}, {Eff: efCon, Val: bonus},
++	}}
++}
++
++// loginWithRules logs the character in under the given catalog, returns the
++// Str/Int/Dex/Con the client is shown and what the logout saved.
++func loginWithRules(t *testing.T, rules map[int][]content.BaseEffect, st world.CharacterState) ([4]int16, world.CharacterSave) {
++	t.Helper()
++	db := newDB()
++	db.loadResult = st
++	ln, err := net.Listen("tcp", "127.0.0.1:0")
++	if err != nil {
++		t.Fatal(err)
++	}
++	log := slog.New(slog.NewTextHandler(io.Discard, nil))
++	d := New(Config{Log: log, ItemEffects: rules, ItemPos: map[int]int{itemPedraAmunra: accessoryPosMask}})
++	w := world.New(world.Config{GridDim: 16}, log, db, d.Handle)
++	ctx, cancel := context.WithCancel(context.Background())
++	done := make(chan struct{})
++	go func() { _ = w.Serve(ctx, ln); close(done) }()
++	defer func() { cancel(); <-done }()
++	c := loginAndSelect(t, ln.Addr().String())
++	defer c.Close()
++
++	send(t, c, protocol.MsgCharacterLogin, (&protocol.MsgCharacterLoginBody{}).Encode())
++	var shown [4]int16
++	for got := false; !got; {
++		ty, p := readAny(t, c)
++		if ty == protocol.MsgUpdateScore {
++			for i := range shown {
++				shown[i] = int16(binary.LittleEndian.Uint16(p[32+2*i:])) // STRUCT_SCORE Str..Con
++			}
++			got = true
++		}
++	}
++	send(t, c, protocol.MsgCharacterLogout, nil)
++	for {
++		if ty, _ := readAny(t, c); ty == protocol.MsgCNFCharacterLogout {
++			break
++		}
++	}
++	save, n := db.lastSavedChar()
++	if n == 0 {
++		t.Fatal("logout saved nothing")
++	}
++	return shown, save
++}
++
++// stateFromSave is what the next login reads back from the database.
++func stateFromSave(s world.CharacterSave, equip [world.MaxEquip]world.Item) world.CharacterState {
++	return world.CharacterState{Slot: s.Slot, Name: "Hero", Class: 3, Level: int(s.Level), X: 2100, Y: 2100,
++		HP: s.HP, MaxHP: s.MaxHP, MP: s.MP, MaxMP: s.MaxMP, ClassMaster: classMasterMortal,
++		Str: s.Str, Int: s.Int, Dex: s.Dex, Con: s.Con,
++		HasBase: true, BaseStr: s.BaseStr, BaseInt: s.BaseInt, BaseDex: s.BaseDex, BaseCon: s.BaseCon,
++		BaseMaxHP: s.BaseMaxHP, BaseMaxMP: s.BaseMaxMP, Equip: equip}
++}
++
++func amunraEquip() [world.MaxEquip]world.Item {
++	var eq [world.MaxEquip]world.Item
++	eq[9] = world.Item{Index: itemPedraAmunra}
++	return eq
++}
++
++// The player report of 2026-10-08: a Huntress built 12/12/2512/860 wore a
++// Pedra Amunra saved at +100 and logged in after the stone became +200. The
++// base used to be rebuilt as stored - today's bonus (112 - 200 = -88) and kept
++// for good. With the base saved, the rule change moves only the bonus.
++func TestBaseScoreSurvivesItemRuleChange(t *testing.T) {
++	base := [4]int16{12, 12, 2512, 860}
++	st := world.CharacterState{Slot: 0, Name: "Hero", Class: 3, Level: 399, X: 2100, Y: 2100,
++		HP: 2000, MaxHP: 2000, MP: 500, MaxMP: 500, ClassMaster: classMasterMortal,
++		// CurrentScore saved under the old rule (+100), base saved alongside.
++		Str: base[0] + 100, Int: base[1] + 100, Dex: base[2] + 100, Con: base[3] + 100,
++		HasBase: true, BaseStr: base[0], BaseInt: base[1], BaseDex: base[2], BaseCon: base[3],
++		BaseMaxHP: 2000, BaseMaxMP: 500, Equip: amunraEquip()}
++
++	shown, save := loginWithRules(t, amunraRules(200), st)
++	for i, want := range base {
++		if shown[i] != want+200 {
++			t.Errorf("attribute %d shown %d, want base %d + 200", i, shown[i], want)
++		}
++	}
++	if got := [4]int16{save.BaseStr, save.BaseInt, save.BaseDex, save.BaseCon}; got != base {
++		t.Fatalf("saved base %v, want %v", got, base)
++	}
++
++	// The rule changes again (and the stone comes off): the base still holds.
++	shown, save = loginWithRules(t, amunraRules(300), stateFromSave(save, amunraEquip()))
++	for i, want := range base {
++		if shown[i] != want+300 {
++			t.Errorf("after a second change: attribute %d shown %d, want %d", i, shown[i], want+300)
++		}
++	}
++	shown, save = loginWithRules(t, amunraRules(300), stateFromSave(save, [world.MaxEquip]world.Item{}))
++	if shown != base {
++		t.Fatalf("without the stone: shown %v, want the base %v", shown, base)
++	}
++	if got := [4]int16{save.BaseStr, save.BaseInt, save.BaseDex, save.BaseCon}; got != base {
++		t.Fatalf("base drifted to %v", got)
++	}
++}
++
++// A row saved before the base was persisted (HasBase false) still derives it
++// once from the CurrentScore, and that login's save stores it, so from then on
++// the next rule change can no longer move it.
++func TestBaseScoreLegacyRowDerivesOnceThenPersists(t *testing.T) {
++	st := world.CharacterState{Slot: 0, Name: "Hero", Class: 3, Level: 399, X: 2100, Y: 2100,
++		HP: 2000, MaxHP: 2000, MP: 500, MaxMP: 500, ClassMaster: classMasterMortal,
++		Str: 112, Int: 112, Dex: 2612, Con: 960, Equip: amunraEquip()}
++
++	_, save := loginWithRules(t, amunraRules(100), st)
++	want := [4]int16{12, 12, 2512, 860}
++	if got := [4]int16{save.BaseStr, save.BaseInt, save.BaseDex, save.BaseCon}; got != want {
++		t.Fatalf("derived and saved base %v, want %v", got, want)
++	}
++	shown, _ := loginWithRules(t, amunraRules(200), stateFromSave(save, amunraEquip()))
++	for i := range want {
++		if shown[i] != want[i]+200 {
++			t.Errorf("attribute %d shown %d, want %d", i, shown[i], want[i]+200)
++		}
++	}
++}
+diff --git a/tmserver/internal/handler/character.go b/tmserver/internal/handler/character.go
+index 0eddcefd..b9d9f9c7 100644
+--- a/tmserver/internal/handler/character.go
++++ b/tmserver/internal/handler/character.go
+@@ -303,10 +303,14 @@ func (d *Dispatcher) completeCharacterLogin(w *world.World, s *world.Session, st
+ 		d.deriveSkillBonus(e)
+ 		e.Equip = st.Equip
+ 		e.Carry = st.Carry
+-		// Capture the equipment-free BaseScore from the loaded CurrentScore, so later
+-		// equip/unequip recomputes (refreshScore) reflect gear changes without double-
+-		// counting the gear already baked into the stored CurrentScore.
+-		d.deriveBaseScore(e)
++		// The equipment-free BaseScore is saved on its own (migration 0027). A
++		// character saved before that still carries only the CurrentScore, so its
++		// base is captured once from it, as before; the next save stores it.
++		if st.HasBase {
++			d.loadBaseScore(e, st)
++		} else {
++			d.deriveBaseScore(e)
++		}
+ 		// Re-apply a still-active Divine buff from the persisted deadline (the buff is
+ 		// read-time, so this doesn't affect the base just derived). Expired → dropped.
+ 		if st.DivineEnd > time.Now().Unix() {
+diff --git a/tmserver/internal/handler/item.go b/tmserver/internal/handler/item.go
+index 5e5ad75c..40f23009 100644
+--- a/tmserver/internal/handler/item.go
++++ b/tmserver/internal/handler/item.go
+@@ -2267,6 +2267,12 @@ func (d *Dispatcher) deriveBaseScore(e *world.Entity) {
+ 	e.BaseInt = e.Int - b.intel
+ 	e.BaseDex = e.Dex - b.dex
+ 	e.BaseCon = e.Con - b.con
++	if e.BaseStr < 0 || e.BaseInt < 0 || e.BaseDex < 0 || e.BaseCon < 0 {
++		// The stored CurrentScore does not match today's equipment bonus: the
++		// rules changed after it was saved. Logged so a drift is never silent.
++		d.log.Warn("derived base score is negative", "name", e.Name,
++			"str", e.BaseStr, "int", e.BaseInt, "dex", e.BaseDex, "con", e.BaseCon)
++	}
+ 	e.BaseAC = playerBaseAC(e)
+ 	e.BaseDamage = playerBaseDamage(e)
+ 	e.BaseMaxHP = e.MaxHP - b.maxHP
+@@ -2275,6 +2281,17 @@ func (d *Dispatcher) deriveBaseScore(e *world.Entity) {
+ 	// them entirely from current equipment instead of subtracting the login value.
+ }
+ 
++// loadBaseScore takes the BaseScore as saved (migration 0027) instead of deriving it;
++// the login's refreshScore then rebuilds the CurrentScore with today's equipment
++// rules, so a change to those rules can move the CurrentScore but never the base the
++// player built.
++func (d *Dispatcher) loadBaseScore(e *world.Entity, st world.CharacterState) {
++	e.BaseStr, e.BaseInt, e.BaseDex, e.BaseCon = st.BaseStr, st.BaseInt, st.BaseDex, st.BaseCon
++	e.BaseAC = playerBaseAC(e)
++	e.BaseDamage = playerBaseDamage(e)
++	e.BaseMaxHP, e.BaseMaxMP = st.BaseMaxHP, st.BaseMaxMP
++}
++
+ // refreshScore recomputes the live CurrentScore = BaseScore + FLAT equipment, after any
+ // equipment or attribute change, and caches the percent EF_HPADD/EF_MPADD bonuses. The
+ // multiplicative effects (HPADD%/MPADD% and the Divine/Vigor buffs) are NOT baked here —
+diff --git a/tmserver/internal/world/persistence.go b/tmserver/internal/world/persistence.go
+index 86cc977a..c04c9d99 100644
+--- a/tmserver/internal/world/persistence.go
++++ b/tmserver/internal/world/persistence.go
+@@ -154,6 +154,18 @@ type CharacterState struct {
+ 	ScoreBonus uint16
+ 	DivineEnd  int64 // Unix-seconds deadline of the Divine buff (0 = none)
+ 
++	// Equipment-free BaseScore as last saved (migration 0027). Str..Con and
++	// MaxHP/MaxMP are the CurrentScore. HasBase is false for a character saved
++	// before the base was persisted: the login then derives it by subtraction,
++	// once, and the next save stores it.
++	HasBase   bool
++	BaseStr   int16
++	BaseInt   int16
++	BaseDex   int16
++	BaseCon   int16
++	BaseMaxHP int32
++	BaseMaxMP int32
++
+ 	// Skill state (skills front). SkillBonus is not loaded from the DB — the
+ 	// login path re-derives it from Level and LearnedSkill, as the legacy
+ 	// BASE_GetBonusSkillPoint does on character load.
+@@ -218,6 +230,15 @@ type CharacterSave struct {
+ 	MaxMP      int32
+ 	DivineEnd  int64 // Unix-seconds deadline of the Divine buff (0 = none/expired)
+ 
++	// Equipment-free BaseScore (BaseStr..BaseCon, BaseMaxHP/MP), saved so the
++	// login never has to rebuild it from the CurrentScore (migration 0027).
++	BaseStr   int16
++	BaseInt   int16
++	BaseDex   int16
++	BaseCon   int16
++	BaseMaxHP int32
++	BaseMaxMP int32
++
+ 	ScoreBonus       uint16
+ 	SpecialBonus     uint16
+ 	LearnedSkill     int32
+diff --git a/tmserver/internal/world/world.go b/tmserver/internal/world/world.go
+index 73370212..a66e024b 100644
+--- a/tmserver/internal/world/world.go
++++ b/tmserver/internal/world/world.go
+@@ -399,6 +399,10 @@ func (w *World) CharacterSaveFor(s *Session, e *Entity) CharacterSave {
+ 	// current equipment contribution once, including for pre-issue-321 saves.
+ 	cs.HP, cs.MaxHP = e.HP, e.MaxHP-e.EquipmentAttributeHP
+ 	cs.MP, cs.MaxMP = e.MP, e.MaxMP-e.EquipmentAttributeMP
++	// The equipment-free base travels on its own (migration 0027): rebuilding it
++	// at login from the values above depends on the bonus rules of that moment.
++	cs.BaseStr, cs.BaseInt, cs.BaseDex, cs.BaseCon = e.BaseStr, e.BaseInt, e.BaseDex, e.BaseCon
++	cs.BaseMaxHP, cs.BaseMaxMP = e.BaseMaxHP, e.BaseMaxMP
+ 	cs.DivineEnd = e.DivineEnd // 0 once the buff has expired (cleared by the tick sweep)
+ 	cs.ScoreBonus, cs.SpecialBonus = e.ScoreBonus, e.SpecialBonus
+ 	cs.LearnedSkill, cs.SecLearnedSkill, cs.BaseSpecial = e.LearnedSkill, e.SecLearnedSkill, e.BaseSpecial
+-- 
+2.54.0.windows.1
+

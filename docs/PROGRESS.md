@@ -43,7 +43,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - Itens no chão ficam fora de escopo (decisão do usuário, 06/10).
 7. Relato de jogador (08/10, [evidência](evidence/05-gameplay/2026-10-08-trash-delete.md)):
    - a lixeira não chegava ao servidor e o item "voltava". Com o #32 (`4983f4cd`) e o servidor [PR #377](https://github.com/Jean1dev/w2pp-OpenWYD/pull/377) (`0b9a6774`) implantados, a fase `trash` foi aprovada no Railway: descarte, compra, relogin, e equipar e desequipar logo depois ([evidência](evidence/05-gameplay/2026-10-08-trash-delete.md#execução-online-08102026-aprovada));
-   - print do jogador (web): o crítico negativo é bug de exibição do runtime, corrigido no patch 0030. FOR/INT −88 estão gravados no banco do personagem, sem ganho de equipamento que explique; falta a decisão do operador (origem do dado, correção da ficha). Arco: falta uma print com a arma.
+   - print do jogador (web): o crítico negativo é bug de exibição do runtime, corrigido no patch 0030. FOR/INT −88: a base era reconstruída no login com as regras do momento, e a Amunra +9 passou de +100 a +200. A correção é a base persistida ([ADR 020](decisions/020-persisted-base-score.md), PR [#378](https://github.com/Jean1dev/w2pp-OpenWYD/pull/378), `patches/server/0012`), sem merge. Os dados não serão corrigidos (alfa). Arco: falta uma print com a arma.
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
 
@@ -1124,3 +1124,24 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - a origem desses valores não está no código atual (busca no tm-server, na API e nas migrações).
 - **Não executado:** rebuild local e verificação visual do crítico (o personagem de teste tem crítico menor que 128); a correção da ficha no banco, que depende de decisão do operador.
 - **Próximo passo:** o operador decide a origem e a correção de FOR/INT; pedir ao jogador uma print com o arco.
+
+### 08/10/2026 — servidor: base de atributos persistida (ADR 020)
+
+- **Pedido do usuário:**
+  - merge do #34;
+  - não corrigir os dados (alfa);
+  - corrigir a causa dos atributos negativos e garantir que não volte.
+- **Achado:**
+  - no banco (leitura `READ ONLY`, sem nomes), o único personagem com atributo negativo tem exatamente −100 em FOR, INT, DES e CON em relação à distribuição de criação;
+  - no código (confirmado em fonte), a base é reconstruída no login com as regras do momento, e a escala de refino de 17/08 dobrou a Amunra +9.
+- **Servidor** (PR [#378](https://github.com/Jean1dev/w2pp-OpenWYD/pull/378), sobre `0b9a6774`):
+  - migração 0027 com `base_*`;
+  - store, proto (regenerado com protoc 3.21.12 / protoc-gen-go 1.36.11; regerar o proto sem mudança reproduz os arquivos), dbserver, dbclient, world e login;
+  - um save sem base limpa a base gravada (rollback seguro);
+  - log para base derivada negativa.
+- **Comandos e resultados:**
+  - `go test` dos testes novos: ok; o teste do caso relatado falha sem a correção (112 em vez de 212);
+  - `go test -tags=integration ./internal/store/` contra Postgres 16 embutido (temporário, fora do Git): ok, inclusive a suíte existente;
+  - suíte do servidor: ok, exceto `internal/npctemplate` e `dbserver/cmd/dbserver`, que falham só no Windows por causa do sistema de arquivos e não foram tocados.
+- **Não executado:** CI do #378; deploy; verificação online das colunas depois de um relogin.
+- **Próximo passo:** CI, merge e deploy do #378 (a migração roda no dbserver); relogar um personagem de teste e conferir as colunas `base_*` no banco.
