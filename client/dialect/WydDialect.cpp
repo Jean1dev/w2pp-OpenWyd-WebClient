@@ -97,6 +97,10 @@ static_assert(sizeof(MSG_SwapItem) == 20 && offsetof(MSG_SwapItem, SourType) == 
 static_assert(sizeof(MSG_UseItem) == 36 && offsetof(MSG_UseItem, SourType) == 12 &&
 	offsetof(MSG_UseItem, DestPos) == 24 && offsetof(MSG_UseItem, GridX) == 28 &&
 	offsetof(MSG_UseItem, GridY) == 30 && offsetof(MSG_UseItem, ItemID) == 32, "MSG_UseItem");
+// DeleteItem (0x2E4, handler/item.go deleteItem): runtime MSG_STANDARDPARM2
+// {Parm1 = carry slot, Parm2 = sIndex}, server {Slot i32, SIndex i32}; same bytes.
+static_assert(sizeof(MSG_STANDARDPARM2) == 20 && offsetof(MSG_STANDARDPARM2, Parm1) == 12 &&
+	offsetof(MSG_STANDARDPARM2, Parm2) == 16, "MSG_STANDARDPARM2");
 // UpdateCarry (0x185, protocol/carry.go): Carry[64]@12 + Coin@524, identical.
 static_assert(sizeof(MSG_Carry) == 528 && offsetof(MSG_Carry, Carry) == 12 &&
 	offsetof(MSG_Carry, Coin) == 524, "MSG_Carry");
@@ -136,6 +140,7 @@ constexpr int kSendAffect = 268;
 constexpr int kUpdateEquip = 60;
 constexpr int kSetHpDam = 20;
 constexpr int kSwapItem = 20;
+constexpr int kDeleteItem = 20;
 constexpr int kUseItemWire = 34;
 constexpr int kUpdateCarry = 528;
 constexpr int kUpdateCargoCoin = 57; // protocol/cargo.go: coin @12 (UNVERIFIED offset)
@@ -205,6 +210,7 @@ enum : unsigned short
 	OpMotion = 0x36A,
 	OpUseItem = 0x373,
 	OpSwapItem = 0x376,
+	OpDeleteItem = 0x2E4,
 	OpUpdateCarry = 0x185,
 	OpAction2 = 0x368,
 	OpAction = 0x36C,
@@ -1286,6 +1292,22 @@ int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int*
 		Put16(out, 30, in->GridY);
 		Put16(out, 32, in->ItemID);
 		return OutDone(outSize, kUseItemWire);
+	}
+	case OpDeleteItem:
+	{
+		// Item dropped on the trash grid and confirmed (TMFieldScene message box
+		// 740, SGrid.cpp GRID_DELETE). The runtime has already removed it from
+		// its grid, so dropping this frame left the server holding an item the
+		// player no longer saw. The server clears the slot and answers 0x182.
+		if (msgSize != static_cast<int>(sizeof(MSG_STANDARDPARM2)) || outCap < kDeleteItem)
+			return OutFail(WYD_STAT_OUT_DROP_SIZE, op);
+		const auto* in = reinterpret_cast<const MSG_STANDARDPARM2*>(msg);
+		if (in->Parm1 < 0 || in->Parm1 >= kCarryVisible)
+			return OutFail(WYD_STAT_OUT_DROP_RANGE, op);
+		std::memcpy(out, msg, kHeader);
+		Put32(out, 12, static_cast<std::uint32_t>(in->Parm1));
+		Put32(out, 16, static_cast<std::uint32_t>(in->Parm2));
+		return OutDone(outSize, kDeleteItem);
 	}
 	case OpBuy:
 	{

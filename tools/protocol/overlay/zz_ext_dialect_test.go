@@ -728,6 +728,19 @@ func TestExtDialectOutbound(t *testing.T) {
 			t.Fatalf("type %v len %d %+v", h.Type, len(b), m)
 		}
 	})
+	t.Run("delete_item", func(t *testing.T) {
+		h, b := frame("delete_item")
+		var l struct {
+			Slot   int32 `json:"slot"`
+			SIndex int32 `json:"sIndex"`
+		}
+		mustJSON(t, d.Outbound["delete_item"].Logical, &l)
+		var m MsgDeleteItemBody
+		if h.Type != MsgDeleteItem || len(b) != MsgDeleteItemBodySize || m.Decode(b) != nil ||
+			m.Slot != l.Slot || m.SIndex != l.SIndex {
+			t.Fatalf("type %v len %d %+v", h.Type, len(b), m)
+		}
+	})
 }
 
 // fxSwap: the four positional bytes of MSG_TradingItem, named as the server

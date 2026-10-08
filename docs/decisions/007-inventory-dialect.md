@@ -62,4 +62,13 @@ Até lá, "coleta/drop no chão" fica **bloqueada pelo servidor** na etapa 5.
 
 ## Limites
 
-Cargo (`place 2`, NPC guarda) não foi exercitado; é da fatia 3. Split e delete (`0x02E5`/`0x02E4`) seguem descartados. A recusa por requisito (`NoticeReqNotMet`) só é alcançável quando o runtime não bloqueia antes. O runtime recusa localmente um item cujo `nPos` não serve no slot, sem enviar pacote.
+Cargo (`place 2`, NPC guarda) não foi exercitado; é da fatia 3. Split (`0x02E5`) segue descartado; delete (`0x02E4`) passou a ser encaminhado em 08/10 (revisão abaixo). A recusa por requisito (`NoticeReqNotMet`) só é alcançável quando o runtime não bloqueia antes. O runtime recusa localmente um item cujo `nPos` não serve no slot, sem enviar pacote.
+
+## Revisão de 08/10/2026: lixeira (`0x02E4`)
+
+Um jogador relatou que itens descartados sumiam, mas voltavam ao comprar algo, e que depois não conseguia equipar nem desequipar.
+
+- **Confirmado em fonte.** Soltar um item na lixeira (`GRID_DELETE`, upstream `SGrid.cpp:1949-1957`) abre a caixa 740. Ao confirmar, `TMFieldScene.cpp:16946-16973` tira o item da grade **localmente** (`PickupAtItem`) e envia `MSG_STANDARDPARM2` `0x02E4` {Parm1 = página×15 + célula, Parm2 = sIndex}. O dialeto descartava o pacote (`default` → `outDropUnknown`). O servidor ficava com o item, e o cliente mostrava o slot vazio. A compra seguinte reenviava o slot e o item "voltava". Ao mesmo tempo, arrastar um equipamento para esse slot "vazio" virava, no servidor, uma troca com o item fantasma, recusada por `NoticeReqNotMet` (hipótese para o "não equipa", a confirmar no log do servidor).
+- **Decisão.** Encaminhar `0x02E4` com 20 bytes, escritos por offset (`Slot` i32 @12, `SIndex` i32 @16; mesmo layout de `MsgDeleteItemBody`), e descartar tamanho errado e slot fora de `[0, 60)`. O `deleteItem` do Go (servidor fixado `98286fdf`, `handler/item.go:136`) limpa o slot e responde `0x0182`, que já passa. O mesmo opcode sai do runtime ao usar a Bolsa do Andarilho (`SGrid.cpp:4515-4525`, `Parm2 = 3467`), depois do `0x0373`. Quando o servidor já consumiu a bolsa, o slot está vazio e o pedido não tem efeito, como no original.
+- **Limite.** O `deleteItem` do Go ignora `SIndex` (paridade legada) e não reenvia o slot quando recusa (troca ativa, slot inacessível). Um cliente já dessincronizado pode apagar o item que o servidor tem naquele slot. O endurecimento (`SIndex` igual ao do slot, senão reenvia o slot) é uma mudança de servidor separada. Jogadores afetados antes desta correção ressincronizam ao relogar: o item volta a aparecer e pode ser descartado de novo.
+- **Testes.** Vetor de saída `delete_item` em `gen_fixtures.py`, conferido em wasm32 (`dialect_test.cpp`) e contra o decoder do servidor fixado (`zz_ext_dialect_test.go`).

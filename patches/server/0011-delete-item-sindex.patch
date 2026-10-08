@@ -1,0 +1,95 @@
+From a3171774067570c3fef60d72be17254aa2109fba Mon Sep 17 00:00:00 2001
+From: Jeanluca <jeanlucafp@gmail.com>
+Date: Thu, 8 Oct 2026 09:14:31 -0300
+Subject: [PATCH] fix(handler): delete an item only when the slot still holds
+ it
+
+_MSG_DeleteItem carries the SIndex the client is destroying, but the
+handler cleared the slot unconditionally (legacy parity). The 7662 client
+empties its own trash-grid cell before asking (TMFieldScene message box
+740), so a client whose grid drifted from the server destroyed an item
+the player never saw.
+
+The slot is now cleared only when its index matches SIndex. On a mismatch
+the real slot goes back as MsgSendItem, which resyncs that cell; an
+empty slot named with SIndex 0 stays silent as before. The Wanderer's Bag
+path (UseItem then DeleteItem 3467 on a consumed slot) now gets the empty
+slot back instead of silence.
+
+Test: TestDeleteItemWrongIndexResyncs fails without the fix.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ tmserver/internal/handler/item.go         | 12 +++++++++++
+ tmserver/internal/handler/itemops_test.go | 25 +++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
+
+diff --git a/tmserver/internal/handler/item.go b/tmserver/internal/handler/item.go
+index d6f1019e..5e5ad75c 100644
+--- a/tmserver/internal/handler/item.go
++++ b/tmserver/internal/handler/item.go
+@@ -133,6 +133,12 @@ func (d *Dispatcher) getItem(w *world.World, s *world.Session, _ protocol.Header
+ // MsgSendItem so the client and server never disagree on the slot. The removal
+ // persists on the next periodic/logout save (parity: no immediate write). NPC shop
+ // is a stateless request/response, so there is no "shop open" state to guard.
++//
++// Unlike the legacy, the slot is only cleared when it still holds the SIndex the
++// client named. The client empties its own cell before asking (trash grid,
++// TMFieldScene message box 740), so a client whose grid drifted from the server
++// would otherwise destroy an item the player never saw. On a mismatch the real
++// slot is sent back instead, which resyncs that cell.
+ func (d *Dispatcher) deleteItem(w *world.World, s *world.Session, _ protocol.Header, payload []byte) {
+ 	e := w.Entity(s.Conn)
+ 	if e == nil || e.HP <= 0 || s.Mode != world.UserPlay {
+@@ -151,6 +157,12 @@ func (d *Dispatcher) deleteItem(w *world.World, s *world.Session, _ protocol.Hea
+ 	if !carrySlotAccessible(e, slot) {
+ 		return
+ 	}
++	if int32(e.Carry[slot].Index) != body.SIndex {
++		if body.SIndex != 0 {
++			d.sendSlot(w, s, world.ItemPlaceCarry, slot, e.Carry[slot])
++		}
++		return
++	}
+ 	if e.Carry[slot].Empty() {
+ 		return
+ 	}
+diff --git a/tmserver/internal/handler/itemops_test.go b/tmserver/internal/handler/itemops_test.go
+index fbc082a7..2209eb16 100644
+--- a/tmserver/internal/handler/itemops_test.go
++++ b/tmserver/internal/handler/itemops_test.go
+@@ -65,6 +65,31 @@ func TestDeleteItemEmptySlotNoop(t *testing.T) {
+ 	}
+ }
+ 
++// A client whose grid drifted names an item the slot no longer holds: the slot is
++// kept and sent back so the client shows what the server has.
++func TestDeleteItemWrongIndexResyncs(t *testing.T) {
++	addr, stop, _ := startServerClock(t, carryDB(world.Item{Index: 1100}))
++	defer stop()
++	c := enterWorld(t, addr)
++	defer c.Close()
++
++	send(t, c, protocol.MsgDeleteItem, (&protocol.MsgDeleteItemBody{Slot: 0, SIndex: 401}).Encode())
++	_, slot, index, _ := sendItemSlotAmount(expect(t, c, protocol.MsgSendItem))
++	if slot != 0 || index != 1100 {
++		t.Fatalf("mismatch SendItem slot=%d index=%d, want slot 0 kept with 1100", slot, index)
++	}
++	// The item is still there: deleting it by its real index works.
++	send(t, c, protocol.MsgDeleteItem, (&protocol.MsgDeleteItemBody{Slot: 0, SIndex: 1100}).Encode())
++	if _, slot, index, _ = sendItemSlotAmount(expect(t, c, protocol.MsgSendItem)); slot != 0 || index != 0 {
++		t.Fatalf("delete SendItem slot=%d index=%d, want slot 0 cleared", slot, index)
++	}
++	// An empty slot named with an item also resyncs (as empty).
++	send(t, c, protocol.MsgDeleteItem, (&protocol.MsgDeleteItemBody{Slot: 3, SIndex: 1100}).Encode())
++	if _, slot, index, _ = sendItemSlotAmount(expect(t, c, protocol.MsgSendItem)); slot != 3 || index != 0 {
++		t.Fatalf("empty-slot SendItem slot=%d index=%d, want slot 3 empty", slot, index)
++	}
++}
++
+ func TestSplitItem(t *testing.T) {
+ 	addr, stop, _ := startServerClock(t, carryDB(amountItem(2400, 10))) // 2400 ∈ splittable range
+ 	defer stop()
+-- 
+2.54.0.windows.1
+
