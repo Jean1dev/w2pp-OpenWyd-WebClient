@@ -1,6 +1,6 @@
 # ADR 020: base de atributos persistida no servidor
 
-Data: 08/10/2026. Estado: **implementado e testado, sem merge nem deploy**. PR [#378](https://github.com/Jean1dev/w2pp-OpenWYD/pull/378), espelhado em `patches/server/0012-persist-base-score.patch` (sobre o `main` do servidor em `0b9a6774`).
+Data: 08/10/2026. Estado: **em produção desde 08/10 (servidor `cd5839c8`, db-server `34a6aa7d`, tm-server `ae9d13e3`); migração 0027 aplicada e base gravada no relogin, confirmado em execução**. PR [#378](https://github.com/Jean1dev/w2pp-OpenWYD/pull/378), espelhado em `patches/server/0012-persist-base-score.patch` (sobre o `main` do servidor em `0b9a6774`).
 
 ## Contexto
 
@@ -45,3 +45,10 @@ Os testes de unidade rodam na CI do servidor; o de integração exige Postgres e
 - O personagem do relato continua com −88 até o operador decidir corrigir os dados. Depois do deploy, a base dele passa a ser gravada como está (−88/−88/2412/760) e deixa de mudar.
 - Um personagem que ainda use uma Amunra +9 salva no tempo de +100 terá a base derivada uma última vez no primeiro login depois do deploy, como hoje.
 - O alerta no log mostra quando isso produz base negativa.
+
+## Deploy (08/10/2026)
+
+- O #378 foi mergeado em `cd5839c8`. O db-server (`34a6aa7d`) e o tm-server (`ae9d13e3`) foram implantados com SUCCESS, e o tm-server subiu limpo.
+- No banco (leitura `READ ONLY`): as 6 colunas `base_*` existem. Antes de qualquer login, nenhuma linha tinha base.
+- Relogin do personagem de teste A (`verify_world.mjs --phases login,enter`, ok): `base 12/12/12/12` gravada, igual ao CurrentScore, porque a arma inicial não dá atributo. Na mesma leitura, outra linha também já tinha base (um jogador que logou).
+- Log do tm-server desde o deploy: nenhum `derived base score is negative`, nenhum erro.
