@@ -79,3 +79,11 @@ A print é da **versão web**: página "WYD / Canal server" e painel de configur
 | Arco | não aparece na print | Sem dado. |
 
 O banco não guarda o crítico salvo (`critical = 0`), porque o servidor o recalcula do equipamento a cada `refreshScore`. Isso bate com a exibição vir só do `0x0336`.
+
+## Causa de FOR/INT negativos (08/10/2026)
+
+O personagem tem **100 a menos em cada um dos quatro atributos**, a partir de `12/12/2512/860`. Outra Caçadora de nível 399 está em `12/12/3360/12`, com a mesma soma de pontos (3396).
+
+O servidor reconstruía a base no login como "salvo − equipamento", com as regras daquele momento. A escala de refino de 17/08 dobrou a Pedra Amunra +9 de +100 para +200 em cada atributo, o que basta para produzir esse padrão.
+
+A correção grava a base em colunas próprias ([ADR 020](../../decisions/020-persisted-base-score.md), PR [#378](https://github.com/Jean1dev/w2pp-OpenWYD/pull/378)). O teste do caso relatado mostra 112 em vez de 212 sem a correção. Os dados gravados não serão corrigidos (decisão do usuário: alfa).
