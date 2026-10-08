@@ -43,7 +43,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - Itens no chão ficam fora de escopo (decisão do usuário, 06/10).
 7. Relato de jogador (08/10, [evidência](evidence/05-gameplay/2026-10-08-trash-delete.md)):
    - a lixeira não chegava ao servidor e o item "voltava". Com o #32 (`4983f4cd`) e o servidor [PR #377](https://github.com/Jean1dev/w2pp-OpenWYD/pull/377) (`0b9a6774`) implantados, a fase `trash` foi aprovada no Railway: descarte, compra, relogin, e equipar e desequipar logo depois ([evidência](evidence/05-gameplay/2026-10-08-trash-delete.md#execução-online-08102026-aprovada));
-   - print do jogador (web): o crítico negativo é bug de exibição do runtime, corrigido no patch 0030. FOR/INT −88: a base era reconstruída no login com as regras do momento, e a Amunra +9 passou de +100 a +200. A correção é a base persistida ([ADR 020](decisions/020-persisted-base-score.md), PR [#378](https://github.com/Jean1dev/w2pp-OpenWYD/pull/378), `patches/server/0012`), sem merge. Os dados não serão corrigidos (alfa). Arco: falta uma print com a arma.
+   - print do jogador (web): o crítico negativo é bug de exibição do runtime, corrigido no patch 0030. FOR/INT −88: a base era reconstruída no login com as regras do momento, e a Amunra +9 passou de +100 a +200. A correção é a base persistida ([ADR 020](decisions/020-persisted-base-score.md), PR [#378](https://github.com/Jean1dev/w2pp-OpenWYD/pull/378), `patches/server/0012`), em produção desde 08/10 (`cd5839c8`): migração aplicada e base gravada no relogin. Os dados não serão corrigidos (alfa). Arco: falta uma print com a arma.
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
 
@@ -1145,3 +1145,14 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - suíte do servidor: ok, exceto `internal/npctemplate` e `dbserver/cmd/dbserver`, que falham só no Windows por causa do sistema de arquivos e não foram tocados.
 - **Não executado:** CI do #378; deploy; verificação online das colunas depois de um relogin.
 - **Próximo passo:** CI, merge e deploy do #378 (a migração roda no dbserver); relogar um personagem de teste e conferir as colunas `base_*` no banco.
+
+### 08/10/2026 — deploy da base persistida
+
+- **Pedido do usuário:** merge do #378 e do #35 e acompanhar o deploy.
+- **Resultado:**
+  - #378 → `cd5839c8` (db-server `34a6aa7d`, tm-server `ae9d13e3`, SUCCESS); #35 → `ab8ed33a`;
+  - migração 0027 confirmada no banco;
+  - relogin de A: base `12/12/12/12` gravada;
+  - nenhum alerta de base negativa nem erro no log ([ADR 020](decisions/020-persisted-base-score.md#deploy-08102026)).
+- **Não executado:** relogin do personagem do relato, que depende do jogador; teste com uma mudança real de regra em produção.
+- **Próximo passo:** pedir ao jogador uma print com o arco; Benelli segue com −88, por decisão do usuário.
