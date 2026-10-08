@@ -44,7 +44,7 @@ import { checkGuildChat, checkParty, checkPartyChat, checkPartyEvidence } from '
 import { fsTraceInit, packageIndex, openedByDir } from './fs_trace.mjs';
 import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  checkEquip, checkPotion, checkLoot, checkShop, checkBank, checkPaidTeleport, checkChat, checkBuff, checkHealOther, checkRestart, checkSettings, checkConcurrent, itemAmount } from './world_checks.mjs';
+  checkEquip, checkPotion, checkLoot, checkShop, checkTrash, checkBank, checkPaidTeleport, checkChat, checkBuff, checkHealOther, checkRestart, checkSettings, checkConcurrent, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -1040,7 +1040,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'bank', 'chat', 'party', 'partychat', 'guildchat', 'trade', 'paidteleport', 'settings'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'trash', 'bank', 'chat', 'party', 'partychat', 'guildchat', 'trade', 'paidteleport', 'settings'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -2686,6 +2686,104 @@ async function main() {
       res.beforeRelogin = await a.bag();
       res.relogin = await reloginA('A-shop-relogin', 0);
       checkShop(res);
+      return res;
+    });
+
+    // Player report (08/10): an item dropped on the trash grid and confirmed
+    // (box 740) vanished from the grid but came back after a buy, and equip/
+    // unequip stopped working. The runtime empties the cell itself and sends
+    // 0x02E4, which the dialect used to drop (ADR 007, revision of 08/10).
+    await step('trash', async () => {
+      const res = {};
+      r.trash = res;
+      const bag0 = await a.bag();
+      const worn = new Set(bag0.equip.map(it => it.index).filter(Boolean));
+      const page0 = bag0.carry.slice(0, 15).map((it, k) => ({ ...it, k })).filter(it => it.index > 0 && !worn.has(it.index));
+      assert(page0.length > 0, 'nothing on carry page 0 to discard');
+      const victim = page0.at(-1);
+      res.victim = { slot: victim.k, index: victim.index };
+      res.counts = { before: a.countItem(bag0, victim.index) };
+      // 1. Pick the item up and drop it on the trash cell; OK on box 740.
+      await a.openInventory();
+      await a.shot('trash-open');
+      const sent0 = await a.outCount();
+      await a.clickCell({ place: 1, slot: victim.k });
+      const cursor = await a.cursorItem();
+      const [tx, ty] = await a.eval(() => [Module._wyd_field_trash_cell_screen(0), Module._wyd_field_trash_cell_screen(1)]);
+      assert(tx >= 0 && ty >= 0, 'trash cell not on screen');
+      await a.clickCanvas(tx, ty);
+      const box = await a.eval(() => Module._wyd_scene_msgbox_message());
+      await a.shot('trash-confirm');
+      if (box === 740) assert.equal(await a.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'OK refused');
+      await a.frames(3);
+      await sleep(3000); // the server's 0x0182 for the cleared slot
+      res.drop = { cursor, box, sent: (await a.outCount()) - sent0, lastSent: '0x' + (await a.lastSent()).toString(16) };
+      res.afterTrash = await a.bag();
+      res.counts.afterTrash = a.countItem(res.afterTrash, victim.index);
+      console.log(`    trash slot ${victim.k} item ${victim.index}: box ${box}, sent ${res.drop.sent} (${res.drop.lastSent}), ` +
+        `count ${res.counts.before}->${res.counts.afterTrash}`);
+      // 2. A buy at the shop: before the fix the server resent the slot here.
+      res.open = await a.openNpc(/^aki$/i, ARMIA_EAST, 'shop window', () => Module._wyd_field_shop_visible() === 1);
+      await a.ensureInventory();
+      await a.frames(3);
+      const cells = await a.shopCells();
+      let bag1 = await a.bag();
+      const goods = cells.filter(c => c.price > 0 && c.item !== victim.index).sort((p, q) => p.price - q.price);
+      assert(goods.length > 0, 'the shop lists nothing to buy');
+      const cheap = goods[0];
+      if (bag1.coin < cheap.price) {
+        // Gold for the buy: sell another priced item (not the discarded one).
+        const priced = await a.eval(ids => ids.map(i => Module._wyd_item_price(i)), bag1.carry.slice(0, 15).map(it => it.index));
+        const sell = bag1.carry.slice(0, 15).map((it, k) => ({ ...it, k }))
+          .filter(it => it.index > 0 && it.index !== victim.index && !worn.has(it.index) && priced[it.k] >= 4).at(-1);
+        assert(sell, `no gold (${bag1.coin}) and nothing to sell for ${cheap.price}`);
+        await a.clickCell({ place: 1, slot: sell.k });
+        await a.clickCanvas(cells[0].sx, cells[0].sy);
+        if (await a.eval(() => Module._wyd_scene_msgbox_message()) === 890)
+          assert.equal(await a.eval(() => Module._wyd_debug_scene_msgbox_ok()), 1, 'sell OK refused');
+        await a.until('sold slot cleared', k => Module._wyd_debug_my_item(1, k) === 0, 15000, sell.k).catch(() => false);
+        await sleep(2000);
+        bag1 = await a.bag();
+        res.sell = { item: sell.index, coin: bag1.coin };
+        assert(bag1.coin >= cheap.price, `still short of gold for ${cheap.price} after selling`);
+      }
+      await a.tapCanvas(cheap.sx, cheap.sy);
+      await a.until('bought item', ([i, n]) => {
+        let c = 0; for (let k = 0; k < 64; k++) if (Module._wyd_debug_my_item(1, k) === i) c++;
+        return c > n;
+      }, 15000, [cheap.item, a.countItem(bag1, cheap.item)]).catch(() => false);
+      await sleep(3000);
+      const bag2 = await a.bag();
+      res.buy = { item: cheap.item, price: cheap.price, gained: a.countItem(bag2, cheap.item) - a.countItem(bag1, cheap.item) };
+      res.counts.afterBuy = a.countItem(bag2, victim.index);
+      await a.shot('trash-after-buy');
+      console.log(`    buy ${cheap.item}: gained ${res.buy.gained}; discarded item count ${res.counts.afterBuy}`);
+      await a.page.locator('#canvas').press('Escape');
+      await a.frames(2);
+      // 3. Relogin: the server's carry is what comes back.
+      res.beforeRelogin = await a.bag();
+      res.relogin = await reloginA('A-trash-relogin', 0);
+      res.counts.afterRelogin = a.countItem(res.relogin, victim.index);
+      // 4. Equip and unequip right after (the report's last symptom).
+      const slot = [6, 7, 1, 2, 3, 4, 5].find(i => res.relogin.equip[i].index > 0);
+      assert(slot !== undefined, 'nothing equipped to move');
+      const free = res.relogin.carry.slice(0, 15).findIndex(it => it.index === 0);
+      assert(free >= 0, 'no free cell on carry page 0');
+      const item = res.relogin.equip[slot].index;
+      res.equip = { slot, free, item };
+      await a.openInventory();
+      res.equip.unequip = await a.moveItem({ place: 0, slot }, { place: 1, slot: free });
+      await a.until('server echo of the unequip', ([s, f, i]) => Module._wyd_debug_my_item(0, s) === 0 &&
+        Module._wyd_debug_my_item(1, f) === i, 20000, [slot, free, item]).catch(() => false);
+      res.equip.off = await a.bag();
+      res.equip.reequip = await a.moveItem({ place: 1, slot: free }, { place: 0, slot });
+      await a.until('server echo of the re-equip', ([s, f, i]) => Module._wyd_debug_my_item(0, s) === i &&
+        Module._wyd_debug_my_item(1, f) === 0, 20000, [slot, free, item]).catch(() => false);
+      res.equip.on = await a.bag();
+      await a.shot('trash-equip');
+      console.log(`    relogin count ${res.counts.afterRelogin}; equip slot ${slot} item ${item}: ` +
+        `off ${res.equip.off.equip[slot].index} on ${res.equip.on.equip[slot].index}`);
+      checkTrash(res);
       return res;
     });
 

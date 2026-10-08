@@ -37,13 +37,32 @@ Ele não informou a plataforma, o personagem, a classe nem prints.
 
 ## Não executado
 
-- Fase online (lixeira → compra → relogin → equipar) no Railway: sem `.env` neste worktree e sem build do runtime.
 - Logs do tm-server para o personagem do jogador: falta o nome.
 - `-race`/lint no servidor; cliente Windows.
 
 ## Próximo passo
 
 1. Perguntar ao jogador: plataforma, personagem, classe e prints dos stats e do arco.
-2. Build e deploy do cliente. Depois, a fase online acima, com duas sessões e relogin.
-3. Merge e deploy do [PR #377](https://github.com/Jean1dev/w2pp-OpenWYD/pull/377).
-4. Sintomas 2 e 3: reproduzir com Caçadora e arco, web × Windows.
+2. Sintomas 2 e 3: reproduzir com Caçadora e arco, web × Windows.
+
+## Execução online (08/10/2026): aprovada
+
+Os PRs #32 (cliente, `4983f4cd`) e Jean1dev/w2pp-OpenWYD#377 (servidor, `0b9a6774`) entraram no `main` e foram implantados no Railway às 09:28 (deploys `f89aa285` e `ca8ee75d`, ambos SUCCESS). As duas contas de teste foram criadas no portal com `tools/create_test_account.mjs`; as credenciais ficam só no `.env`.
+
+O harness usa um build local do runtime com o dialeto do `main` e o patch `0029-trash-cell-probe` (sonda só de leitura da célula da lixeira, controle 67080). O alvo é o tm-server do Railway pelo proxy TCP.
+
+```
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,create,enter --class 0
+node tools/verify_world.mjs --target reseau.proxy.rlwy.net:56950 --client-version 12000 --env-file .env --phases login,enter,trash
+```
+
+| Passo | Resultado ([JSON](2026-10-08-trash-passed.json)) |
+|---|---|
+| Lixeira | item 4144 do slot 3 no cursor, caixa 740, OK; 1 frame enviado, o último `0x2e4`; contagem 1 → 0 |
+| Servidor | `item deleted conn=1 slot=3 index=4144` no log do tm-server (12:51:03Z) |
+| Compra (Aki) | item 1774 por 300; ganhou 1; o item 4144 **não voltou** (contagem 0) |
+| Relogin | inventário idêntico ao de antes; 4144 continua ausente |
+| Equipar/desequipar | arma 861: equip 6 → carry 3 → equip 6, um `0x0376` em cada sentido, ambos confirmados pelo eco do servidor |
+| Saúde | nenhum descarte de entrada ou de saída, nenhum erro de página |
+
+Com isso, os sintomas 1 e 4 estão **confirmados em execução** como resolvidos neste cenário. Uma execução de base com o cliente antigo não foi feita. O "não equipa" continua sendo a hipótese mais provável para o que o jogador viu, mas falta o personagem dele para conferir no log.

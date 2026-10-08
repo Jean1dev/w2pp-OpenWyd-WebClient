@@ -1,0 +1,22 @@
+Etapa 5: read-only probe of the inventory trash cell (m_pQuicInvDelete,
+control 67080). The trash phase drops a carry item there with real mouse
+input and confirms box 740, which sends 0x02E4 through the dialect.
+
+diff --git a/webclient/client-wasm/compat/src/wyd_client_entry.cpp b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+--- a/webclient/client-wasm/compat/src/wyd_client_entry.cpp
++++ b/webclient/client-wasm/compat/src/wyd_client_entry.cpp
+@@ -1211,6 +1211,14 @@
+   return f && f->m_pChatGuild ? (f->m_pChatGuild->m_bSelected ? 1 : 0) : -1;
+ }
+ 
++// Trash cell of the inventory window (control 67080, GRID_DELETE): dropping
++// the cursor item there opens message box 740, whose OK sends 0x02E4. Center
++// as drawn, or -1 when hidden or outside the Field. Read-only.
++extern "C" WYD_EXPORT int wyd_field_trash_cell_screen(int which) {
++  TMFieldScene* f = WydField();
++  return f ? WydCellCenter(f->m_pQuicInvDelete, 0, 0, which) : -1;
++}
++
+ // Gold buttons of the inventory/cargo windows and the amount box OK
+ // (B_MONEY 65563, B_CARGO_MONEY 65688, B_IG_OK 65886): center as drawn, or -1.
+ extern "C" WYD_EXPORT int wyd_field_button_screen(unsigned int id, int which) {
