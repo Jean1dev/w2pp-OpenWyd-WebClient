@@ -712,8 +712,27 @@ static void TestItems()
 	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&u), sizeof(u), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
 	CHECK(size == 34 && std::memcmp(wire, k_out_use_item, 34) == 0); // Size rewritten, padding not sent
 	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&u), 34, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
-	CHECK(WydDialectStatValue(WYD_STAT_OUT_TRANSLATED) == 2);
-	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_SIZE) == 2);
+
+	// Trash grid: the runtime removed the item locally, the server must hear it.
+	MSG_STANDARDPARM2 del{};
+	del.Header = s.Header;
+	del.Header.Size = sizeof(del);
+	del.Header.Type = 0x2E4;
+	del.Parm1 = 17;
+	del.Parm2 = 401;
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&del), sizeof(del), wire, sizeof(wire), &size) == WYD_DIALECT_TRANSLATED);
+	CHECK(size == 20 && std::memcmp(wire, k_out_delete_item, 20) == 0);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&del), 19, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	CHECK(WydDialectOutbound(reinterpret_cast<char*>(&del), sizeof(del), wire, 19, &size) == WYD_DIALECT_DROP);
+	for (int slot : {-1, 60})
+	{
+		del.Parm1 = slot; // 4 carry pages of 15 cells
+		CHECK(WydDialectOutbound(reinterpret_cast<char*>(&del), sizeof(del), wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	}
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_TRANSLATED) == 3);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_SIZE) == 4);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_RANGE) == 4);
+	CHECK(WydDialectStatValue(WYD_STAT_OUT_DROP_UNKNOWN) == 0);
 }
 
 static void TestShopCargoChat()

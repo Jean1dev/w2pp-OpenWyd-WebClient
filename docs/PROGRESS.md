@@ -41,6 +41,10 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - em produção desde 06/10 (`25016ab3`): `chat` e `concurrent` aprovados no Railway, sem regressão em `logout` e `bank` ([evidência](evidence/05-gameplay/2026-10-06-whisper-duplicate-login.md#após-o-deploy-confirmado-em-execução-tm-server-25016ab3)); falta a conferência com o cliente Windows;
    - avisos nas recusas de compra sem ouro, saque/depósito inválido e teleporte pago sem ouro: [PR #376](https://github.com/Jean1dev/w2pp-OpenWYD/pull/376), `patches/server/0010`, em produção desde 06/10 (`b8488a56`). `shop`, `bank` e `paidteleport` aprovados no Railway ([evidência](evidence/05-gameplay/2026-10-06-refusal-panels.md)); falta conferir com o cliente Windows. Na venda, o Go não tem recusa que o legado avise ([ADR 008](decisions/008-shop-cargo-chat-dialect.md#revisão-de-06102026-tarde-lacuna-1)).
    - Itens no chão ficam fora de escopo (decisão do usuário, 06/10).
+7. Relato de jogador (08/10, [evidência](evidence/05-gameplay/2026-10-08-trash-delete.md)):
+   - a lixeira não chegava ao servidor e o item "voltava". O dialeto passou a encaminhar `0x02E4`, com testes locais aprovados. Faltam o build, o deploy e a fase online (lixeira → compra → relogin → equipar);
+   - o `patches/server/0011` (o delete exige o `SIndex` do slot e ressincroniza quando não bate) está no [PR #377](https://github.com/Jean1dev/w2pp-OpenWYD/pull/377), sem merge;
+   - stats negativos e arco: hipóteses. Pedir ao jogador a plataforma, o personagem e prints.
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
 
@@ -1074,3 +1078,21 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Achado (confirmado em execução):** a leitura do cache bloqueia a thread principal, então um contador de tempo não atualiza. Por isso o aviso é fixo.
 - **Não executado:** Safari; domínio público; `settings:ui`, `scene` e `client:stream`, porque o runtime não mudou.
 - **Próximo passo:** decisão do operador sobre a música padrão; A4 (etapa 6, medição com GPU numa janela) e A5 (CI e deploy automático).
+
+### 08/10/2026 — etapa 5: relato de jogador (lixeira, stats, arco, equipar)
+
+- **Pedido do usuário:** investigar o relato de um jogador: itens descartados voltam, stats negativos, arco esquisito, não equipa nem desequipa.
+- **Arquivos:**
+  - `client/dialect/WydDialect.cpp` (`0x02E4` encaminhado);
+  - `tools/protocol/{gen_fixtures.py,dialect_test.cpp,overlay/zz_ext_dialect_test.go}`;
+  - `docs/evidence/03-protocolo/fixtures/dialect.json`;
+  - `patches/server/0011-delete-item-sindex.patch`;
+  - ADR 007, `compatibility.md`, [evidência](evidence/05-gameplay/2026-10-08-trash-delete.md) e este progresso.
+- **Comandos e resultados:**
+  - `run_dialect_test.py`: 811 checks, 0 falhas;
+  - `run_go_vectors.py`: `delete_item` PASS;
+  - `go test ./tmserver/internal/handler/` com o 0011: ok;
+  - o teste novo do servidor falha sem a correção.
+- **Achado (confirmado em fonte):** o runtime esvazia a célula antes de enviar `0x02E4`, e o dialeto descartava o pacote. O "não equipa" é hipótese, como consequência da grade dessincronizada.
+- **Não executado:** build do runtime, fase online, logs do jogador, cliente Windows, `-race`/lint do servidor. Sem merge ou deploy; servidor no [PR #377](https://github.com/Jean1dev/w2pp-OpenWYD/pull/377).
+- **Próximo passo:** dados do jogador; build, deploy e fase online; PR do 0011; reproduzir arco e stats web × Windows.

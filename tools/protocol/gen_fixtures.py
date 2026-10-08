@@ -333,6 +333,12 @@ def swap_item(d: dict) -> bytearray:
     return b
 
 
+def delete_item(d: dict) -> bytearray:
+    b = header(20, 0x02E4, d["id"])
+    struct.pack_into("<ii", b, 12, d["slot"], d["sIndex"])
+    return b
+
+
 def use_item(d: dict) -> bytearray:
     b = header(34, 0x0373, d["id"])
     struct.pack_into("<iiiiHHH", b, 12, d["sourType"], d["sourPos"], d["destType"], d["destPos"],
@@ -453,6 +459,8 @@ OUT_ATTACK_MULTI = {"opcode": 0x0367, "id": 5, "posX": 2100, "posY": 2101, "targ
 OUT_SWAP = {"id": 5, "place0": 0, "slot0": 6, "place1": 1, "slot1": 5, "warp": 1234}
 OUT_USE = {"id": 5, "sourType": 1, "sourPos": 0, "destType": 0, "destPos": 0,
            "gridX": 2100, "gridY": 2101, "warpId": 777}
+# Runtime MSG_STANDARDPARM2 for the trash grid (TMFieldScene message box 740).
+OUT_DELETE_ITEM = {"id": 5, "slot": 17, "sIndex": 401}
 
 
 def out_attack(d: dict) -> bytearray:
@@ -567,6 +575,7 @@ def main() -> int:
         "attack_multi": (out_attack(OUT_ATTACK_MULTI), OUT_ATTACK_MULTI),
         "swap_item": (swap_item(OUT_SWAP), OUT_SWAP),
         "use_item": (use_item(OUT_USE), OUT_USE),
+        "delete_item": (delete_item(OUT_DELETE_ITEM), OUT_DELETE_ITEM),
         "buy": (buy(OUT_BUY), OUT_BUY),
     }
     for kind in ("invite", "leader", "member", "remove"):
