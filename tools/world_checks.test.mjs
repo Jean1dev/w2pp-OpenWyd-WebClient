@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkBank, checkPaidTeleport, checkChat,
+  itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkTrash, checkBank, checkPaidTeleport, checkChat,
   checkSettings, musicCentibels, musicElementVolume, checkConcurrent } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
@@ -403,4 +403,38 @@ test('concurrent: the duplicate login is refused to try again, the first session
     { retries: ['0x11c', '0x11c'] }, { sameEquip: false },
   ];
   for (const x of bad) assert.throws(() => checkConcurrent({ ...ok, ...x }), JSON.stringify(x));
+});
+
+test('trash: 0x02E4 leaves, the item stays gone after a buy and a relogin, equip still works', () => {
+  assert.doesNotThrow(() => validateOptions(options('login,enter,trash')));
+  assert.throws(() => validateOptions(options('login,enter,second,trash')));
+  assert.throws(() => validateOptions(options('login,enter,shop,trash')));
+  const weapon = it(861);
+  const end = bagOf({ 6: weapon }, { 0: it(401, [61, 120]), 2: it(400) }, { coin: 20 });
+  const t = {
+    victim: { slot: 1, index: 4144 },
+    drop: { cursor: 4144, box: 740, sent: 1, lastSent: '0x2e4' },
+    afterTrash: bagOf({ 6: weapon }, { 0: it(401, [61, 120]) }),
+    counts: { before: 1, afterTrash: 0, afterBuy: 0, afterRelogin: 0 },
+    buy: { gained: 1 },
+    beforeRelogin: end, relogin: structuredClone(end),
+    equip: { slot: 6, free: 3, item: 861,
+      unequip: { picked: 861, expect: 861, swapsSent: 1 }, reequip: { picked: 861, expect: 861, swapsSent: 1 },
+      off: bagOf({}, { 0: it(401, [61, 120]), 3: weapon }), on: end },
+  };
+  checkTrash(t);
+  const bad = [
+    { drop: { ...t.drop, box: 0 } }, { drop: { ...t.drop, sent: 0 } }, { drop: { ...t.drop, lastSent: '0x376' } },
+    { drop: { ...t.drop, cursor: 0 } },
+    { afterTrash: bagOf({}, { 1: it(4144) }) },
+    // The report: gone from the grid, back after the buy or the relogin.
+    { counts: { ...t.counts, afterBuy: 1 } }, { counts: { ...t.counts, afterRelogin: 1 } },
+    { counts: { ...t.counts, afterTrash: 1, afterBuy: 1, afterRelogin: 1 } },
+    { buy: { gained: 0 } },
+    { relogin: bagOf({ 6: weapon }, { 0: it(401, [61, 120]), 1: it(4144), 2: it(400) }, { coin: 20 }) },
+    { equip: { ...t.equip, unequip: { ...t.equip.unequip, swapsSent: 0 } } },
+    { equip: { ...t.equip, off: end } },
+    { equip: { ...t.equip, on: bagOf({}, { 3: weapon }) } },
+  ];
+  for (const b of bad) assert.throws(() => checkTrash({ ...t, ...b }), JSON.stringify(b));
 });

@@ -42,8 +42,7 @@ Atualização: 02/10/2026. O cliente web, via gateway próprio, faz no tm-server
    - avisos nas recusas de compra sem ouro, saque/depósito inválido e teleporte pago sem ouro: [PR #376](https://github.com/Jean1dev/w2pp-OpenWYD/pull/376), `patches/server/0010`, em produção desde 06/10 (`b8488a56`). `shop`, `bank` e `paidteleport` aprovados no Railway ([evidência](evidence/05-gameplay/2026-10-06-refusal-panels.md)); falta conferir com o cliente Windows. Na venda, o Go não tem recusa que o legado avise ([ADR 008](decisions/008-shop-cargo-chat-dialect.md#revisão-de-06102026-tarde-lacuna-1)).
    - Itens no chão ficam fora de escopo (decisão do usuário, 06/10).
 7. Relato de jogador (08/10, [evidência](evidence/05-gameplay/2026-10-08-trash-delete.md)):
-   - a lixeira não chegava ao servidor e o item "voltava". O dialeto passou a encaminhar `0x02E4`, com testes locais aprovados. Faltam o build, o deploy e a fase online (lixeira → compra → relogin → equipar);
-   - o `patches/server/0011` (o delete exige o `SIndex` do slot e ressincroniza quando não bate) está no [PR #377](https://github.com/Jean1dev/w2pp-OpenWYD/pull/377), sem merge;
+   - a lixeira não chegava ao servidor e o item "voltava". Com o #32 (`4983f4cd`) e o servidor [PR #377](https://github.com/Jean1dev/w2pp-OpenWYD/pull/377) (`0b9a6774`) implantados, a fase `trash` foi aprovada no Railway: descarte, compra, relogin, e equipar e desequipar logo depois ([evidência](evidence/05-gameplay/2026-10-08-trash-delete.md#execução-online-08102026-aprovada));
    - stats negativos e arco: hipóteses. Pedir ao jogador a plataforma, o personagem e prints.
 
 As cores e texturas erradas eram defeito de código, não falta de asset: os catálogos de textura 7662 (registros de 264 bytes) eram lidos como 528, o que foi corrigido pelo patch 0005 ([evidências](evidence/02-build/README.md#catálogos-de-textura-causa-real-das-cores-erradas-28092026)). Restam três arquivos ausentes: `abox01/02.msa` e `questsubjects4.txt`.
@@ -1096,3 +1095,21 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Achado (confirmado em fonte):** o runtime esvazia a célula antes de enviar `0x02E4`, e o dialeto descartava o pacote. O "não equipa" é hipótese, como consequência da grade dessincronizada.
 - **Não executado:** build do runtime, fase online, logs do jogador, cliente Windows, `-race`/lint do servidor. Sem merge ou deploy; servidor no [PR #377](https://github.com/Jean1dev/w2pp-OpenWYD/pull/377).
 - **Próximo passo:** dados do jogador; build, deploy e fase online; PR do 0011; reproduzir arco e stats web × Windows.
+
+### 08/10/2026 — etapa 5: lixeira em produção e fase `trash`
+
+- **Pedido do usuário:** merge dos dois PRs, acompanhar o deploy, criar contas novas e reproduzir o teste.
+- **Deploy:** #32 → `4983f4cd` (webclient `f89aa285`); #377 → `0b9a6774` (tm-server `ca8ee75d`); ambos SUCCESS; o tm-server subiu limpo.
+- **Arquivos:**
+  - `patches/openwyd/0029-trash-cell-probe.patch` (sonda só de leitura);
+  - `tools/verify_world.mjs` (fase `trash`);
+  - `tools/world_checks.mjs` e `world_checks.test.mjs` (`checkTrash`, restrição `login,enter,trash`);
+  - evidência com JSON e este progresso.
+- **Contas:** duas contas novas no portal (`create_test_account.mjs`), só no `.env` deste worktree; personagem A criado (classe 0).
+- **Comandos e resultados:**
+  - `npm run world:checks`: 42/42;
+  - `login,create,enter`: ok;
+  - `login,enter,trash`: ok (472 s);
+  - `item deleted` no log do servidor.
+- **Não executado:** base com o cliente antigo; segunda sessão observando; cliente Windows; sintomas 2 e 3.
+- **Próximo passo:** dados do jogador (plataforma, personagem, prints) para os stats negativos e o arco.

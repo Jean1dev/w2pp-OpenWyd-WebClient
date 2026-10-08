@@ -15,7 +15,7 @@ export function redactEvidence(value, secrets) {
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
   'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea',
-  'equip', 'potion', 'loot', 'shop', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent', 'settings'];
+  'equip', 'potion', 'loot', 'shop', 'trash', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent', 'settings'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -44,7 +44,7 @@ export function validateOptions(opt) {
       'potion runs only with login,enter,second,death');
   // Slice 3: shop and bank are private to A and end with their own relogin;
   // chat needs B as the listener and includes the /city teleport commands.
-  for (const [p, only] of [['shop', ['enter', 'login', 'shop']], ['bank', ['bank', 'enter', 'login']],
+  for (const [p, only] of [['shop', ['enter', 'login', 'shop']], ['trash', ['enter', 'login', 'trash']], ['bank', ['bank', 'enter', 'login']],
     ['paidteleport', ['enter', 'login', 'paidteleport']],
     ['chat', ['chat', 'enter', 'login', 'second']], ['party', ['enter', 'login', 'party', 'second']],
     ['partychat', ['enter', 'login', 'partychat', 'second']],
@@ -361,6 +361,31 @@ export function checkShop(s) {
   assert.equal(s.repeat.coinBefore - s.repeat.coinAfter, s.repeat.gained * price, 'repeated buy: gold and items disagree');
   checkInventoryRelogin(s.beforeRelogin, s.relogin);
   assert.equal(s.relogin.coin, s.beforeRelogin.coin, 'gold differs after relogin');
+}
+
+// Trash grid (player report of 08/10, ADR 007): the item dropped on the trash
+// and confirmed (box 740) leaves through 0x02E4 and the server deletes it, so
+// a later buy and a relogin do not bring it back; equip/unequip still work.
+export function checkTrash(t) {
+  assert.equal(t.drop.cursor, t.victim.index, 'trash: item not picked by the cursor');
+  assert.equal(t.drop.box, 740, 'trash: confirmation box 740 did not open');
+  assert(t.drop.sent >= 1, 'trash: nothing left the client');
+  assert.equal(t.drop.lastSent, '0x2e4', 'trash: 0x02E4 was not the last frame sent');
+  assert.equal(t.afterTrash.carry[t.victim.slot].index, 0, 'trash: cell still holds the item');
+  assert.equal(t.counts.afterTrash, t.counts.before - 1, 'trash: item count did not drop by one');
+  assert(t.buy.gained >= 1, 'trash: the buy after the trash did not land');
+  assert.equal(t.counts.afterBuy, t.counts.afterTrash, 'trash: the discarded item came back after the buy');
+  checkInventoryRelogin(t.beforeRelogin, t.relogin);
+  assert.equal(t.counts.afterRelogin, t.counts.afterTrash, 'trash: the discarded item came back after relogin');
+  const { slot, free, item } = t.equip;
+  for (const [name, m] of [['unequip', t.equip.unequip], ['equip', t.equip.reequip]]) {
+    assert.equal(m.picked, m.expect, `trash ${name}: item not picked by the cursor`);
+    assert(m.swapsSent >= 1, `trash ${name}: no 0x0376 left the client`);
+  }
+  assert.equal(t.equip.off.equip[slot].index, 0, 'trash unequip: slot still holds the item');
+  assert.equal(t.equip.off.carry[free].index, item, 'trash unequip: item not in the carry cell');
+  assert.equal(t.equip.on.equip[slot].index, item, 'trash re-equip: item not back in the slot');
+  assert.equal(t.equip.on.carry[free].index, 0, 'trash re-equip: carry cell not emptied');
 }
 
 // Account cargo (slice 3): both gold pools and the stored item change only by
