@@ -44,7 +44,7 @@ import { checkGuildChat, checkParty, checkPartyChat, checkPartyEvidence } from '
 import { fsTraceInit, packageIndex, openedByDir } from './fs_trace.mjs';
 import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  checkEquip, checkPotion, checkLoot, checkShop, checkTrash, checkBank, checkPaidTeleport, checkChat, checkBuff, checkHealOther, checkRestart, checkSettings, checkConcurrent, itemAmount } from './world_checks.mjs';
+  checkEquip, checkPotion, checkLoot, checkShop, checkTrash, checkBank, checkPaidTeleport, checkChat, checkBuff, checkHealOther, checkRestart, checkSettings, checkAudio, checkConcurrent, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -149,6 +149,30 @@ async function startGateway(port, target) {
 const traced = new Map();
 const traceOpens = page => page.evaluate(() => [...(window.__measure?.opens ?? [])]);
 
+// Phase audio: every AudioBufferSourceNode.start with the gain node it feeds
+// (the compat layer wires source -> gain -> destination per play) and the JS
+// stack of the caller, so a sound that escapes the mute names its path.
+function audioTraceInit() {
+  window.__audio = [];
+  const connect = AudioNode.prototype.connect;
+  AudioNode.prototype.connect = function (target, ...rest) {
+    this.__to = target;
+    return connect.call(this, target, ...rest);
+  };
+  const start = AudioBufferSourceNode.prototype.start;
+  AudioBufferSourceNode.prototype.start = function (...args) {
+    const g = this.__to;
+    window.__audio.push({
+      at: performance.now() | 0,
+      seconds: Math.round((this.buffer?.duration ?? 0) * 100) / 100,
+      gain: g?.gain ? g.gain.value : null,
+      toDestination: !!(g && (g instanceof AudioDestinationNode || g.__to instanceof AudioDestinationNode)),
+      stack: new Error().stack.split('\n').slice(2, 12).map(l => l.trim().replace(/^at /, '').replace(/ \(.*\)$/, ''))
+    });
+    return start.apply(this, args);
+  };
+}
+
 class Session {
   constructor(browser, origin, label, creds) {
     this.browser = browser; this.origin = origin; this.label = label; this.creds = creds;
@@ -158,6 +182,7 @@ class Session {
   async open() {
     this.context = await this.browser.newContext({ viewport: { width: 1024, height: 768 } });
     if (opt['trace-files']) await this.context.addInitScript(fsTraceInit);
+    if (phases.has('audio')) await this.context.addInitScript(audioTraceInit);
     this.page = await this.context.newPage();
     this.connected = false;
     this.page.on('websocket', ws => {
@@ -1040,7 +1065,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'trash', 'bank', 'chat', 'party', 'partychat', 'guildchat', 'trade', 'paidteleport', 'settings'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'trash', 'bank', 'chat', 'party', 'partychat', 'guildchat', 'trade', 'paidteleport', 'settings', 'audio'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -1096,7 +1121,7 @@ async function main() {
     gw = await startGateway(await freePort(), opt.target);
     // settings measures the zone music: headless has no user gesture to unlock audio.
     browser = await chromium.launch({ headless: !opt.headed,
-      args: phases.has('settings') ? ['--autoplay-policy=no-user-gesture-required'] : [] });
+      args: phases.has('settings') || phases.has('audio') ? ['--autoplay-policy=no-user-gesture-required'] : [] });
     await step('badpass', async () => {
       const s = await newSession('A-badpass', A);
       const before = await s.probe();
@@ -1448,6 +1473,84 @@ async function main() {
 
       const res = { initial, slider, mute, zone, relogin, resolutions };
       checkSettings(res);
+      return res;
+    });
+
+    // Etapa 7, effects mute measured at the audio output, not at the runtime
+    // levels: the player heard blows and spells with "Mudo" pressed (09/10).
+    // Walking in town plays the field ambience (TMFieldScene::FrameMove);
+    // fighting a Gremlin plays swings and hits (TMHuman).
+    await step('audio', async () => {
+      const pg = a.page;
+      const panel = pg.locator('details.wyd-settings');
+      const setOpen = async open => {
+        if ((await panel.evaluate(d => d.open)) !== open) await panel.locator('summary').click();
+        await a.frames(1);
+      };
+      const muteOf = kind => pg.locator('.wyd-settings-row', { has: pg.locator(`#wyd-${kind}`) }).locator('.wyd-mute');
+      const window_ = async (label, act) => {
+        await setOpen(false);
+        const n0 = await a.eval(() => window.__audio.length);
+        if (act) await act();
+        else for (const [dx, dy] of [[160, 80], [-160, 80], [160, -80], [-160, -80]]) await a.walk(dx, dy);
+        await a.frames(30);
+        const log = await a.eval(n => window.__audio.slice(n), n0);
+        const audible = log.filter(e => e.gain === null || e.gain > 0);
+        const levels = await a.eval(() => ({ effects: Module._wyd_audio_get_level(0), music: Module._wyd_audio_get_level(1) }));
+        const out = { ...levels, plays: log.length, audible: audible.length,
+          gains: [...new Set(log.map(e => e.gain))].slice(0, 8), samples: audible.slice(0, 3) };
+        console.log(`    ${label}: ${out.plays} plays, ${out.audible} audible, effects ${out.effects}`);
+        return out;
+      };
+      const enterAgain = async () => {
+        await a.loginToSelect();
+        const pin = await a.pin();
+        assert.equal(pin.result, 'lock1', 'relogin PIN rejected');
+        return a.enter(0);
+      };
+      // About 30 s on one live Gremlin, one click per intent as in 'attack'.
+      const fight = async () => {
+        let mob;
+        for (let i = 0; i < 6 && !mob; i++) {
+          mob = (await a.mobs()).find(m => m.name.trim() === 'Gremlin' && m.onScreen && m.hp > 0 && m.maxHp > 0);
+          if (!mob) await a.walk(i % 2 ? -160 : 160, 80);
+        }
+        assert(mob, 'no live Gremlin on screen');
+        const c0 = await a.combat(mob.id);
+        const end = Date.now() + 30000;
+        let lastClick = 0;
+        while (Date.now() < end) {
+          const c = await a.combat(mob.id);
+          if (c.myDie === 1 || c.myHp <= 0 || !c.present || c.hp <= 0) break;
+          if (Date.now() - lastClick > 6000) { await a.clickHuman(mob.id); lastClick = Date.now(); }
+          await sleep(500);
+        }
+        const c = await a.combat(mob.id);
+        assert(c.outAttack > c0.outAttack, 'no attack sent, the fight proves nothing');
+      };
+
+      await a.closePanels();
+      await setOpen(true);
+      await pg.locator('#wyd-effects').fill('60');
+      const unmuted = await window_('unmuted');
+      await a.toGremlinField();
+      const fightUnmuted = await window_('fight unmuted', fight);
+      await setOpen(true);
+      await muteOf('effects').click();
+      await muteOf('music').click();
+      const muted = await window_('muted');
+      const fightMuted = await window_('fight muted', fight);
+      // As the player: the saved preference is muted from the boot on.
+      await a.reload();
+      await enterAgain();
+      const bootMuted = await window_('muted at boot');
+      await a.toGremlinField();
+      const fightBootMuted = await window_('fight muted at boot', fight);
+      await setOpen(true);
+      await muteOf('effects').click();
+      const unmutedAgain = await window_('unmuted again', fight);
+      const res = { unmuted, fightUnmuted, muted, fightMuted, bootMuted, fightBootMuted, unmutedAgain };
+      checkAudio(res);
       return res;
     });
 

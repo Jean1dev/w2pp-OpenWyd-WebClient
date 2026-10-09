@@ -9,7 +9,7 @@ Estado em 29/09/2026: **no ar e verificado.** Deploy pela branch do PR #3 (`rail
 | Projeto / ambiente | `wyd-client-web` / `production` |
 | Serviço | `w2pp-OpenWyd-WebClient` (repositório, deploy automático do `main`, builder Dockerfile via `railway.json`) |
 | Domínio | `https://w2pp-openwyd-webclient-production.up.railway.app` (porta 8080) |
-| Bucket | `arranged-orb` (região `iad`), prefixo `assets-f4c03289374bd614`, 16 objetos, 346.600.204 bytes, verificados por `HEAD` |
+| Bucket | `arranged-orb` (região `iad`), prefixo `assets-a457267b6cd82874` desde 09/10 (cache do pacote ativo), 16 objetos, 346.607.659 bytes, verificados por `HEAD`; o prefixo anterior `assets-f4c03289374bd614` (sem cache) fica para rollback |
 | tm-server | projeto `wyd`; como a rede privada não atravessa projetos, o acesso é pelo proxy TCP público `reseau.proxy.rlwy.net:56950` |
 
 ## O que roda
@@ -42,7 +42,7 @@ Todas as rotas, exceto `/healthz`, exigem a credencial Basic, inclusive a abertu
 | `WYD_ASSET_S3_URL_STYLE` | `virtual-host` | |
 | `WYD_ASSET_S3_BUCKET` | nome interno do bucket | |
 | `WYD_ASSET_S3_ACCESS_KEY_ID`, `WYD_ASSET_S3_SECRET_ACCESS_KEY` | secretas | definidas por stdin a partir da CLI; se forem rotacionadas (`--reset`), redefina-as |
-| `WYD_ASSET_S3_PREFIX`, `WYD_ASSET_MANIFEST` | `assets-f4c03289374bd614`, `f4c03289374bd614` | versão ativa dos assets |
+| `WYD_ASSET_S3_PREFIX`, `WYD_ASSET_MANIFEST` | `assets-a457267b6cd82874`, `a457267b6cd82874` (09/10) | versão ativa dos assets |
 
 Gate por conta do portal ([ADR 015](decisions/015-portal-account-gate.md)), alternativa exclusiva ao Basic. **Ativo em produção desde 02/10** (deploy `82f3850`); `WYD_BASIC_AUTH_*` foram removidas:
 - `WYD_PORTAL_URL`: origem do portal, por exemplo `https://wyd-ten.vercel.app`;
@@ -85,6 +85,10 @@ diretório da página. WASM e músicas não entram nesse cache.
 do diretório local: o navegador revalida o carregador antes de escolher o pacote.
 `config.json` e HTML continuam sem armazenamento HTTP. Credenciais não são
 gravadas no IndexedDB. O jogo continua online e precisa montar os assets em memória.
+
+Ativo em produção desde 09/10 (deploy `5669ce6f`, [evidência](evidence/07-web/2026-10-09-cache-and-mute.md)).
+O `Config.bin` do `assets-local` local tem música 0 desde o contorno de 01/10; o publicado
+mantém 20. Empacote com o `Config.bin` publicado, ou o `.data` muda e todos baixam de novo.
 
 Para ativar no deploy, regenere os assets com os dois comandos Python acima,
 publique **o par `.js`/`.data` e seu manifesto no mesmo prefixo novo**, e só então
