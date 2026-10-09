@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
+import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, checkAudio, redactEvidence,
   itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkTrash, checkBank, checkPaidTeleport, checkChat,
   checkSettings, musicCentibels, musicElementVolume, checkConcurrent } from './world_checks.mjs';
 
@@ -389,6 +389,23 @@ test('settings: music levels follow the original curve, mute survives a zone cha
   bad({ resolutions: [res('1024x768'), res('1280x1024'), { ...res('1280x1024', true), displayed: [1036, 828] }] });
   assert.throws(() => validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,enter,second,settings' }));
   validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,create,enter,settings' });
+});
+
+test('audio: muted effects start no audible sound, in town and in combat, also muted from the boot', () => {
+  const w = (plays, audible, effects = 60) => ({ effects, music: 0, plays, audible });
+  const ok = { unmuted: w(44, 44), fightUnmuted: w(12, 12), muted: w(0, 0, 0), fightMuted: w(0, 0, 0),
+    bootMuted: w(0, 0, 0), fightBootMuted: w(0, 0, 0), unmutedAgain: w(7, 7) };
+  checkAudio(ok);
+  const bad = patch => assert.throws(() => checkAudio({ ...ok, ...patch }));
+  bad({ unmuted: w(0, 0) });
+  bad({ fightUnmuted: w(3, 0) });
+  // A sound started at gain 0 is silent; one with gain > 0 while muted is the bug.
+  bad({ fightMuted: w(5, 2, 0) });
+  bad({ fightBootMuted: w(1, 1, 0) });
+  bad({ muted: w(0, 0, 60) });
+  bad({ unmutedAgain: w(0, 0) });
+  assert.throws(() => validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,enter,second,audio' }));
+  validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,enter,audio' });
 });
 
 test('concurrent: the duplicate login is refused to try again, the first session closed, the retry enters the same character', () => {

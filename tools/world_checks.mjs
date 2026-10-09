@@ -15,7 +15,7 @@ export function redactEvidence(value, secrets) {
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
   'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea',
-  'equip', 'potion', 'loot', 'shop', 'trash', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent', 'settings'];
+  'equip', 'potion', 'loot', 'shop', 'trash', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent', 'settings', 'audio'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -58,6 +58,10 @@ export function validateOptions(opt) {
   if (phases.has('settings'))
     assert([...phases].every(n => ['login', 'create', 'enter', 'settings'].includes(n)) && phases.has('enter'),
       'settings runs only with login,[create,]enter');
+  // Etapa 7, effects mute measured at the audio output; reloads A's page, alone.
+  if (phases.has('audio'))
+    assert([...phases].every(n => ['login', 'create', 'enter', 'audio'].includes(n)) && phases.has('enter'),
+      'audio runs only with login,[create,]enter');
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
     move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], buff: ['login'], healother: ['login'], loot: ['login'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
@@ -581,4 +585,20 @@ export function checkSettings(s) {
   const [w, h] = fit.canvas.split('x').map(Number);
   assert(fit.displayed[0] > w && Math.abs(fit.displayed[0] / fit.displayed[1] - w / h) < 0.01,
     `fit shows ${fit.displayed} for ${fit.canvas}`);
+}
+
+// Etapa 7, effects mute at the audio output (patch 0023). Each window lists
+// the effect sounds started while walking, with the gain each one is wired
+// through; audible means a source started with gain > 0 to the destination.
+export function checkAudio(a) {
+  assert(a.unmuted.plays > 0 && a.unmuted.audible > 0, `unmuted: ${a.unmuted.plays} plays, ${a.unmuted.audible} audible; the check proves nothing`);
+  assert.equal(a.muted.effects, 0, 'muted: effects level not 0');
+  assert.equal(a.muted.audible, 0, `muted: ${a.muted.audible} effect sounds audible`);
+  assert.equal(a.bootMuted.effects, 0, 'muted at boot: effects level not 0');
+  assert.equal(a.bootMuted.audible, 0, `muted at boot: ${a.bootMuted.audible} effect sounds audible`);
+  // Combat (the player's report): swings and hits.
+  assert(a.fightUnmuted.audible > 0, 'fight unmuted: no audible effect, the check proves nothing');
+  assert.equal(a.fightMuted.audible, 0, `fight muted: ${a.fightMuted.audible} effect sounds audible`);
+  assert.equal(a.fightBootMuted.audible, 0, `fight muted at boot: ${a.fightBootMuted.audible} effect sounds audible`);
+  assert(a.unmutedAgain.audible > 0, 'unmuted again: effects stayed silent');
 }

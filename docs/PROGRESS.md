@@ -1156,3 +1156,24 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - nenhum alerta de base negativa nem erro no log ([ADR 020](decisions/020-persisted-base-score.md#deploy-08102026)).
 - **Não executado:** relogin do personagem do relato, que depende do jogador; teste com uma mudança real de regra em produção.
 - **Próximo passo:** pedir ao jogador uma print com o arco; Benelli segue com −88, por decisão do usuário.
+
+### 09/10/2026 — etapa 7: cache do pacote em produção e relato do mudo
+
+- **Pedido do usuário:** o jogador mandou um vídeo: o "Mudo" não silencia os efeitos, e o cliente baixa tudo a cada acesso pelo link.
+- **Download (causa confirmada em execução):**
+  - a produção ainda usava o pacote de 29/09, sem `WYD_PRELOAD_CACHE`;
+  - publicado `assets-a457267b6cd82874`, com o mesmo `.data` (`3dad5977…`) e o loader com cache; variáveis trocadas com aprovação; deploy `5669ce6f`;
+  - pelo link do portal, o 2º acesso não baixa o `.data` (`fromCache: true`): 13 s no Chromium e 24 s no Firefox ([evidência](evidence/07-web/2026-10-09-cache-and-mute.md)).
+- **Achado:** o `Config.bin` do `assets-local` local tem música 0 (contorno de 01/10), e o publicado tem 20. O reempacotamento usou o publicado; `docs/deploy.md` registra isso.
+- **Mudo (não reproduzido):**
+  - nova fase `audio`, que mede o ganho de cada som iniciado;
+  - com o runtime da mesma fonte da produção, 0 efeitos audíveis em mudo, andando e em combate, e também com o mudo salvo desde o boot;
+  - sem mudo, 7–139 sons audíveis; ao desmutar, voltam (17).
+- **Arquivos:**
+  - `tools/verify_world.mjs` (fase `audio`);
+  - `tools/world_checks.mjs` e `world_checks.test.mjs` (`checkAudio`);
+  - `docs/deploy.md`;
+  - a evidência e este progresso.
+- **Comandos:** `npm run world:checks` 43/43; `verify_world --phases login,enter,audio` (execuções na evidência).
+- **Não executado:** o mudo no runtime publicado dentro do Field; Safari.
+- **Próximo passo:** respostas do jogador (outra aba ou cliente aberto, caixas de som × microfone, gravação só com o áudio da aba).
