@@ -3213,6 +3213,9 @@ async function main() {
         const at = await a.me();
         await a.shot(`kefra-${label}`);
         const ok = box ? await a.eval(() => Module._wyd_debug_scene_msgbox_ok()) : null;
+        // Without a table entry the runtime opens an empty box (message 0, which
+        // the probe cannot tell from no box); left open, it swallows the chat.
+        if (!box) await a.page.locator('#canvas').press('Escape');
         await a.frames(2);
         const lastSent = await a.lastSent();
         await a.until(`${label} in Hall`, ([x, y]) => Math.hypot(Module._wyd_field_myhuman_x() - x,

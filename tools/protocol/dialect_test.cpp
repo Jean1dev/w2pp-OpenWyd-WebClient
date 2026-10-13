@@ -419,6 +419,16 @@ static void TestOutbound()
 		CHECK(WydDialectOutbound(parm, 16, wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
 		CHECK(WydDialectOutbound(parm, 12, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
 	}
+	// Quest: StandardParm2(npc, confirm) passes unchanged; a short frame is refused.
+	{
+		MSG_STANDARDPARM2 quest{};
+		quest.Header.Type = 0x28B;
+		quest.Header.Size = sizeof(quest);
+		quest.Parm1 = 1234;
+		quest.Parm2 = 1;
+		CHECK(WydDialectOutbound(reinterpret_cast<char*>(&quest), sizeof(quest), wire, sizeof(wire), &size) == WYD_DIALECT_PASS);
+		CHECK(WydDialectOutbound(reinterpret_cast<char*>(&quest), 16, wire, sizeof(wire), &size) == WYD_DIALECT_DROP);
+	}
 	// Unmapped opcodes (here CombineItem 0x3A6) are never sent.
 	char chat[156] = {static_cast<char>(156), 0, 0, 0, static_cast<char>(0xA6), 0x03};
 	CHECK(WydDialectOutbound(chat, sizeof(chat), wire, sizeof(wire), &size) == WYD_DIALECT_DROP);

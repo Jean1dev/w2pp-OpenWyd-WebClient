@@ -1,0 +1,43 @@
+Etapa 5: the Hall of Kefra entrance was missing from the runtime's teleport
+table. The server spends one Kefra entry per 0x0290 sent from the 4x4 block
+at (2364,3892) (GetFunc.cpp:994), but the decompiled table has 37 portals and
+no Kefra Hall, so standing there opened an empty box whose OK sent nothing.
+Add the block with _NN_Name_Khepra (1370) as the target, free of charge, and
+size the lookup loop from the table. The Windows 7662 table is not confirmed.
+
+diff --git a/Projects/TMProject/TMGlobal.h b/Projects/TMProject/TMGlobal.h
+--- a/Projects/TMProject/TMGlobal.h
++++ b/Projects/TMProject/TMGlobal.h
+@@ -189,7 +189,7 @@ const static TMVector3 g_vecItemBillPos[28] =
+     {0.76899999f, 0.509f, -1.143f},
+ };
+ 
+-const static stTeleportPos g_TeleportTable[37] =
++const static stTeleportPos g_TeleportTable[38] =
+ {
+   { 2116, 2100, 700, g_pMessageStringTable[209] },
+   { 2480, 1716, 700, g_pMessageStringTable[209] },
+@@ -227,7 +227,10 @@ const static stTeleportPos g_TeleportTable[37] =
+   { 3648, 3140, 700, g_pMessageStringTable[211] },
+   { 2480, 1648, 700, g_pMessageStringTable[301] },
+   { 1052, 1708, 0, g_pMessageStringTable[321] },
+-  { 1056, 1724, 0, g_pMessageStringTable[485] }
++  { 1056, 1724, 0, g_pMessageStringTable[485] },
++  // Hall of Kefra entrance (_NN_Name_Khepra); the server spends one entry
++  // per 0x290 from this block (GetFunc.cpp:994).
++  { 2364, 3892, 0, g_pMessageStringTable[1370] }
+ };
+ 
+ static unsigned int g_dwFoodColor[7] =
+diff --git a/Projects/TMProject/TMFieldScene.cpp b/Projects/TMProject/TMFieldScene.cpp
+--- a/Projects/TMProject/TMFieldScene.cpp
++++ b/Projects/TMProject/TMFieldScene.cpp
+@@ -7960,7 +7960,7 @@ int TMFieldScene::FrameMove(unsigned int dwServerTime)
+ 		int x = (int)m_pMyHuman->m_vecPosition.x & 0xFFFC;
+ 		int y = (int)m_pMyHuman->m_vecPosition.y & 0xFFFC;
+ 
+-		for (int ll = 0; ll < 37; ++ll)
++		for (int ll = 0; ll < (int)(sizeof(g_TeleportTable) / sizeof(g_TeleportTable[0])); ++ll)
+ 		{
+ 			if (g_TeleportTable[ll].nX == x && g_TeleportTable[ll].nY == y)
+ 			{
