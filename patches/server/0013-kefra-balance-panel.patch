@@ -1,0 +1,313 @@
+From c4bf9b88ddcf0d42436ebfcfe157a56dca95897d Mon Sep 17 00:00:00 2001
+From: Jeanluca <jeanlucafp@gmail.com>
+Date: Tue, 13 Oct 2026 13:52:35 -0300
+Subject: [PATCH] fix(tmserver): show the Kefra balance panel and answer it at
+ the Sobrevivente
+
+The Hall of Kefra balance (_DN_CHANGE_COUNT) went out through w.Send, which
+stamps the session's conn in HEADER.ID. The 7662 client only shows a
+MSG_MessagePanel with ID 0 (TMScene.cpp:1371), so players never saw how many
+entries a sealed scroll gave or how many were left, and read it as "one
+access" (#343). The text was also UTF-8 instead of the legacy Windows-1252.
+
+- send the balance like SendClientMessage (ID 0, Language.txt bytes); the
+  Nightmare balance and /nt share the string and get the same fix
+- the Sobrevivente answers with the balance when the player has no scroll
+  (intentional deviation from the silent legacy, asked by #343)
+- entries per scroll configurable: -kefra-entries-per-scroll /
+  W2PP_KEFRA_ENTRIES_PER_SCROLL, default 100 (legacy)
+
+Closes #343
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ docs/game.md                               |  2 +-
+ docs/migration/handlers/_MSG_Quest-npcs.md | 16 ++++++-
+ tmserver/cmd/tmserver/main.go              |  6 ++-
+ tmserver/internal/handler/chat.go          |  2 +-
+ tmserver/internal/handler/dispatch.go      |  7 ++++
+ tmserver/internal/handler/kefra.go         | 28 +++++++++----
+ tmserver/internal/handler/kefra_test.go    | 49 ++++++++++++++++++----
+ tmserver/internal/handler/movement.go      |  2 +-
+ tmserver/internal/handler/nightmare.go     |  2 +-
+ 9 files changed, 91 insertions(+), 23 deletions(-)
+
+diff --git a/docs/game.md b/docs/game.md
+index 63ee7fce..e0812d70 100644
+--- a/docs/game.md
++++ b/docs/game.md
+@@ -9,7 +9,7 @@
+ ✅ /erion: se teleportará para a cidade de Erion <br/>
+ ✅ /azran: se teleportará para a cidade de Azran <br/>
+ ✅ /gelo: se teleportará para a cidade de Gelo <br/>
+-✅ /kefra: se teleportará para a cidade de Kefra <br/>
++✅ /kefra: se teleportará para a cidade de Kefra. Ali, o NPC Sobrevivente troca o Pergaminho Selado (4127) por acessos ao Hall de Kefra (100 por pergaminho, ajustável com `-kefra-entries-per-scroll`), e cada entrada no Hall gasta um. Falar com ele sem pergaminho mostra os acessos restantes <br/>
+ ✅ /noatun: se teleportará para Noatun <br/>
+ ✅ /arch: se teleportará para a cidade dos reinos (apenas o teleporte; o destrave do Arch é ⏳) <br/>
+ ✅ /rei ou /king: teleporta para o rei correspondente à capa equipada — Hekalotia (azul) vai para `(1748,1574)` e Akelonia (vermelha) para `(1748,1880)`; sem capa de reino, o comando não teleporta <br/>
+diff --git a/docs/migration/handlers/_MSG_Quest-npcs.md b/docs/migration/handlers/_MSG_Quest-npcs.md
+index f491a7e5..ebd3bc16 100644
+--- a/docs/migration/handlers/_MSG_Quest-npcs.md
++++ b/docs/migration/handlers/_MSG_Quest-npcs.md
+@@ -156,12 +156,24 @@ está implementado; cidadania e o bloco condicional continuam pendentes.
+ ## Sobrevivente — Hall de Kefra (#325)
+ 
+ O NPC `MOB.Merchant=100`, `EF_GRADE0=22` converte o primeiro item **4127**
+-(Pergaminho Selado) nos slots acessíveis do inventário em **100 acessos** ao Hall.
++(Pergaminho Selado) nos slots acessíveis do inventário em **100 acessos** ao Hall
++(o valor legado; cada servidor ajusta com `-kefra-entries-per-scroll` /
++`W2PP_KEFRA_ENTRIES_PER_SCROLL`, #343).
+ A interação é imediata, tanto com `confirm=0` quanto com `confirm!=0`, e limpa
+ inteiramente o slot selecionado, conforme `_MSG_Quest.cpp:2598-2623`. Não exige
+-espaço livre. Sem pergaminho acessível, ou se a soma exceder `int32`, nada muda.
++espaço livre. Se a soma exceder `int32`, nada muda.
+ O servidor envia o slot vazio e a mensagem `_DN_CHANGE_COUNT` (420) com o saldo.
+ 
++**Desvio intencional (#343):** sem pergaminho acessível, o legado fica em silêncio;
++o Go responde com `_DN_CHANGE_COUNT` e o saldo atual (inclusive 0), para o jogador
++consultar os acessos restantes no próprio NPC.
++
++A mensagem sai como no `SendClientMessage` (`SendFunc.cpp:27-43`): `MSG_MessagePanel`
++com `HEADER.ID` 0 e o texto em Windows-1252. O cliente 7662 descarta o painel com
++outro ID (`TMScene.cpp:1371`), e até o #343 o saldo nunca aparecia na tela. A mesma
++correção vale para o saldo do Pesadelo (`/nt` e a troca de entradas), que usa a
++mesma string.
++
+ O template real `npc/Sobrevivente` tem `MOB.Merchant=100` no byte 17, mas
+ `CurrentScore.Merchant=68` (o valor exposto por `Entity.Merchant`). O despacho
+ aceita o discriminador legado do template e também `Entity.Merchant=100`, sempre
+diff --git a/tmserver/cmd/tmserver/main.go b/tmserver/cmd/tmserver/main.go
+index e6f90001..472ab70b 100644
+--- a/tmserver/cmd/tmserver/main.go
++++ b/tmserver/cmd/tmserver/main.go
+@@ -110,6 +110,7 @@ func run(logger *slog.Logger) error {
+ 	}
+ 	statusAddr := flag.String("status-addr", defStatusAddr, "HTTP channel-status listen address (serv00.htm); real WYD serves status on :80, separate from the game port. Empty disables")
+ 	maxNightmare := flag.Int("max-nightmare", envInt("W2PP_MAX_NIGHTMARE", 3), "counted Nightmare admissions per map and cycle")
++	kefraEntriesPerScroll := flag.Int("kefra-entries-per-scroll", envInt("W2PP_KEFRA_ENTRIES_PER_SCROLL", 100), "Hall of Kefra entries one sealed scroll grants at the Sobrevivente (legacy 100; servers commonly use 50 or 100)")
+ 	clientVersion := flag.Int("client-version", envInt("W2PP_CLIENT_VERSION", 7640), "MSG_AccountLogin.ClientVersion the client must send (protocol-spec says 7640; this 7662 'Cavaleiros de Kersef' build sends 12000)")
+ 	doubleExp := flag.Bool("double-exp", envBool("W2PP_DOUBLE_EXP", false), "DOUBLEMODE: double PvE experience (gameconfig double)")
+ 	newbieEvent := flag.Bool("newbie-event", envBool("W2PP_NEWBIE_EVENT", false), "NewbieEventServer: +15% exp and newbie under-100 bonus (gameconfig)")
+@@ -296,8 +297,9 @@ func run(logger *slog.Logger) error {
+ 		eventSeed = 1
+ 	}
+ 	dispatch := handler.New(handler.Config{
+-		MaxNightmare: *maxNightmare,
+-		Log:          logger, ClientVersion: int32(*clientVersion), BaseMobs: baseMobs, SummonMobs: summonMobs, VineMob: vineMob, ItemPrices: itemPrices, ItemEffects: itemEffects, ItemReqs: itemReqs,
++		MaxNightmare:          *maxNightmare,
++		KefraEntriesPerScroll: *kefraEntriesPerScroll,
++		Log:                   logger, ClientVersion: int32(*clientVersion), BaseMobs: baseMobs, SummonMobs: summonMobs, VineMob: vineMob, ItemPrices: itemPrices, ItemEffects: itemEffects, ItemReqs: itemReqs,
+ 		ItemVolatiles: itemVolatiles, ItemPos: itemPos, ItemUnique: itemUnique, ItemGrades: itemGrades, ItemExtra: itemExtra, Spells: spells, Heights: heights,
+ 		SancRate:        sancRate,
+ 		ExpEvents:       level.ExpEvents{DoubleMode: *doubleExp, NewbieEvent: *newbieEvent, KefraLive: *kefraLive},
+diff --git a/tmserver/internal/handler/chat.go b/tmserver/internal/handler/chat.go
+index 93adb893..e5459037 100644
+--- a/tmserver/internal/handler/chat.go
++++ b/tmserver/internal/handler/chat.go
+@@ -297,7 +297,7 @@ func (d *Dispatcher) runCommand(w *world.World, s *world.Session, name string, a
+ 	cmd := strings.TrimPrefix(name, "/")
+ 	if cmd == "nt" {
+ 		if e := w.Entity(s.Conn); e != nil {
+-			sendKefraBalance(w, s, e.NightmareEntries)
++			d.sendKefraBalance(w, s, e.NightmareEntries)
+ 		}
+ 		return true
+ 	}
+diff --git a/tmserver/internal/handler/dispatch.go b/tmserver/internal/handler/dispatch.go
+index d7ceb209..9432a7a0 100644
+--- a/tmserver/internal/handler/dispatch.go
++++ b/tmserver/internal/handler/dispatch.go
+@@ -36,6 +36,10 @@ type Config struct {
+ 	Log           *slog.Logger     // default slog.Default()
+ 	Now           func() time.Time // wall clock for calendar-gated guild ops
+ 
++	// KefraEntriesPerScroll is how many Hall of Kefra entries one sealed
++	// scroll grants at the Sobrevivente; default 100 (the legacy value).
++	KefraEntriesPerScroll int
++
+ 	// AffectDuration tunes how long a CAST buff/debuff lasts (issue #229). The
+ 	// zero value is legacy-faithful; production defaults are set in
+ 	// cmd/tmserver/main.go. Item/cash/Divine affects never pass through it.
+@@ -263,6 +267,9 @@ func New(cfg Config) *Dispatcher {
+ 	if cfg.MaxFailLogin <= 0 {
+ 		cfg.MaxFailLogin = 3
+ 	}
++	if cfg.KefraEntriesPerScroll <= 0 {
++		cfg.KefraEntriesPerScroll = defaultKefraEntriesPerScroll
++	}
+ 	if cfg.Log == nil {
+ 		cfg.Log = slog.Default()
+ 	}
+diff --git a/tmserver/internal/handler/kefra.go b/tmserver/internal/handler/kefra.go
+index 35fc981a..5b8a03cd 100644
+--- a/tmserver/internal/handler/kefra.go
++++ b/tmserver/internal/handler/kefra.go
+@@ -9,10 +9,16 @@ import (
+ )
+ 
+ const (
+-	itemSealedScroll      = 4127
+-	kefraEntriesPerScroll = 100
++	itemSealedScroll = 4127
++	// defaultKefraEntriesPerScroll is the legacy grant (_MSG_Quest.cpp:2614);
++	// Config.KefraEntriesPerScroll overrides it per server.
++	defaultKefraEntriesPerScroll = 100
+ )
+ 
++// changeCount is _DN_CHANGE_COUNT (Language.txt:420) in the table's
++// Windows-1252 bytes, like the other legacy strings sent to the client.
++const changeCount = "Voc\xea pode usar isto %d vezes."
++
+ func isSurvivorNPC(npc *world.Entity) bool {
+ 	if npc == nil || npc.Grade != 22 {
+ 		return false
+@@ -25,8 +31,12 @@ func isSurvivorNPC(npc *world.Entity) bool {
+ 
+ // survivorExchange ports SOBREVIVENTE (_MSG_Quest.cpp:2598). The legacy
+ // ignores confirm and clears the first matching slot, including all effects.
++//
++// Unlike the legacy, which stays silent, a player without a scroll gets the
++// remaining balance (issue #343), so the NPC is where entries can be checked.
+ func (d *Dispatcher) survivorExchange(w *world.World, s *world.Session, e *world.Entity) {
+-	if e.KefraTicket > math.MaxInt32-kefraEntriesPerScroll {
++	grant := int32(d.cfg.KefraEntriesPerScroll)
++	if e.KefraTicket > math.MaxInt32-grant {
+ 		return
+ 	}
+ 	for slot := 0; slot < activeCarryLimit(e); slot++ {
+@@ -34,15 +44,17 @@ func (d *Dispatcher) survivorExchange(w *world.World, s *world.Session, e *world
+ 			continue
+ 		}
+ 		e.Carry[slot] = world.Item{}
+-		e.KefraTicket += kefraEntriesPerScroll
++		e.KefraTicket += grant
+ 		d.sendSlot(w, s, protocol.ItemPlaceCarry, slot, e.Carry[slot])
+-		sendKefraBalance(w, s, e.KefraTicket)
++		d.sendKefraBalance(w, s, e.KefraTicket)
+ 		d.log.Info("kefra scroll exchanged", "conn", s.Conn, "name", e.Name, "tickets", e.KefraTicket)
+ 		return
+ 	}
++	d.sendKefraBalance(w, s, e.KefraTicket)
+ }
+ 
+-// sendKefraBalance uses the legacy _DN_CHANGE_COUNT text (Language.txt:420).
+-func sendKefraBalance(w *world.World, s *world.Session, balance int32) {
+-	w.Send(s, protocol.MsgMessagePanel, protocol.EncodeMessagePanelBody(fmt.Sprintf("Você pode usar isto %d vezes.", balance)))
++// sendKefraBalance sends _DN_CHANGE_COUNT the way SendClientMessage does
++// (HEADER.ID 0), the only form the 7662 client shows (TMScene.cpp:1371).
++func (d *Dispatcher) sendKefraBalance(w *world.World, s *world.Session, balance int32) {
++	d.sendClientMessage(w, s, fmt.Sprintf(changeCount, balance))
+ }
+diff --git a/tmserver/internal/handler/kefra_test.go b/tmserver/internal/handler/kefra_test.go
+index f1b8901c..284e9063 100644
+--- a/tmserver/internal/handler/kefra_test.go
++++ b/tmserver/internal/handler/kefra_test.go
+@@ -115,17 +115,21 @@ func TestSurvivorExchange(t *testing.T) {
+ 				if e.KefraTicket != wantBalance || e.Carry != before {
+ 					t.Errorf("exchange balance=%d, want %d; inventory matches=%v", e.KefraTicket, wantBalance, e.Carry == before)
+ 				}
+-				if !accepted && kefraPacketCount(w, s) != packets {
+-					t.Error("rejected exchange sent packets")
++				if tc.overflow && kefraPacketCount(w, s) != packets {
++					t.Error("overflowing exchange sent packets")
+ 				}
+ 			})
+-			if accepted {
++			switch {
++			case accepted:
+ 				ty, payload := read(t, c)
+ 				want := protocol.EncodeSendItemBody(protocol.ItemPlaceCarry, tc.slot, protocol.SelItem{})
+ 				if ty != protocol.MsgSendItem || !bytes.Equal(payload, want) {
+ 					t.Fatalf("missing cleared slot: type=%x payload=%x", ty, payload)
+ 				}
+ 				assertKefraBalance(t, c, tc.balance+100)
++			case !tc.overflow:
++				// No usable scroll: the Sobrevivente answers with the balance (#343).
++				assertKefraBalance(t, c, tc.balance)
+ 			}
+ 		})
+ 	}
+@@ -154,6 +158,27 @@ func TestSurvivorExchange(t *testing.T) {
+ 			}
+ 			assertKefraBalance(t, c, balance)
+ 		}
++		// The third interaction found no scroll and only reported the balance.
++		assertKefraBalance(t, c, 200)
++	})
++
++	t.Run("configured grant", func(t *testing.T) {
++		runInLoop(t, w, func() {
++			d.cfg.KefraEntriesPerScroll = 50
++			defer func() { d.cfg.KefraEntriesPerScroll = defaultKefraEntriesPerScroll }()
++			e := w.Entity(s.Conn)
++			e.KefraTicket = 3
++			e.Carry = [world.MaxCarry]world.Item{}
++			e.Carry[0] = world.Item{Index: 4127}
++			d.quest(w, s, protocol.Header{}, protocol.EncodeStandardParm2(int32(npcID), 0))
++			if e.KefraTicket != 53 || e.Carry[0].Index != 0 {
++				t.Errorf("balance=%d carry0=%d, want 53 and the scroll spent", e.KefraTicket, e.Carry[0].Index)
++			}
++		})
++		if ty, _ := read(t, c); ty != protocol.MsgSendItem {
++			t.Fatalf("got %x, want SendItem", ty)
++		}
++		assertKefraBalance(t, c, 53)
+ 	})
+ 
+ 	t.Run("invalid interactions", func(t *testing.T) {
+@@ -183,12 +208,22 @@ func TestSurvivorExchange(t *testing.T) {
+ 	})
+ }
+ 
++// assertKefraBalance reads _DN_CHANGE_COUNT as the 7662 client needs it: a
++// message panel with HEADER.ID 0 and the Windows-1252 legacy text.
+ func assertKefraBalance(t *testing.T, c net.Conn, balance int32) {
+ 	t.Helper()
+-	ty, payload := read(t, c)
+-	want := protocol.EncodeMessagePanelBody(fmt.Sprintf("Você pode usar isto %d vezes.", balance))
+-	if ty != protocol.MsgMessagePanel || !bytes.Equal(payload, want) {
+-		t.Fatalf("balance message type=%x payload=%q, want %d", ty, payload, balance)
++	h, payload := readFrameHeader(t, c)
++	want := protocol.EncodeMessagePanelBody(fmt.Sprintf("Voc\xea pode usar isto %d vezes.", balance))
++	if h.Type != protocol.MsgMessagePanel || h.ID != 0 || !bytes.Equal(payload, want) {
++		t.Fatalf("balance message type=%x id=%d payload=%q, want %d", h.Type, h.ID, payload, balance)
++	}
++}
++
++func TestKefraEntriesPerScrollDefault(t *testing.T) {
++	for _, tc := range []struct{ cfg, want int }{{0, 100}, {-5, 100}, {50, 50}, {100, 100}} {
++		if got := New(Config{KefraEntriesPerScroll: tc.cfg}).cfg.KefraEntriesPerScroll; got != tc.want {
++			t.Errorf("KefraEntriesPerScroll %d -> %d, want %d", tc.cfg, got, tc.want)
++		}
+ 	}
+ }
+ 
+diff --git a/tmserver/internal/handler/movement.go b/tmserver/internal/handler/movement.go
+index 991cb114..8d63ee71 100644
+--- a/tmserver/internal/handler/movement.go
++++ b/tmserver/internal/handler/movement.go
+@@ -245,7 +245,7 @@ func (d *Dispatcher) reqTeleport(w *world.World, s *world.Session, _ protocol.He
+ 		e.KefraTicket--
+ 		x := 2364 + int16(w.Rand().Intn(3))
+ 		y := 3906 + int16(w.Rand().Intn(3))
+-		sendKefraBalance(w, s, e.KefraTicket)
++		d.sendKefraBalance(w, s, e.KefraTicket)
+ 		d.doTeleport(w, s, x, y)
+ 		return
+ 	}
+diff --git a/tmserver/internal/handler/nightmare.go b/tmserver/internal/handler/nightmare.go
+index 45989cf9..88fad412 100644
+--- a/tmserver/internal/handler/nightmare.go
++++ b/tmserver/internal/handler/nightmare.go
+@@ -231,7 +231,7 @@ func (d *Dispatcher) useNightmareDeed(w *world.World, s *world.Session, e *world
+ 	e.LastNightmareUse = d.now().Unix()
+ 	consumeOneItem(&e.Carry[src])
+ 	d.sendSlot(w, s, world.ItemPlaceCarry, src, e.Carry[src])
+-	sendKefraBalance(w, s, e.NightmareEntries)
++	d.sendKefraBalance(w, s, e.NightmareEntries)
+ }
+ 
+ func (d *Dispatcher) nightmareMobKilled(w *world.World, mob *world.Entity) {
+-- 
+2.54.0.windows.1
+

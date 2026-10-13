@@ -1,0 +1,493 @@
+{
+ "when": "2026-10-13T18:29:11.145Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "enter",
+  "kefra"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 24758,
+   "at": "2026-10-13T18:29:40.697Z"
+  },
+  "enter": {
+   "ok": true,
+   "me": {
+    "id": 1,
+    "name": "Web*******",
+    "x": 2094.5,
+    "y": 2100.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "score": {
+    "level": 0,
+    "hp": 105,
+    "maxHp": 105,
+    "mp": 105,
+    "maxMp": 105,
+    "damage": 22,
+    "ac": 32
+   },
+   "preview": {
+    "level": 0,
+    "hp": 105,
+    "maxHp": 100,
+    "mp": 105,
+    "maxMp": 100
+   },
+   "dialect": {
+    "inTranslated": 35,
+    "inPass": 2,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 37,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "glErrors": 0,
+   "ms": 20550,
+   "at": "2026-10-13T18:30:07.673Z"
+  },
+  "kefra": {
+   "ok": true,
+   "start": {
+    "sent": {
+     "sent": true,
+     "lastSent": "0x334"
+    },
+    "at": [
+     2365.5,
+     3884.5
+    ]
+   },
+   "exchange": {
+    "scrollsBefore": 1,
+    "npc": 12905,
+    "npcAt": [
+     2370.5,
+     3888.5
+    ],
+    "clicks": [
+     {
+      "hit": true,
+      "lastSent": 651
+     }
+    ],
+    "balance": 197,
+    "panels": [
+     "Voc� pode usar isto 197 vezes."
+    ],
+    "scrolls": 0,
+    "scrollsAfter": 0
+   },
+   "entries": [
+    {
+     "at": [
+      2364.5,
+      3892.5
+     ],
+     "box": true,
+     "ok": 1,
+     "lastSent": 656,
+     "to": [
+      2364.5,
+      3906.5
+     ],
+     "inHall": true,
+     "balance": 196,
+     "panels": [
+      "Voc� pode usar isto 196 vezes."
+     ],
+     "back": {
+      "sent": {
+       "sent": true,
+       "lastSent": "0x334"
+      },
+      "at": [
+       2365.5,
+       3886.5
+      ]
+     }
+    },
+    {
+     "at": [
+      2366.5,
+      3894.5
+     ],
+     "box": true,
+     "ok": 1,
+     "lastSent": 656,
+     "to": [
+      2365.5,
+      3907.5
+     ],
+     "inHall": true,
+     "balance": 195,
+     "panels": [
+      "Voc� pode usar isto 195 vezes."
+     ],
+     "back": {
+      "sent": {
+       "sent": true,
+       "lastSent": "0x334"
+      },
+      "at": [
+       2367.5,
+       3885.5
+      ]
+     }
+    },
+    {
+     "at": [
+      2364.5,
+      3892.5
+     ],
+     "box": true,
+     "ok": 1,
+     "lastSent": 656,
+     "to": [
+      2366.5,
+      3906.5
+     ],
+     "inHall": true,
+     "balance": 194,
+     "panels": [
+      "Voc� pode usar isto 194 vezes."
+     ],
+     "back": {
+      "sent": {
+       "sent": true,
+       "lastSent": "0x334"
+      },
+      "at": [
+       2366.5,
+       3886.5
+      ]
+     }
+    }
+   ],
+   "noScroll": {
+    "npc": 12905,
+    "npcAt": [
+     2370.5,
+     3888.5
+    ],
+    "clicks": [
+     {
+      "hit": true,
+      "lastSent": 651
+     }
+    ],
+    "balance": 194,
+    "panels": [
+     "Voc� pode usar isto 194 vezes."
+    ],
+    "scrolls": 0
+   },
+   "relogin": {
+    "back": {
+     "sent": {
+      "sent": true,
+      "lastSent": "0x334"
+     },
+     "at": [
+      2365.5,
+      3885.5
+     ]
+    },
+    "npc": 12905,
+    "npcAt": [
+     2370.5,
+     3888.5
+    ],
+    "clicks": [
+     {
+      "hit": true,
+      "lastSent": 651
+     }
+    ],
+    "balance": 194,
+    "panels": [
+     "Voc� pode usar isto 194 vezes."
+    ],
+    "scrolls": 0
+   },
+   "ms": 434787,
+   "at": "2026-10-13T18:37:29.444Z"
+  }
+ },
+ "ok": true,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "bbc8f15079ca226e14ae5267c5a554a1b1b5683c",
+  "external/server": "6078345345c817a4b1eb8398aba8659abd79886a",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-10-13T18:29:41.209Z",
+   "freeMiB": 1099,
+   "totalMiB": 8014,
+   "browserMiB": 1076,
+   "pages": {
+    "A": {
+     "wasmMiB": 125,
+     "jsMiB": 468
+    }
+   }
+  },
+  {
+   "point": "end enter",
+   "at": "2026-10-13T18:30:08.366Z",
+   "freeMiB": 1014,
+   "totalMiB": 8014,
+   "browserMiB": 1207,
+   "pages": {
+    "A": {
+     "wasmMiB": 216,
+     "jsMiB": 468
+    }
+   }
+  },
+  {
+   "point": "item relogin: before login",
+   "at": "2026-10-13T18:35:49.828Z",
+   "freeMiB": 1380,
+   "totalMiB": 8014,
+   "browserMiB": 256,
+   "pages": {}
+  },
+  {
+   "point": "end kefra",
+   "at": "2026-10-13T18:37:29.798Z",
+   "freeMiB": 1215,
+   "totalMiB": 8014,
+   "browserMiB": 1228,
+   "pages": {
+    "A-kefra-relogin": {
+     "wasmMiB": 259,
+     "jsMiB": 595
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "field",
+   "file": ".cache/world/2026-10-13T18-29-11-133Z/A-field.png",
+   "sha256": "4f2468fa6a11d0efa3ab028b9d27a98c25d2b2ee19711cbfa26d16a6b8211cb6"
+  },
+  {
+   "name": "kefra-exchange",
+   "file": ".cache/world/2026-10-13T18-29-11-133Z/A-kefra-exchange.png",
+   "sha256": "3feba33249f9df36b1b0343391498c60c9426c39221dc3c11191c8f1775c3e3b"
+  },
+  {
+   "name": "kefra-entry1",
+   "file": ".cache/world/2026-10-13T18-29-11-133Z/A-kefra-entry1.png",
+   "sha256": "1ebd57ddcc09c5c73da0468d46f3a0ef25e7198ace867d25bbb9dff368bd1968"
+  },
+  {
+   "name": "kefra-entry2",
+   "file": ".cache/world/2026-10-13T18-29-11-133Z/A-kefra-entry2.png",
+   "sha256": "b999cc25d2f20b8f6373ff8734fc006b48d538bcda8e6d1313c9a41a51cb3d4f"
+  },
+  {
+   "name": "kefra-entry3",
+   "file": ".cache/world/2026-10-13T18-29-11-133Z/A-kefra-entry3.png",
+   "sha256": "691c86d0e26e2792fed3ac32fb97e95df0545b852d0c89542b0c64584deb8858"
+  },
+  {
+   "name": "kefra-noscroll",
+   "file": ".cache/world/2026-10-13T18-29-11-133Z/A-kefra-noscroll.png",
+   "sha256": "725601dee3a6cede3222cd90df226bf1c4449d73f5038d47124323e3385e19da"
+  },
+  {
+   "name": "kefra-relogin",
+   "file": ".cache/world/2026-10-13T18-29-11-133Z/A-kefra-relogin-kefra-relogin.png",
+   "sha256": "31b44d473c0fa259716fb9a7681ac78b606c45b44fa2fc1e30795091bde64e7c"
+  }
+ ],
+ "final_A-kefra-relogin": {
+  "inTranslated": 36,
+  "inPass": 35,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 4,
+  "outPass": 6,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 71,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "A-kefra-relogin": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-10-13T15:29:15.6969674-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-10-13T15:29:16.7938638-03:00",
+   "msg": "chat open"
+  },
+  {
+   "time": "2026-10-13T15:29:32.4148915-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-13T15:35:49.8192652-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 1876,
+   "bytes_down": 17936
+  },
+  {
+   "time": "2026-10-13T15:35:49.8203508-03:00",
+   "msg": "chat closed",
+   "reason": "browser closed"
+  },
+  {
+   "time": "2026-10-13T15:35:51.2380341-03:00",
+   "msg": "chat open"
+  },
+  {
+   "time": "2026-10-13T15:36:12.4235491-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-13T15:37:38.5538997-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 534,
+   "bytes_down": 12364
+  },
+  {
+   "time": "2026-10-13T15:37:38.5538997-03:00",
+   "msg": "chat closed",
+   "reason": "browser closed"
+  }
+ ]
+}
