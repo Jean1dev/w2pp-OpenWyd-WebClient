@@ -15,7 +15,7 @@ export function redactEvidence(value, secrets) {
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
   'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea',
-  'equip', 'potion', 'loot', 'shop', 'trash', 'bank', 'paidteleport', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent', 'settings', 'audio'];
+  'equip', 'potion', 'loot', 'shop', 'trash', 'bank', 'paidteleport', 'kefra', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent', 'settings', 'audio'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -45,7 +45,7 @@ export function validateOptions(opt) {
   // Slice 3: shop and bank are private to A and end with their own relogin;
   // chat needs B as the listener and includes the /city teleport commands.
   for (const [p, only] of [['shop', ['enter', 'login', 'shop']], ['trash', ['enter', 'login', 'trash']], ['bank', ['bank', 'enter', 'login']],
-    ['paidteleport', ['enter', 'login', 'paidteleport']],
+    ['paidteleport', ['enter', 'login', 'paidteleport']], ['kefra', ['enter', 'kefra', 'login']],
     ['chat', ['chat', 'enter', 'login', 'second']], ['party', ['enter', 'login', 'party', 'second']],
     ['partychat', ['enter', 'login', 'partychat', 'second']],
     ['guildchat', ['enter', 'guildchat', 'login', 'second']],
@@ -420,6 +420,28 @@ export function checkBank(b) {
 // Paid city portal (Armia -> Noatum): with the price on A the server charges it
 // once and moves A; with less, 0x0290 still leaves the client and nothing
 // changes. The parked gold comes back and the relogin keeps only the charge.
+// Hall of Kefra (issue #343): the Sobrevivente turns the sealed scroll (4127)
+// into entries, each Hall entrance spends one, and the balance panel
+// (_DN_CHANGE_COUNT, "Você pode usar isto %d vezes.") reaches the client.
+// The Sobrevivente answers with the balance even without a scroll (a request
+// of the issue; the legacy stays silent), and the balance survives relogin.
+export function checkKefra(k) {
+  assert(k.exchange.scrollsBefore >= 1, 'A carries no sealed scroll (4127): seed one first');
+  assert.equal(k.exchange.scrollsAfter, k.exchange.scrollsBefore - 1, 'exchange: the scroll did not leave the carry');
+  assert(k.entries.length >= 2, 'fewer than two Hall entries attempted');
+  k.entries.forEach((e, i) => {
+    assert.equal(e.lastSent, 0x290, `entry ${i + 1}: no 0x0290 after OK`);
+    assert(e.inHall, `entry ${i + 1}: A did not reach the Hall`);
+  });
+  assert(Number.isInteger(k.exchange.balance) && k.exchange.balance >= 1, 'exchange: no balance panel');
+  k.entries.forEach((e, i) =>
+    assert.equal(e.balance, k.exchange.balance - (i + 1), `entry ${i + 1}: balance panel differs from one spent entry`));
+  const left = k.exchange.balance - k.entries.length;
+  assert.equal(k.noScroll.balance, left, 'Sobrevivente without a scroll: no balance panel');
+  assert.equal(k.noScroll.scrolls, 0, 'Sobrevivente without a scroll: carry changed');
+  assert.equal(k.relogin.balance, left, 'relogin: balance differs from before');
+}
+
 export function checkPaidTeleport(t, price) {
   assert.equal(t.paid.lastSent, 0x290, 'paid: no 0x0290 after OK');
   assert(t.paid.moved > 50 && t.paid.nearNoatum, 'paid: A did not reach Noatum');

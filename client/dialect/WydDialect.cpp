@@ -193,6 +193,7 @@ enum : unsigned short
 	OpDeleteCharacter = 0x211,
 	OpCharacterLogin = 0x213,
 	OpCharacterLogout = 0x215,
+	OpQuest = 0x28B,
 	OpReqTeleport = 0x290,
 	OpChangeCity = 0x291,
 	OpCreateMob = 0x364,
@@ -1369,6 +1370,9 @@ int WydDialectOutbound(const char* msg, int msgSize, char* out, int outCap, int*
 	case OpCharacterLogout:
 	case OpPing:
 		return OutPass(msgSize, kHeader, op);
+	case OpQuest: // StandardParm2(npc, confirm): a click on a quest NPC (TMFieldScene
+		// MouseClick_QuestNPC); the server reads both ints (handler/misc.go quest).
+		return OutPass(msgSize, static_cast<int>(sizeof(MSG_STANDARDPARM2)), op);
 	case OpReqTeleport: // StandardParm(0); the server reads only the header
 	case OpChangeCity:  // StandardParm(village); the server derives it from the position
 		return OutPass(msgSize, 16, op);

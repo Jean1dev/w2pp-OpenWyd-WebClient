@@ -1,0 +1,507 @@
+{
+ "when": "2026-10-13T18:07:05.854Z",
+ "target": "reseau.proxy.rlwy.net:56950",
+ "clientVersion": 12000,
+ "phases": [
+  "login",
+  "enter",
+  "kefra"
+ ],
+ "accounts": {
+  "A": "web*********",
+  "B": "web*********"
+ },
+ "results": {
+  "login": {
+   "ok": true,
+   "pin": {
+    "sent": true,
+    "result": "lock1"
+   },
+   "slots": [
+    {
+     "filled": true,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    },
+    {
+     "filled": false,
+     "level": 0
+    }
+   ],
+   "ms": 34792,
+   "at": "2026-10-13T18:07:48.738Z"
+  },
+  "enter": {
+   "ok": true,
+   "me": {
+    "id": 1,
+    "name": "Web*******",
+    "x": 2091.5,
+    "y": 2096.5,
+    "hp": 105,
+    "maxHp": 105,
+    "cls": 1,
+    "characterClass": 0,
+    "equip": [
+     1,
+     1103,
+     1115,
+     1127,
+     1139,
+     1151,
+     861,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "look": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     863
+    ]
+   },
+   "score": {
+    "level": 0,
+    "hp": 105,
+    "maxHp": 105,
+    "mp": 105,
+    "maxMp": 105,
+    "damage": 22,
+    "ac": 32
+   },
+   "preview": {
+    "level": 0,
+    "hp": 105,
+    "maxHp": 100,
+    "mp": 105,
+    "maxMp": 100
+   },
+   "dialect": {
+    "inTranslated": 34,
+    "inPass": 2,
+    "inDropUnknown": 0,
+    "inDropSize": 0,
+    "inDropRange": 0,
+    "outTranslated": 3,
+    "outPass": 2,
+    "outDropUnknown": 0,
+    "fieldZeroed": 0,
+    "unmappedNonZero": 0,
+    "inboundFrames": 36,
+    "droppedIn": [],
+    "droppedOut": []
+   },
+   "glErrors": 0,
+   "ms": 22767,
+   "at": "2026-10-13T18:08:21.009Z"
+  },
+  "kefra": {
+   "start": {
+    "sent": {
+     "sent": true,
+     "lastSent": "0x334"
+    },
+    "at": [
+     2366.5,
+     3884.5
+    ]
+   },
+   "exchange": {
+    "scrollsBefore": 1,
+    "npc": 12905,
+    "npcAt": [
+     2370.5,
+     3888.5
+    ],
+    "clicks": [
+     {
+      "hit": true,
+      "lastSent": 651
+     },
+     {
+      "hit": true,
+      "lastSent": 651
+     },
+     {
+      "hit": true,
+      "lastSent": 651
+     }
+    ],
+    "balance": null,
+    "panels": [],
+    "scrolls": 0,
+    "scrollsAfter": 0
+   },
+   "entries": [
+    {
+     "at": [
+      2365.5,
+      3894.5
+     ],
+     "box": true,
+     "ok": 1,
+     "lastSent": 656,
+     "to": [
+      2365.5,
+      3908.5
+     ],
+     "inHall": true,
+     "balance": null,
+     "panels": [],
+     "back": {
+      "sent": {
+       "sent": true,
+       "lastSent": "0x334"
+      },
+      "at": [
+       2366.5,
+       3885.5
+      ]
+     }
+    },
+    {
+     "at": [
+      2364.5,
+      3892.5
+     ],
+     "box": true,
+     "ok": 1,
+     "lastSent": 656,
+     "to": [
+      2364.5,
+      3908.5
+     ],
+     "inHall": true,
+     "balance": null,
+     "panels": [],
+     "back": {
+      "sent": {
+       "sent": true,
+       "lastSent": "0x334"
+      },
+      "at": [
+       2366.5,
+       3886.5
+      ]
+     }
+    },
+    {
+     "at": [
+      2364.5,
+      3892.5
+     ],
+     "box": true,
+     "ok": 1,
+     "lastSent": 656,
+     "to": [
+      2366.5,
+      3907.5
+     ],
+     "inHall": true,
+     "balance": null,
+     "panels": [],
+     "back": {
+      "sent": {
+       "sent": true,
+       "lastSent": "0x334"
+      },
+      "at": [
+       2367.5,
+       3885.5
+      ]
+     }
+    }
+   ],
+   "noScroll": {
+    "npc": 12905,
+    "npcAt": [
+     2370.5,
+     3888.5
+    ],
+    "clicks": [
+     {
+      "hit": true,
+      "lastSent": 651
+     },
+     {
+      "hit": true,
+      "lastSent": 651
+     },
+     {
+      "hit": true,
+      "lastSent": 651
+     }
+    ],
+    "balance": null,
+    "panels": [],
+    "scrolls": 0
+   },
+   "relogin": {
+    "back": {
+     "sent": {
+      "sent": true,
+      "lastSent": "0x334"
+     },
+     "at": [
+      2366.5,
+      3886.5
+     ]
+    },
+    "npc": 12905,
+    "npcAt": [
+     2370.5,
+     3888.5
+    ],
+    "clicks": [
+     {
+      "hit": true,
+      "lastSent": 651
+     },
+     {
+      "hit": true,
+      "lastSent": 651
+     },
+     {
+      "hit": true,
+      "lastSent": 651
+     }
+    ],
+    "balance": null,
+    "panels": [],
+    "scrolls": 0
+   },
+   "ok": false,
+   "error": "exchange: no balance panel",
+   "ms": 491972,
+   "at": "2026-10-13T18:16:42.941Z"
+  }
+ },
+ "ok": false,
+ "node": "v24.14.1",
+ "lock": {
+  "schema_version": 1,
+  "server": {
+   "url": "https://github.com/Jean1dev/w2pp-OpenWYD.git",
+   "commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "historical_commit": "8a14bcc52bbe1636886e0e7e25a7ed735d5570dc"
+  },
+  "upstream": {
+   "url": "https://github.com/alanpetry/OpenWyd.git",
+   "commit": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+  },
+  "toolchains": {
+   "audit_python": "3.14.3",
+   "go": "1.25.13",
+   "go_windows_amd64_sha256": "54a6bbffada82938ac4ae66e354b2e9c04ebdceff96f8d0455406c723b5ed1fc",
+   "emscripten": "6.0.0",
+   "emsdk_node": "22.16.0",
+   "emsdk_python": "3.13.3",
+   "emsdk_commit": "d223ae73c6998296e3ab27cf81dc2c2c9fd383de",
+   "emscripten_release": "772bb4648be4a897ca062d6adc65bc70223d2703",
+   "playwright": "1.54.2 (package.json devDependency)",
+   "railway_cli": "@railway/cli 5.63.1 via npx; read-only use (status, variables, deployment list, logs)"
+  },
+  "gateway": {
+   "module": "gateway/go.mod",
+   "go": "1.25.13",
+   "github.com/coder/websocket": {
+    "version": "v1.8.15",
+    "go_sum": "h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=",
+    "license": "ISC (LICENSE.txt in module)"
+   }
+  },
+  "upstream_patches": {
+   "dir": "patches/openwyd",
+   "apply": "python tools/apply_openwyd_patches.py",
+   "own_sources": [
+    "client/dialect/WydDialect.h",
+    "client/dialect/WydDialect.cpp"
+   ]
+  },
+  "operator_environment": {
+   "railway_project": "08049b1a-6753-4274-b436-0dff658a5df1",
+   "service": "tm-server",
+   "observed_deploy_commit": "98286fdf01202f503523e89d3e50b2183f00c36c",
+   "client_version": 12000,
+   "tcp_proxy": "reseau.proxy.rlwy.net:56950",
+   "observed": "2026-09-28"
+  }
+ },
+ "revisions": {
+  ".": "4087ec478e11e22f600c792e3cdd11e6137048c0",
+  "external/server": "cd5839c854e959f9412d7764b2b7f9e6c71f126f",
+  "external/OpenWyd": "beb9f69bdea6d81f70af14b5ce85ed064575bb26"
+ },
+ "memory": [
+  {
+   "point": "end login",
+   "at": "2026-10-13T18:07:49.239Z",
+   "freeMiB": 1233,
+   "totalMiB": 8014,
+   "browserMiB": 1099,
+   "pages": {
+    "A": {
+     "wasmMiB": 150,
+     "jsMiB": 468
+    }
+   }
+  },
+  {
+   "point": "end enter",
+   "at": "2026-10-13T18:08:21.832Z",
+   "freeMiB": 1108,
+   "totalMiB": 8014,
+   "browserMiB": 1217,
+   "pages": {
+    "A": {
+     "wasmMiB": 259,
+     "jsMiB": 468
+    }
+   }
+  },
+  {
+   "point": "item relogin: before login",
+   "at": "2026-10-13T18:14:31.347Z",
+   "freeMiB": 1174,
+   "totalMiB": 8014,
+   "browserMiB": 259,
+   "pages": {}
+  },
+  {
+   "point": "end kefra",
+   "at": "2026-10-13T18:16:43.415Z",
+   "freeMiB": 1171,
+   "totalMiB": 8014,
+   "browserMiB": 1227,
+   "pages": {
+    "A-kefra-relogin": {
+     "wasmMiB": 216,
+     "jsMiB": 561
+    }
+   }
+  }
+ ],
+ "activePhase": null,
+ "screenshots": [
+  {
+   "name": "field",
+   "file": ".cache/world/2026-10-13T18-07-05-839Z/A-field.png",
+   "sha256": "4f736bd8dde3a9e3c03948c1612a27e86a5f8f8183e7d134bb9a40713e4c08dd"
+  },
+  {
+   "name": "kefra-exchange",
+   "file": ".cache/world/2026-10-13T18-07-05-839Z/A-kefra-exchange.png",
+   "sha256": "4b1bb54e60b8a2eb95c75da96b6afdc8df36524a9666a6416e86c2b1d8279da5"
+  },
+  {
+   "name": "kefra-entry1",
+   "file": ".cache/world/2026-10-13T18-07-05-839Z/A-kefra-entry1.png",
+   "sha256": "f3a42ca328ca9085ef4ac73ed85547ff7038d42684875acc7c6ffd1a0a15bf3f"
+  },
+  {
+   "name": "kefra-entry2",
+   "file": ".cache/world/2026-10-13T18-07-05-839Z/A-kefra-entry2.png",
+   "sha256": "76063a99c0aa2b00eb754117b025a150a250bca139b0afa7e4496080d4873465"
+  },
+  {
+   "name": "kefra-entry3",
+   "file": ".cache/world/2026-10-13T18-07-05-839Z/A-kefra-entry3.png",
+   "sha256": "df4786dfd05d174a31ecbe29a8fba452dae99589565f492fdf7da8f3da402b85"
+  },
+  {
+   "name": "kefra-noscroll",
+   "file": ".cache/world/2026-10-13T18-07-05-839Z/A-kefra-noscroll.png",
+   "sha256": "4f166ae9129a3545cb99f885a8d103ca10758610e4a4bdb4083377026ff28939"
+  },
+  {
+   "name": "kefra-relogin",
+   "file": ".cache/world/2026-10-13T18-07-05-839Z/A-kefra-relogin-kefra-relogin.png",
+   "sha256": "17f03bf9496bd85e2c5b9039f5f9b1cbf99f378333831add5c9854381b1f6c6e"
+  }
+ ],
+ "error": "exchange: no balance panel",
+ "final_A-kefra-relogin": {
+  "inTranslated": 29,
+  "inPass": 27,
+  "inDropUnknown": 0,
+  "inDropSize": 0,
+  "inDropRange": 0,
+  "outTranslated": 4,
+  "outPass": 8,
+  "outDropUnknown": 0,
+  "fieldZeroed": 0,
+  "unmappedNonZero": 0,
+  "inboundFrames": 56,
+  "droppedIn": [],
+  "droppedOut": []
+ },
+ "pageErrors": {
+  "A": [],
+  "A-kefra-relogin": []
+ },
+ "gatewayLog": [
+  {
+   "time": "2026-10-13T15:07:13.6517697-03:00",
+   "msg": "gateway listening"
+  },
+  {
+   "time": "2026-10-13T15:07:14.7934954-03:00",
+   "msg": "chat open"
+  },
+  {
+   "time": "2026-10-13T15:07:38.1686196-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-13T15:14:31.3460333-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 1852,
+   "bytes_down": 17564
+  },
+  {
+   "time": "2026-10-13T15:14:31.3871733-03:00",
+   "msg": "chat closed",
+   "reason": "browser closed"
+  },
+  {
+   "time": "2026-10-13T15:14:32.5695313-03:00",
+   "msg": "chat open"
+  },
+  {
+   "time": "2026-10-13T15:14:53.2963598-03:00",
+   "msg": "relay open"
+  },
+  {
+   "time": "2026-10-13T15:16:52.4649368-03:00",
+   "msg": "chat closed",
+   "reason": "browser closed"
+  },
+  {
+   "time": "2026-10-13T15:16:52.4654796-03:00",
+   "msg": "relay closed",
+   "reason": "browser closed",
+   "bytes_up": 542,
+   "bytes_down": 10488
+  }
+ ]
+}
