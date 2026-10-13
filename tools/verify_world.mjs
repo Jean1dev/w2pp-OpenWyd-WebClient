@@ -44,7 +44,7 @@ import { checkGuildChat, checkParty, checkPartyChat, checkPartyEvidence } from '
 import { fsTraceInit, packageIndex, openedByDir } from './fs_trace.mjs';
 import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  checkEquip, checkPotion, checkLoot, checkShop, checkTrash, checkBank, checkPaidTeleport, checkChat, checkBuff, checkHealOther, checkRestart, checkSettings, checkAudio, checkConcurrent, itemAmount } from './world_checks.mjs';
+  checkEquip, checkPotion, checkLoot, checkShop, checkTrash, checkBank, checkPaidTeleport, checkKefra, checkChat, checkBuff, checkHealOther, checkRestart, checkSettings, checkAudio, checkConcurrent, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -1065,7 +1065,7 @@ async function main() {
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   // Combat adds two walks to the portal and the fight itself.
-  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'trash', 'bank', 'chat', 'party', 'partychat', 'guildchat', 'trade', 'paidteleport', 'settings', 'audio'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
+  const minutes = ['attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea', 'potion', 'loot', 'shop', 'trash', 'bank', 'chat', 'party', 'partychat', 'guildchat', 'trade', 'paidteleport', 'kefra', 'settings', 'audio'].some(x => phases.has(x)) ? 25 : phases.has('tradeedge') || phases.has('restart') ? 60 : 15;
   const deadline = setTimeout(() => stop(`scenario deadline (${minutes} minutes)`), minutes * 60 * 1000);
   const sessions = [];
   const newSession = async (label, creds) => {
@@ -3145,6 +3145,104 @@ async function main() {
       res.relogin = { coin: (await a.bag()).coin };
       await a.healthy();
       checkPaidTeleport(res, PRICE);
+      return res;
+    });
+
+    // Hall of Kefra (issue #343). A must log in carrying a sealed scroll (4127),
+    // seeded in the DB while offline: the GM item packet is not the 28-byte
+    // MSG_CNFGetItem the runtime reads (docs/compatibility.md).
+    await step('kefra', async () => {
+      const res = {}; r.kefra = res;
+      const SCROLL = 4127, KEFRA = [2366, 3885], HALL = [2365, 3907];
+      // Inside the 4x4 Hall entrance block 2364..2367 x 3892..3895 (movement.go).
+      const ENTRY = [2365.5, 3893.5], ENTRIES = 3;
+      const scrolls = async () => a.countItem(await a.bag(), SCROLL);
+      // ASCII part of _DN_CHANGE_COUNT; the last match wins.
+      const balanceIn = texts => {
+        for (const t of [...texts].reverse()) { const m = /pode usar isto (-?\d+) vezes/.exec(t); if (m) return Number(m[1]); }
+        return null;
+      };
+      const waitBalance = async ms => {
+        const panels = [];
+        for (const end = Date.now() + ms; Date.now() < end; await sleep(250)) {
+          panels.push(...await a.panels());
+          if (balanceIn(panels) !== null) break;
+        }
+        return { balance: balanceIn(panels), panels };
+      };
+      const noPortal = async () => {
+        if ((await a.eval(() => Module._wyd_scene_msgbox_message())) !== 16) return;
+        await a.page.locator('#canvas').press('Escape');
+        await a.frames(2);
+      };
+      const toKefra = async () => {
+        const sent = await a.say('/kefra');
+        await a.until('at Kefra', ([x, y]) => Math.hypot(Module._wyd_field_myhuman_x() - x,
+          Module._wyd_field_myhuman_y() - y) <= 6, 30000, KEFRA).catch(() => false);
+        await sleep(3000);
+        await noPortal();
+        const at = await a.me();
+        return { sent, at: [at.x, at.y] };
+      };
+      // A click on the Sobrevivente sends 0x028B; the answer is the panel.
+      const survivor = async label => {
+        await noPortal();
+        await a.panels();
+        const at = await a.me();
+        const near = (await a.mobs()).filter(q => Math.hypot(q.x - at.x, q.y - at.y) <= 20);
+        const npc = near.find(q => /^sobrevivente$/i.test(q.name.trim()));
+        assert(npc, `Sobrevivente not in view at ${at.x},${at.y}: ${near.map(q => q.name.trim()).join(', ')}`);
+        if (npc.d > 4 || !npc.onScreen) await a.walkTo(npc.x, npc.y, { near: 3, maxClicks: 6, stallOk: true });
+        await noPortal();
+        const clicks = [];
+        let got = { balance: null, panels: [] };
+        for (let i = 0; i < 3 && got.balance === null; i++) {
+          const hit = await a.clickHuman(npc.id);
+          clicks.push({ hit, lastSent: await a.lastSent() });
+          if (hit) got = await waitBalance(6000);
+        }
+        await a.shot(`kefra-${label}`);
+        return { npc: npc.id, npcAt: [npc.x, npc.y], clicks, ...got, scrolls: await scrolls() };
+      };
+      const enterHall = async label => {
+        await a.closePanels();
+        await a.panels();
+        await a.walkTo(ENTRY[0], ENTRY[1], { near: 0.8, maxClicks: 12, stallOk: true,
+          stopWhen: () => a.eval(() => Module._wyd_scene_msgbox_message() === 16) });
+        const box = await a.until(`${label} portal box`, () => Module._wyd_scene_msgbox_message() === 16, 20000).catch(() => false);
+        const at = await a.me();
+        await a.shot(`kefra-${label}`);
+        const ok = box ? await a.eval(() => Module._wyd_debug_scene_msgbox_ok()) : null;
+        await a.frames(2);
+        const lastSent = await a.lastSent();
+        await a.until(`${label} in Hall`, ([x, y]) => Math.hypot(Module._wyd_field_myhuman_x() - x,
+          Module._wyd_field_myhuman_y() - y) <= 3, 20000, HALL).catch(() => false);
+        const got = await waitBalance(5000);
+        const to = await a.me();
+        return { at: [at.x, at.y], box: !!box, ok, lastSent, to: [to.x, to.y],
+          inHall: Math.hypot(to.x - HALL[0], to.y - HALL[1]) <= 3, ...got };
+      };
+      res.start = await toKefra();
+      res.exchange = { scrollsBefore: await scrolls() };
+      assert(res.exchange.scrollsBefore >= 1, 'A carries no sealed scroll (4127): seed one first');
+      Object.assign(res.exchange, await survivor('exchange'));
+      res.exchange.scrollsAfter = res.exchange.scrolls;
+      console.log(`    exchange: scrolls ${res.exchange.scrollsBefore}->${res.exchange.scrollsAfter}, panel ${res.exchange.balance}`);
+      res.entries = [];
+      for (let i = 1; i <= ENTRIES; i++) {
+        const e = await enterHall(`entry${i}`);
+        res.entries.push(e);
+        console.log(`    entry ${i}: ${e.at} -> ${e.to}, hall ${e.inHall}, panel ${e.balance}`);
+        e.back = await toKefra();
+      }
+      res.noScroll = await survivor('noscroll');
+      console.log(`    without scroll: panel ${res.noScroll.balance}`);
+      await reloginA('A-kefra-relogin', 0);
+      res.relogin = { back: await toKefra() };
+      Object.assign(res.relogin, await survivor('relogin'));
+      console.log(`    relogin: panel ${res.relogin.balance}`);
+      await a.healthy();
+      checkKefra(res);
       return res;
     });
 

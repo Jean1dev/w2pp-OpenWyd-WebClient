@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, checkAudio, redactEvidence,
-  itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkTrash, checkBank, checkPaidTeleport, checkChat,
+  itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkTrash, checkBank, checkPaidTeleport, checkKefra, checkChat,
   checkSettings, musicCentibels, musicElementVolume, checkConcurrent } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
@@ -343,6 +343,25 @@ test('paid portal charges the price once, refuses without it and keeps the charg
   for (const x of bad) assert.throws(() => checkPaidTeleport({ ...t, ...x }, 700), JSON.stringify(Object.keys(x)));
   validateOptions(options('login,enter,paidteleport'));
   assert.throws(() => validateOptions(options('login,enter,second,paidteleport')));
+});
+
+test('kefra needs the scroll spent, every entry in the Hall with one less, and the balance panel after relogin', () => {
+  const entry = (balance, n) => ({ lastSent: 0x290, inHall: true, balance: balance - n });
+  const k = { exchange: { scrollsBefore: 1, scrollsAfter: 0, balance: 100 },
+    entries: [entry(100, 1), entry(100, 2), entry(100, 3)],
+    noScroll: { balance: 97, scrolls: 0 }, relogin: { balance: 97 } };
+  checkKefra(k);
+  const bad = [
+    { exchange: { ...k.exchange, scrollsBefore: 0, scrollsAfter: 0 } }, { exchange: { ...k.exchange, scrollsAfter: 1 } },
+    { entries: [entry(100, 1)] }, { entries: [entry(100, 1), { ...entry(100, 2), inHall: false }, entry(100, 3)] },
+    { entries: [entry(100, 1), { ...entry(100, 2), lastSent: 0x36c }, entry(100, 3)] },
+    // Before the server fix: the panels never reach the 7662 client.
+    { exchange: { ...k.exchange, balance: null } }, { entries: [entry(100, 1), entry(100, 1), entry(100, 3)] },
+    { noScroll: { balance: null, scrolls: 0 } }, { relogin: { balance: 100 } },
+  ];
+  for (const x of bad) assert.throws(() => checkKefra({ ...k, ...x }), JSON.stringify(Object.keys(x)));
+  validateOptions(options('login,enter,kefra'));
+  assert.throws(() => validateOptions(options('login,enter,second,kefra')));
 });
 
 test('chat needs B to show the line and the whisper from A in full, the /r reply, and the /city commands', () => {
