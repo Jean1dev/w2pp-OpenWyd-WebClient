@@ -1,0 +1,28 @@
+Etapa 5: the Quest 256 arenas never showed the reset countdown. The server
+now sends MSG_StartTime every second to players inside Coveiro, Carbuncle,
+Kaizen, Hidras and Elfos with the seconds left to the 10-minute reset
+(w2pp-OpenWYD #389, handler/quest_area_reset.go), but FrameMove only draws
+the "MM : SS" timer in a fixed list of 128x128 ground blocks and clears
+m_bRankTimeOn anywhere else. Add the five arenas' blocks to that list. The
+timer also shows in the rest of each block, but the server only sends it
+inside the arena. The Windows 7662 region list is not confirmed.
+
+diff --git a/Projects/TMProject/TMFieldScene.cpp b/Projects/TMProject/TMFieldScene.cpp
+--- a/Projects/TMProject/TMFieldScene.cpp
++++ b/Projects/TMProject/TMFieldScene.cpp
+@@ -7914,7 +7914,14 @@ int TMFieldScene::FrameMove(unsigned int dwServerTime)
+ 			|| m_pGround->m_vecOffsetIndex.x == 10 && m_pGround->m_vecOffsetIndex.y == 2
+ 			|| m_pGround->m_vecOffsetIndex.x == 13 && m_pGround->m_vecOffsetIndex.y == 28
+ 			|| m_pGround->m_vecOffsetIndex.x == 14 && m_pGround->m_vecOffsetIndex.y == 28
+-			|| m_pGround->m_vecOffsetIndex.x == 1 && m_pGround->m_vecOffsetIndex.y == 1)
++			|| m_pGround->m_vecOffsetIndex.x == 1 && m_pGround->m_vecOffsetIndex.y == 1
++			// Quest 256 arenas: the server counts down to the 10-minute reset
++			// (Coveiro, Carbuncle, Kaizen, Hidras, Elfos).
++			|| m_pGround->m_vecOffsetIndex.x == 18 && m_pGround->m_vecOffsetIndex.y == 16
++			|| m_pGround->m_vecOffsetIndex.x == 17 && m_pGround->m_vecOffsetIndex.y == 13
++			|| m_pGround->m_vecOffsetIndex.x == 3 && m_pGround->m_vecOffsetIndex.y == 30
++			|| m_pGround->m_vecOffsetIndex.x == 5 && m_pGround->m_vecOffsetIndex.y == 29
++			|| m_pGround->m_vecOffsetIndex.x == 10 && m_pGround->m_vecOffsetIndex.y == 31)
+ 		{
+ 			unsigned int dwElapsedRankTime = dwServerTime - m_dwStartRankTime;
+ 			int nElapsedTime = dwElapsedRankTime / 1000;

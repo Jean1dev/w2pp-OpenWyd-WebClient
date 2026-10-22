@@ -1181,3 +1181,15 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Comandos:** `npm run world:checks` 43/43; `verify_world --phases login,enter,audio` (execuções na evidência).
 - **Não executado:** o mudo no runtime publicado dentro do Field; Safari.
 - **Próximo passo:** respostas do jogador (outra aba ou cliente aberto, caixas de som × microfone, gravação só com o áudio da aba).
+
+### 22/10/2026 — etapa 5: contador das arenas da Quest 256
+
+- **Pedido do usuário:** issue [#389](https://github.com/Jean1dev/w2pp-OpenWYD/issues/389) do servidor, servidor e cliente juntos.
+- **Servidor** (branch `Jean1dev/legacy-parity-batch`): a cada segundo, quem está no Coveiro, Carbuncle, Kaizen, Hidras ou Elfos recebe `MSG_StartTime` (`0x03A1`) com os segundos até o reset de 10 min.
+- **Cliente:** `patches/openwyd/0032-quest256-arena-timer.patch` inclui os blocos (18,16), (17,13), (3,30), (5,29) e (10,31) na lista de regiões do contador (`TMFieldScene::FrameMove`). Fora da lista, o cliente zera `m_bRankTimeOn`, por isso o servidor manda todo segundo.
+- **Comandos e resultados:**
+  - `python tools/apply_openwyd_patches.py`: 0032 aplicado sobre 0001–0031;
+  - `npm run protocol:dialect`: 813 checks, 0 falhas;
+  - `node tools/dev_railway.mjs runtime`: 115 objetos compilados, link sem símbolo indefinido.
+- **Não executado:** verificação visual na arena do Coveiro (depende do deploy do servidor); cliente Windows.
+- **Próximo passo:** depois do deploy, `scenario:coveiro -- --phase handin` no wyd-automation-tests (`startTimeFrames` > 0) e conferir o contador na tela.
