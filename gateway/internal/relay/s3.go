@@ -95,7 +95,12 @@ func (s *s3Assets) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 	switch {
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusForbidden:
-		// A missing key and a key outside the credential's reach look the same.
+		// A missing key and a key outside the credential's reach look the same
+		// to the browser. Only the operator learns of a refusal: a rotated
+		// secret answers 403 SignatureDoesNotMatch for every object (issue #40).
+		if resp.StatusCode == http.StatusForbidden {
+			s.log.Warn("asset storage denied the credential", "path", r.URL.Path, "status", resp.StatusCode)
+		}
 		http.NotFound(w, r)
 		return
 	case resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent &&

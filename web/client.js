@@ -10,6 +10,7 @@ const identityEl = document.getElementById("identity");
 
 const SESSION_EXPIRED = "Sua sessão expirou. Entre novamente pelo portal.";
 const DOWNLOAD_FAILED = "Não foi possível baixar os dados do jogo. Verifique a conexão e tente novamente.";
+const ASSETS_UNAVAILABLE = "Os dados do jogo estão indisponíveis no servidor. Tente novamente mais tarde.";
 const CACHE_WAIT = "Isso leva alguns segundos, e a tela pode parecer parada.";
 
 // Tela de carregamento: mostra só etapas e a contagem de bytes do pacote,
@@ -288,7 +289,14 @@ function loadScript(src) {
     const s = document.createElement("script");
     s.src = src;
     s.onload = resolve;
-    s.onerror = () => reject(new Error(`Não foi possível baixar ${src}. Verifique a conexão e tente novamente.`));
+    // A tag <script> não expõe o status HTTP; um HEAD separa sessão expirada,
+    // dado ausente no servidor (issue #40) e falha de rede.
+    s.onerror = async () => {
+      const status = await fetch(src, { method: "HEAD", cache: "no-store" }).then(r => r.status, () => 0);
+      clientEvidence.errors.push(`${src}: HTTP ${status || "sem resposta"}`);
+      reject(new Error(status === 401 ? SESSION_EXPIRED : status === 404 ? ASSETS_UNAVAILABLE
+        : `Não foi possível baixar ${src}. Verifique a conexão e tente novamente.`));
+    };
     document.body.appendChild(s);
   });
 }

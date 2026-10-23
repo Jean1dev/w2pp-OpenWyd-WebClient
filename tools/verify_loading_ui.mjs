@@ -107,6 +107,9 @@ const server = createServer(async (req, res) => {
     if (scenario === 'cold') return send('application/json', JSON.stringify({ account: 'alice', code: 'abcdefgh29' }));
     res.writeHead(204); return res.end();
   }
+  // Issue #40: o bucket recusa o carregador (404) ou a sessão caiu (401).
+  if (path === '/openwyd_assets.js' && scenario === 'loader404') return send('text/plain', 'not found', 404);
+  if (path === '/openwyd_assets.js' && scenario === 'loader401') return send('text/plain', 'unauthorized', 401);
   if (path === '/openwyd_assets.js') return send('text/javascript', scenario === 'abort' ? 'window.fake = { snapshots: [], mouse: [] };' : fakePackage(scenario));
   if (path === '/runtime.js') return send('text/javascript', fakeRuntime(scenario));
   try {
@@ -218,12 +221,16 @@ try {
 
       // Falhas: mensagem clara e botão de tentar de novo.
       for (const [s, expected] of [['config401', 'Sua sessão expirou'], ['datafail', 'Sua sessão expirou'],
-        ['abort', 'erro interno']]) {
+        ['abort', 'erro interno'], ['loader404', 'indisponíveis no servidor'], ['loader401', 'Sua sessão expirou']]) {
         const page = await visit(s);
         await until(page, () => document.getElementById('loader').classList.contains('failed'));
         const st = await page.evaluate(loaderState);
         check(`${s}: falha visível`, st.failed && !st.hidden && st.stage.includes(expected), st.stage);
         check(`${s}: botão tentar novamente`, st.retry);
+        if (s.startsWith('loader')) {
+          const errors = await page.evaluate(() => clientEvidence.errors);
+          check(`${s}: status registrado`, errors.includes(`openwyd_assets.js: HTTP ${s.slice(6)}`), errors.join('; '));
+        }
         if (s === 'datafail') await page.screenshot({ path: join(OUT, `${name}-failure.png`) });
         await page.context().close();
       }
