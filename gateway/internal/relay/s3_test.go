@@ -44,6 +44,43 @@ func TestS3ObjectURL(t *testing.T) {
 	}
 }
 
+// A rotated secret makes the bucket refuse every object (issue #40): the
+// browser still sees 404, but the operator gets a warning without secrets.
+func TestS3RefusalIsLogged(t *testing.T) {
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/bucket-x/v1/missing.data" {
+			http.Error(w, "<Code>NoSuchKey</Code>", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "<Code>SignatureDoesNotMatch</Code>", http.StatusForbidden)
+	}))
+	defer fake.Close()
+	var logs strings.Builder
+	s := newS3Assets(config.S3Assets{Endpoint: fake.URL, Region: "auto", Bucket: "bucket-x", Prefix: "v1",
+		URLStyle: "path", AccessKeyID: "key-id", SecretAccessKey: "secret-value"}, time.Second,
+		slog.New(slog.NewTextHandler(&logs, nil)))
+
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/missing.data", nil))
+	if rec.Code != http.StatusNotFound || logs.Len() != 0 {
+		t.Fatalf("missing key: %d, log %q", rec.Code, logs.String())
+	}
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/openwyd_assets.js", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("refused: %d", rec.Code)
+	}
+	got := logs.String()
+	if !strings.Contains(got, "denied") || !strings.Contains(got, "status=403") || !strings.Contains(got, "path=/openwyd_assets.js") {
+		t.Fatalf("refusal not logged: %q", got)
+	}
+	for _, leak := range []string{"secret-value", "key-id", "Signature", fake.URL} {
+		if strings.Contains(got, leak) {
+			t.Fatalf("log leaks %q: %q", leak, got)
+		}
+	}
+}
+
 func TestS3AssetsStreamThroughGateway(t *testing.T) {
 	var seen []*http.Request
 	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

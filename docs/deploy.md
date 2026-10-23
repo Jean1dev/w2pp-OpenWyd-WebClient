@@ -41,7 +41,7 @@ Todas as rotas, exceto `/healthz`, exigem a credencial Basic, inclusive a abertu
 | `WYD_ASSET_S3_REGION` | `auto` | |
 | `WYD_ASSET_S3_URL_STYLE` | `virtual-host` | |
 | `WYD_ASSET_S3_BUCKET` | nome interno do bucket | |
-| `WYD_ASSET_S3_ACCESS_KEY_ID`, `WYD_ASSET_S3_SECRET_ACCESS_KEY` | secretas | definidas por stdin a partir da CLI; se forem rotacionadas (`--reset`), redefina-as |
+| `WYD_ASSET_S3_ACCESS_KEY_ID`, `WYD_ASSET_S3_SECRET_ACCESS_KEY` | secretas | definidas por stdin a partir da CLI; se forem rotacionadas (`--reset`), redefina as duas na hora. Em 22/10 o secret mudou e o ID não; o jogo ficou fora do ar até 23/10 ([issue #40](evidence/08-entrega/2026-10-23-issue-40.md)) |
 | `WYD_ASSET_S3_PREFIX`, `WYD_ASSET_MANIFEST` | `assets-a457267b6cd82874`, `a457267b6cd82874` (09/10) | versão ativa dos assets |
 
 Gate por conta do portal ([ADR 015](decisions/015-portal-account-gate.md)), alternativa exclusiva ao Basic. **Ativo em produção desde 02/10** (deploy `82f3850`); `WYD_BASIC_AUTH_*` foram removidas:
@@ -116,6 +116,8 @@ GET /client.html (sem credencial)  -> 401
 GET /config.json (com credencial)  -> wsUrl wss://<domínio>/ws/server, sem host do tm-server
 GET /openwyd_assets.data           -> 200, application/octet-stream; Range -> 206
 ```
+
+Se todos os assets derem 404, procure `asset storage denied the credential` no log do serviço. Esse warn indica que o bucket recusou a assinatura (403): credencial rotacionada ou errada, não objeto ausente.
 
 Localmente, contra o bucket real (29/09): `.js` 200, Range 206, ausente 404, sem senha 401, e o `.data` de 320 MB chegou pelo gateway com o SHA-256 do manifesto ([evidências](evidence/08-entrega/README.md)).
 

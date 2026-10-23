@@ -1193,3 +1193,18 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
   - `node tools/dev_railway.mjs runtime`: 115 objetos compilados, link sem símbolo indefinido.
 - **Não executado:** verificação visual na arena do Coveiro (depende do deploy do servidor); cliente Windows.
 - **Próximo passo:** depois do deploy, `scenario:coveiro -- --phase handin` no wyd-automation-tests (`startTimeFrames` > 0) e conferir o contador na tela.
+
+### 23/10/2026 — issue #40: assets fora do ar (secret do bucket rotacionado)
+
+- **Sintoma:** o loader parava em "Não foi possível baixar openwyd_assets.js". Todo objeto do bucket dava 404 desde 22/10 ~02h UTC.
+- **Causa (confirmado em execução):** o secret do bucket `arranged-orb` foi rotacionado e o access key ID não mudou. `WYD_ASSET_S3_SECRET_ACCESS_KEY` ficou antigo, e o bucket respondia 403 `SignatureDoesNotMatch`, convertido em 404 sem log. O bucket estava íntegro (32 objetos). [Evidência](evidence/08-entrega/2026-10-23-issue-40.md).
+- **Correção operacional:** a variável foi redefinida por stdin com as credenciais atuais. O deploy `50211c83` (`main`) saiu com SUCCESS e levou também o patch 0032 (Quest 256), cujo deploy de 22/10 (`51bacf29`) tinha falhado sem log. Depois disso: `openwyd_assets.js` 200 (529.643 bytes), `manifest.json` 200, `.data` com Range 206 (total 319.802.941).
+- **Código:**
+  - `gateway/internal/relay/s3.go` registra um warn no 403 do bucket (teste `TestS3RefusalIsLogged`);
+  - `web/client.js` mostra a mensagem certa para 401 e 404 do carregador (cenários `loader404`/`loader401`).
+- **Comandos:** gateway `go vet` + `go test -count=1 ./...` ok (sem `-race`: sem cgo local); `npm run loading:ui` 66/66.
+- **Não executado:** abrir o jogo no navegador até o login depois do deploy; deploy do código novo (gateway/cliente) — vai no próximo deploy do `main`.
+- **Autoria da rotação (confirmado em execução):** o audit log do workspace registra `BucketInstanceCredential.regenerated` em 21/10 23:26:16 UTC com `actor: "railway"` (a plataforma, não um usuário). No mesmo segundo houve a mesma regeneração para outro bucket do workspace. O motivo não aparece no log.
+- **Pendente:**
+  - remover da issue #40 (pública) o cookie de sessão colado no curl;
+  - checar se o outro bucket regenerado tem serviço com o secret antigo.
