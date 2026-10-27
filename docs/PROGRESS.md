@@ -1208,3 +1208,28 @@ Estados permitidos: Pendente, Em andamento, Bloqueada (motivo específico), Vali
 - **Pendente:**
   - remover da issue #40 (pública) o cookie de sessão colado no curl;
   - checar se o outro bucket regenerado tem serviço com o secret antigo.
+
+### 27/10/2026 — issue #42: música do login duplicada no jogo
+
+- **Pedido do usuário:** issue [#42](https://github.com/Jean1dev/w2pp-OpenWyd-WebClient/issues/42). Depois do login, a música da tela de login continua tocando junto com a do mapa.
+- **Causa (confirmado em fonte e em execução):**
+  - `WydWebMusicPlayPath` registrava sempre um `play()` em `pointerdown`/`keydown` e nunca o removia;
+  - a faixa substituída só perdia o `src`, que não descarrega o recurso;
+  - sem gesto no login, o primeiro clique ou tecla no Field retomava a `login.mp3`.
+  - [Evidência](evidence/07-web/2026-10-27-musica-duplicada.md).
+- **Correção:** `patches/openwyd/0033-music-single-track.patch`. O reenvio por gesto só existe com autoplay bloqueado e só toca a faixa atual; é removido na troca e no stop; a faixa antiga é descarregada com `load()`.
+- **Arquivos:**
+  - o patch 0033;
+  - `tools/verify_world.mjs` (fase `music`);
+  - `tools/world_checks.mjs` e `world_checks.test.mjs` (`checkSingleMusic`);
+  - a evidência e este progresso.
+- **Comandos e resultados:**
+  - `python tools/apply_openwyd_patches.py`: 0033 aplicado sobre 0001–0032;
+  - `node tools/dev_railway.mjs runtime`: 115 objetos, nenhum símbolo indefinido;
+  - `npm run world:checks`: 45/45;
+  - `verify_world --phases login,enter,music` no Railway: **antes**, `login.mp3` tocando com a faixa do mapa nas três janelas (0,178 no relogin); **depois**, só a faixa atual.
+- **Não executado:**
+  - `settings` e `audio` com o runtime novo (`settings` interrompida por falta de memória na máquina);
+  - Firefox e Safari;
+  - domínio público.
+- **Próximo passo:** rodar `settings` e `audio`; PR, deploy e conferir pelo portal.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, checkAudio, redactEvidence,
   itemAmount, checkEquip, checkPotion, checkLoot, checkInventoryRelogin, checkShop, checkTrash, checkBank, checkPaidTeleport, checkKefra, checkChat,
-  checkSettings, musicCentibels, musicElementVolume, checkConcurrent } from './world_checks.mjs';
+  checkSettings, musicCentibels, musicElementVolume, checkConcurrent, checkSingleMusic } from './world_checks.mjs';
 
 test('redaction removes nested diagnostic strings without corrupting JSON numbers', () => {
   const value = { error: 'fixture-secret', nested: ['prefix fixture-secret suffix'], x: 123456 };
@@ -425,6 +425,21 @@ test('audio: muted effects start no audible sound, in town and in combat, also m
   bad({ unmutedAgain: w(0, 0) });
   assert.throws(() => validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,enter,second,audio' }));
   validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,enter,audio' });
+});
+
+test('music: after a click and a key in the Field only the current track plays', () => {
+  const w = (...playing) => ({ level: 50, created: 3, current: 'Field.mp3',
+    playing: playing.map(([track, current]) => ({ track, current, volume: 0.126 })) });
+  const ok = { first: w(['Field.mp3', true]), relogin: w(['Field.mp3', true]), zone: w(['Field.mp3', true]) };
+  checkSingleMusic(ok);
+  const bad = patch => assert.throws(() => checkSingleMusic({ ...ok, ...patch }));
+  // Issue #42: the login track resumed by a pending gesture listener.
+  bad({ first: w(['Login.mp3', false], ['Field.mp3', true]) });
+  bad({ relogin: w(['Login.mp3', false]) });
+  bad({ zone: w() });
+  bad({ zone: { ...w(['Field.mp3', true]), created: 1 } });
+  assert.throws(() => validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,enter,second,music' }));
+  validateOptions({ target: 'h:1', 'client-version': '12000', class: '0', phases: 'login,enter,music' });
 });
 
 test('concurrent: the duplicate login is refused to try again, the first session closed, the retry enters the same character', () => {

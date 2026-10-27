@@ -1,0 +1,78 @@
+The web music track is an HTMLAudioElement. Each track registered a one-shot
+pointerdown/keydown play() even when autoplay had worked, never removed it on
+a track change or stop, and only removed src from the replaced element, which
+keeps the loaded resource. The portal's automatic login has no gesture, so the
+first click or key in the Field resumed the login music under the zone music
+(issue #42). Now the gesture retry is registered only when autoplay is blocked,
+plays only the current unstopped track, is removed on replace and stop, and a
+replaced element is unloaded with load(). Windows build unchanged.
+
+diff --git a/webclient/client-wasm/compat/src/win32_emscripten_stubs.cpp b/webclient/client-wasm/compat/src/win32_emscripten_stubs.cpp
+--- a/webclient/client-wasm/compat/src/win32_emscripten_stubs.cpp
++++ b/webclient/client-wasm/compat/src/win32_emscripten_stubs.cpp
+@@ -1697,10 +1697,18 @@ EM_JS(int, WydWebMusicPlayPath, (const char* path, int volume), {
+   while (relativePath.startsWith('/')) relativePath = relativePath.slice(1);
+   if (!relativePath || relativePath.includes('..')) return 0;
+ 
++  // A replaced track must never play again: drop its pending gesture unlock
++  // and unload it (removing src alone keeps the loaded resource, and a later
++  // play() resumes it under the new track).
+   const previous = Module.wydMusic || null;
++  if (previous?.unlock && typeof document !== 'undefined') {
++    document.removeEventListener('pointerdown', previous.unlock, true);
++    document.removeEventListener('keydown', previous.unlock, true);
++  }
+   if (previous?.audio) {
+     previous.audio.pause();
+     previous.audio.removeAttribute('src');
++    previous.audio.load();
+   }
+   if (previous?.objectUrl && previous.url) URL.revokeObjectURL(previous.url);
+ 
+@@ -1718,22 +1726,39 @@ EM_JS(int, WydWebMusicPlayPath, (const char* path, int volume), {
+   audio.loop = true;
+   audio.preload = 'auto';
+   audio.volume = volume <= -10000 ? 0 : Math.min(1, Math.max(0, Math.pow(10, volume / 2000)));
+-  Module.wydMusic = {audio, url, objectUrl: false, volume: volume | 0};
++  const music = {audio, url, objectUrl: false, volume: volume | 0, stopped: false, unlock: null};
++  Module.wydMusic = music;
+   audio.addEventListener('error', () => {
+     console.error(`[openwyd-audio] could not stream ${relativePath}`);
+   }, {once: true});
+-  const start = () => audio.play().catch(() => {});
+-  start();
+-  if (typeof document !== 'undefined') {
+-    document.addEventListener('pointerdown', start, {once: true, capture: true, passive: true});
+-    document.addEventListener('keydown', start, {once: true, capture: true, passive: true});
+-  }
++  // Autoplay blocked: retry on the first gesture, only while this is still the
++  // current, unstopped track.
++  const unlock = () => {
++    if (typeof document !== 'undefined') {
++      document.removeEventListener('pointerdown', unlock, true);
++      document.removeEventListener('keydown', unlock, true);
++    }
++    if (music.unlock === unlock) music.unlock = null;
++    if (Module.wydMusic === music && !music.stopped) audio.play().catch(() => {});
++  };
++  audio.play().catch(() => {
++    if (Module.wydMusic !== music || music.stopped || typeof document === 'undefined') return;
++    music.unlock = unlock;
++    document.addEventListener('pointerdown', unlock, {capture: true, passive: true});
++    document.addEventListener('keydown', unlock, {capture: true, passive: true});
++  });
+   return 1;
+ });
+ 
+ EM_JS(void, WydWebMusicStop, (), {
+   const music = Module.wydMusic;
+   if (!music?.audio) return;
++  music.stopped = true;
++  if (music.unlock && typeof document !== 'undefined') {
++    document.removeEventListener('pointerdown', music.unlock, true);
++    document.removeEventListener('keydown', music.unlock, true);
++    music.unlock = null;
++  }
+   music.audio.pause();
+   music.audio.currentTime = 0;
+ });
