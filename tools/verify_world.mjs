@@ -24,6 +24,8 @@
 //   trade     A trades an item and gold to B by the original window; refusal, check reset, cancel, relogin, return
 //   delete    B creates a throwaway character, a wrong password is refused, the right one deletes it; relogin
 //   concurrent A's account logs in a second time while A is in the Field
+//   music     A clicks and presses a key in the Field after login, relogin and a zone
+//             change; only the current music track plays (issue #42)
 //   settings  A uses the page's settings panel: live music/effects, mute across a
 //             zone change, relogin in the same profile, 1024x768/1280x1024/fit
 //
@@ -44,7 +46,7 @@ import { checkGuildChat, checkParty, checkPartyChat, checkPartyEvidence } from '
 import { fsTraceInit, packageIndex, openedByDir } from './fs_trace.mjs';
 import { checkTradeSwap, checkTradeReset, checkTradeEvidence, checkTradeEdge, sellPrice, checkDelete } from './trade_checks.mjs';
 import { validateOptions, checkHealth, checkPreview, checkArmiaSpawn, checkTeleport, checkCombat, checkCombatRelogin, checkRespawn, checkGrind, checkLearn, checkCast, redactEvidence,
-  checkEquip, checkPotion, checkLoot, checkShop, checkTrash, checkBank, checkPaidTeleport, checkKefra, checkChat, checkBuff, checkHealOther, checkRestart, checkSettings, checkAudio, checkConcurrent, itemAmount } from './world_checks.mjs';
+  checkEquip, checkPotion, checkLoot, checkShop, checkTrash, checkBank, checkPaidTeleport, checkKefra, checkChat, checkBuff, checkHealOther, checkRestart, checkSettings, checkAudio, checkSingleMusic, checkConcurrent, itemAmount } from './world_checks.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const CACHE = join(ROOT, '.cache');
@@ -173,6 +175,19 @@ function audioTraceInit() {
   };
 }
 
+// Phase music: every music element the page creates (WydWebMusicPlayPath uses
+// new Audio), so a replaced track that plays again is still found.
+function musicTraceInit() {
+  window.__music = [];
+  const Native = window.Audio;
+  window.Audio = function (...args) {
+    const el = new Native(...args);
+    window.__music.push(el);
+    return el;
+  };
+  window.Audio.prototype = Native.prototype;
+}
+
 class Session {
   constructor(browser, origin, label, creds) {
     this.browser = browser; this.origin = origin; this.label = label; this.creds = creds;
@@ -183,6 +198,7 @@ class Session {
     this.context = await this.browser.newContext({ viewport: { width: 1024, height: 768 } });
     if (opt['trace-files']) await this.context.addInitScript(fsTraceInit);
     if (phases.has('audio')) await this.context.addInitScript(audioTraceInit);
+    if (phases.has('music')) await this.context.addInitScript(musicTraceInit);
     this.page = await this.context.newPage();
     this.connected = false;
     this.page.on('websocket', ws => {
@@ -1551,6 +1567,58 @@ async function main() {
       const unmutedAgain = await window_('unmuted again', fight);
       const res = { unmuted, fightUnmuted, muted, fightMuted, bootMuted, fightBootMuted, unmutedAgain };
       checkAudio(res);
+      return res;
+    });
+
+    // Issue #42: the login music kept playing under the zone music. The harness
+    // logs in through exports, with no gesture, as the portal's automatic login;
+    // the first click and key in the Field come after the zone music started.
+    // Default autoplay policy: the gesture is what unlocks the music, as for a player.
+    await step('music', async () => {
+      const pg = a.page;
+      const panel = pg.locator('details.wyd-settings');
+      const setOpen = async open => {
+        if ((await panel.evaluate(d => d.open)) !== open) await panel.locator('summary').click();
+        await a.frames(1);
+      };
+      const enterAgain = async () => {
+        await a.loginToSelect();
+        const pin = await a.pin();
+        assert.equal(pin.result, 'lock1', 'relogin PIN rejected');
+        return a.enter(0);
+      };
+      const tracks = () => a.eval(() => {
+        const cur = Module.wydMusic?.audio ?? null;
+        const name = el => (el.currentSrc || el.src || '').split('/').pop() || null;
+        return { level: Module._wyd_audio_get_level(1), created: window.__music.length, current: cur ? name(cur) : null,
+          playing: window.__music.filter(el => !el.paused && !el.ended)
+            .map(el => ({ track: name(el), current: el === cur, volume: Math.round(el.volume * 1000) / 1000 })) };
+      });
+      const window_ = async label => {
+        await a.until('zone music element', () => !!Module.wydMusic?.audio, 30000);
+        await a.walk(140, 60);
+        await pg.keyboard.press('Control');
+        await sleep(2000);
+        const out = await tracks();
+        console.log(`    ${label}: ${out.created} created, playing ${out.playing.map(p => p.track + (p.current ? '' : ' (replaced)')).join(', ') || 'none'}`);
+        return out;
+      };
+
+      await a.closePanels();
+      // An audible level for the relogin: the packaged Config.bin may hold 0.
+      await setOpen(true);
+      await pg.locator('#wyd-music').fill('50');
+      await setOpen(false);
+      const first = await window_('first entry');
+      await a.reload();
+      await enterAgain();
+      const relogin = await window_('relogin');
+      const plays = await a.eval(() => Module._wyd_audio_music_play_calls());
+      await a.toArmiaField();
+      await a.until('zone music restarted', n => Module._wyd_audio_music_play_calls() > n, 30000, plays);
+      const zone = await window_('zone change');
+      const res = { first, relogin, zone };
+      try { checkSingleMusic(res); } catch (e) { e.trail = res; throw e; }
       return res;
     });
 

@@ -15,7 +15,7 @@ export function redactEvidence(value, secrets) {
 
 export const PHASES = ['badpass', 'badpin', 'classes', 'login', 'create', 'enter',
   'inventory', 'second', 'move', 'logout', 'mapchange', 'attack', 'death', 'grind', 'learn', 'cast', 'buff', 'healother', 'castarea',
-  'equip', 'potion', 'loot', 'shop', 'trash', 'bank', 'paidteleport', 'kefra', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent', 'settings', 'audio'];
+  'equip', 'potion', 'loot', 'shop', 'trash', 'bank', 'paidteleport', 'kefra', 'chat', 'party', 'partychat', 'guildchat', 'restart', 'trade', 'tradeedge', 'delete', 'concurrent', 'settings', 'audio', 'music'];
 
 export function validateOptions(opt) {
   assert.match(opt.target ?? '', /^[a-zA-Z0-9.-]+:[0-9]+$/, '--target host:port is required');
@@ -62,6 +62,10 @@ export function validateOptions(opt) {
   if (phases.has('audio'))
     assert([...phases].every(n => ['login', 'create', 'enter', 'audio'].includes(n)) && phases.has('enter'),
       'audio runs only with login,[create,]enter');
+  // Issue #42, one music track at a time; reloads A's page, alone.
+  if (phases.has('music'))
+    assert([...phases].every(n => ['login', 'create', 'enter', 'music'].includes(n)) && phases.has('enter'),
+      'music runs only with login,[create,]enter');
   const deps = { create: ['login'], enter: ['login'], inventory: ['enter'], second: ['enter'],
     move: ['second'], logout: ['second'], mapchange: ['second'], attack: ['second'], death: ['second'], grind: ['login'], learn: ['login'], cast: ['login'], buff: ['login'], healother: ['login'], loot: ['login'], concurrent: ['enter'] };
   for (const name of phases) for (const dep of deps[name] ?? [])
@@ -623,4 +627,17 @@ export function checkAudio(a) {
   assert.equal(a.fightMuted.audible, 0, `fight muted: ${a.fightMuted.audible} effect sounds audible`);
   assert.equal(a.fightBootMuted.audible, 0, `fight muted at boot: ${a.fightBootMuted.audible} effect sounds audible`);
   assert(a.unmutedAgain.audible > 0, 'unmuted again: effects stayed silent');
+}
+
+// Issue #42: the login music kept playing under the zone music. Each window
+// lists every music element the page created that is playing after a click and
+// a key in the Field; only the runtime's current track may play.
+export function checkSingleMusic(m) {
+  for (const [what, w] of Object.entries(m)) {
+    assert(w.created >= 2, `${what}: ${w.created} music elements, no track change to prove anything`);
+    assert(w.current, `${what}: no current music track`);
+    const names = w.playing.map(p => p.track).join(', ');
+    assert(w.playing.every(p => p.current), `${what}: a replaced track still plays (${names})`);
+    assert.equal(w.playing.length, 1, `${what}: ${w.playing.length} tracks playing (${names})`);
+  }
 }
